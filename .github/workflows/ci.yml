@@ -1,8 +1,9 @@
 name: CI
 
-# Once a night and by hand only, never per push or pull request. This repo is private on GitHub's
-# free plan (2,000 Actions minutes a month). On another project, CI on every push and PR used up a
-# whole month's minutes in one week, and after that GitHub refused to run any build at all. The
+# Once a night and by hand only, never per push or pull request. This repo is public now (no minute
+# limit), but private repos on GitHub's free plan share 2,000 Actions minutes a month: on another
+# project, CI on every push and PR used them up in one week, and after that GitHub refused to run
+# any build at all. Nightly stays the policy, also if this repo goes private again. The
 # local check before each merge is the real gate (CLAUDE.md); this run is only a nightly safety net.
 # Don't add push or pull_request triggers back. "Run workflow" on the Actions tab checks at once.
 on:
