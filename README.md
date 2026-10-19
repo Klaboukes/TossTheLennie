@@ -4,6 +4,8 @@ Grab Lennie, a ragdoll, by any limb and fling him around a three-storey family h
 
 Built with [three.js](https://threejs.org/) (rendering) and [cannon-es](https://github.com/pmndrs/cannon-es) (ragdoll physics). Both load from a CDN, so there's no build step.
 
+**Play it:** https://klaboukes.github.io/TossTheLennie/
+
 ## Run it
 
 Any static file server works. With Python:

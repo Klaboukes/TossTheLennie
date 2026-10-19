@@ -13,6 +13,9 @@ python -m http.server 5173   # serve the game, then open http://localhost:5173 (
 node tests/check.mjs         # quick code check: modules parse, imports resolve, index.html links exist (needs Node 20+)
 ```
 
+## Hosting
+GitHub Pages serves `main` as it is at https://klaboukes.github.io/TossTheLennie/, a minute or so after each push (GitHub's own *pages build and deployment* run, free for a public repo and separate from `ci.yml`). `.nojekyll` stops GitHub from processing the files first. Every path in the game must stay relative (`src/main.js`, not `/src/main.js`), because the game lives in the `/TossTheLennie/` subfolder there.
+
 ## Before merging
 The local run is the merge gate: run `node tests/check.mjs` (when Node is installed) and play the change in the browser, with no errors in the console. Nothing on GitHub checks a pull request.
 
