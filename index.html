@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Toss the Lennie</title>
+  <meta name="description" content="Grab Lennie by a limb and fling him around a three-storey family house: down the stairs, through the rooms and out of the windows. Score points for how contorted he ends up." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+        "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <!-- Score: one compact pill, top left -->
+  <div id="scorebox" class="glass">
+    <h1 class="brand">Toss <span>the</span> Lennie</h1>
+    <div class="score">
+      <div class="score-main"><span id="stat-total">0</span><small>pts</small></div>
+      <div class="score-sub">
+        Best <b id="stat-best">0</b><i>·</i>Last <b id="stat-last">–</b><i>·</i><b id="stat-tosses">0</b> tosses
+      </div>
+    </div>
+  </div>
+
+  <!-- All controls: one icon toolbar, top right -->
+  <nav id="toolbar" class="glass" aria-label="Game controls">
+    <div class="tb-group">
+      <button id="btn-drop" class="icon-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="drop-menu" data-tip="Drop Lennie on… (1–4)" aria-label="Drop Lennie on a floor">
+        <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5 12 14l4.5-4.5M4 20h16"/></svg>
+      </button>
+      <button id="btn-reset" class="icon-btn" data-tip="Reset: fix windows, Lennie downstairs (R)" aria-label="Reset">
+        <svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4v4h4"/></svg>
+      </button>
+    </div>
+    <span class="tb-sep"></span>
+    <div class="tb-group">
+      <button id="btn-focus" class="icon-btn" data-tip="Focus on Lennie (F)" aria-label="Focus camera on Lennie">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8" class="fill"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>
+      </button>
+      <button id="btn-follow" class="icon-btn" aria-pressed="false" data-tip="Camera follows Lennie (G)" aria-label="Camera follows Lennie">
+        <svg viewBox="0 0 24 24"><rect x="3" y="7" width="12" height="10" rx="2.5"/><path d="m15 11 6-3.2v8.4L15 13"/></svg>
+      </button>
+      <button id="btn-cutaway" class="icon-btn" aria-pressed="true" data-tip="Cutaway: hide upper floors (C)" aria-label="Cutaway view">
+        <svg viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8 12 3.5Z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5" class="dash"/><path d="m3.5 16.5 8.5 4.5 8.5-4.5" class="dash"/></svg>
+      </button>
+      <button id="btn-slowmo" class="icon-btn" aria-pressed="false" data-tip="Slow motion (Z)" aria-label="Slow motion">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 8.5V13l3 2M9.5 2.5h5"/></svg>
+      </button>
+    </div>
+    <span class="tb-sep"></span>
+    <div class="tb-group">
+      <button id="btn-sound" class="icon-btn" aria-pressed="true" data-tip="Sound (M)" aria-label="Sound">
+        <svg viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10" class="sound-on"/><path d="m16 9.5 5 5M21 9.5l-5 5" class="sound-off"/></svg>
+      </button>
+      <button id="btn-help" class="icon-btn" aria-expanded="false" aria-controls="help" data-tip="How to play (H)" aria-label="How to play">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6"/><circle cx="12" cy="17" r=".6" class="fill"/></svg>
+      </button>
+    </div>
+
+    <div id="drop-menu" class="menu" role="menu" hidden>
+      <div class="menu-title">Drop Lennie on</div>
+      <button role="menuitem" data-drop="3">Roof<kbd>4</kbd></button>
+      <button role="menuitem" data-drop="2">Floor 3 · study &amp; bathroom<kbd>3</kbd></button>
+      <button role="menuitem" data-drop="1">Floor 2 · bedrooms<kbd>2</kbd></button>
+      <button role="menuitem" data-drop="0">Floor 1 · living room &amp; kitchen<kbd>1</kbd></button>
+    </div>
+  </nav>
+
+  <!-- Contortion meter + status: one slim pill, bottom centre -->
+  <div id="meter" class="glass">
+    <div class="meter-row">
+      <span class="meter-label">Contortion</span>
+      <div class="meter-track"><div id="meter-fill" class="meter-fill"></div></div>
+      <span id="meter-value" class="meter-value">0%</span>
+    </div>
+    <div id="toss-status" class="status">Grab one of Lennie's limbs and fling him!</div>
+  </div>
+
+  <aside id="result" class="glass" aria-live="polite">
+    <div class="r-head">
+      <span id="r-title">Toss #1</span>
+      <span id="r-rating" class="r-rating"></span>
+    </div>
+    <div id="r-total" class="r-total">0</div>
+    <ul id="r-lines" class="r-lines"></ul>
+    <div id="r-foot" class="r-foot"></div>
+  </aside>
+
+  <div id="help" class="glass" role="dialog" aria-labelledby="help-title" hidden>
+    <h2 id="help-title">How to play</h2>
+    <p class="help-lede">Grab Lennie by a limb and fling him through the house. When he comes to rest you score: the more contorted, the more points. Bounces, mid-air catches and smashed windows multiply it.</p>
+    <dl class="help-keys">
+      <dt>Drag a limb</dt><dd>grab, flick and let go</dd>
+      <dt>Scroll while holding</dt><dd>push him away or pull him closer</dd>
+      <dt>Drag empty space</dt><dd>orbit the camera</dd>
+      <dt>Right-drag · Scroll</dt><dd>pan · zoom</dd>
+      <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>Q</kbd><kbd>E</kbd></dt><dd>fly the camera</dd>
+      <dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>drop Lennie on floor 1–3 or the roof</dd>
+      <dt><kbd>R</kbd></dt><dd>reset (fix windows, Lennie downstairs)</dd>
+      <dt><kbd>F</kbd> <kbd>G</kbd> <kbd>C</kbd> <kbd>Z</kbd> <kbd>M</kbd></dt><dd>focus · follow · cutaway · slow-mo · sound</dd>
+    </dl>
+    <button id="help-close" class="help-close">Let's toss!</button>
+  </div>
+
+  <div id="toast" role="status"></div>
+  <div id="pops"></div>
+
+  <noscript>Toss the Lennie needs JavaScript and WebGL.</noscript>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
