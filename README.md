@@ -65,3 +65,11 @@ Walls and floors between the camera and the point it's looking at fade out autom
 - `src/scoring.js`: contortion measurement, trick detection and the multiplier
 - `src/guard.js`: safety net that puts Lennie back in one piece if a limb ever ends up inside a wall or floor
 - `src/audio.js`: synthesized sound effects
+
+## License
+
+Copyright (C) 2026 Klaboukes
+
+Toss the Lennie is free software: you can redistribute it and/or modify it under the terms of the [GNU General Public License](LICENSE) as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; see the license for details.
+
+three.js and cannon-es are separate projects under the MIT License.
