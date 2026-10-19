@@ -1,0 +1,73 @@
+name: CI
+
+# Once a night and by hand only, never per push or pull request. This repo is private on GitHub's
+# free plan (2,000 Actions minutes a month). On another project, CI on every push and PR used up a
+# whole month's minutes in one week, and after that GitHub refused to run any build at all. The
+# local check before each merge is the real gate (CLAUDE.md); this run is only a nightly safety net.
+# Don't add push or pull_request triggers back. "Run workflow" on the Actions tab checks at once.
+on:
+  schedule:
+    - cron: '0 3 * * *'   # 03:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read   # to find the last successful run
+
+jobs:
+  check:
+    name: Check the game's code
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Check when anything but documentation, Claude settings or scripts changed since the last
+      # successful run (or there is none, or it was started by hand).
+      - name: Anything to check?
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          last=$(gh run list --workflow ci.yml --branch main --status success --limit 1 \
+            --json headSha --jq '.[0].headSha // ""')
+          if [ "${{ github.event_name }}" = workflow_dispatch ] || [ -z "$last" ] \
+            || ! git cat-file -e "$last^{commit}" 2>/dev/null; then
+            build=true
+          elif git diff --name-only "$last" HEAD \
+            | grep -qvE '\.md$|^docs/|^\.claude/|^scripts/'; then
+            build=true
+          else
+            build=false
+            echo "Only documentation changed since $last: nothing to check."
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
+      # No dependency cache: the game has no dependencies (three.js and cannon-es come from a CDN
+      # at play time), so there is nothing to download or cache. Add `cache: npm` here if a
+      # package-lock.json ever appears.
+      - uses: actions/setup-node@v6
+        if: steps.changes.outputs.build == 'true'
+        with:
+          node-version: 22
+
+      - name: Check modules, imports and links
+        if: steps.changes.outputs.build == 'true'
+        run: node tests/check.mjs
+
+      # Nothing is uploaded when the check passes: the free plan's artifact storage is small.
+      - name: Upload report on failure
+        if: failure() && steps.changes.outputs.build == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: check-report
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 3
