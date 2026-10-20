@@ -26,6 +26,16 @@ const DOOR_BREAK_SPEED = 7;
 const DOOR_CRACK_SPEED = GLASS_BREAK_SPEED;
 const SLOWMO_SCALE = 0.25;
 const CAMERA_SPEED = 6;
+const GRAVITY = 9.82;
+const AIM_MAX_SPEED = MAX_PART_SPEED - 2; // leaves room for the somersault spin
+const AIM_MIN_SPEED = 6; // short throws become line drives rather than limp lobs
+const AIM_MIN_IMPACT = DOOR_BREAK_SPEED + 1.5; // aimed at a wall, door or window, he hits it at least this hard
+// For this long after an aimed launch the "hand" keeps his centre on the arc,
+// while he peels off the floor (his limbs and joints tugging against it would
+// knock him off course); then he's on his own and starts his somersault.
+const AIM_GUIDE_TIME = 0.12;
+const AIM_LOFT = { start: 0.9, min: 0.1, max: 8, step: 0.3 }; // arc top, metres above the higher end
+const AIM_CLICK_PX = 6; // a press that moves further than this orbits the camera instead of throwing
 const SOFT = new Set(['cushion', 'leaves', 'trampoline']);
 
 const $ = (id) => document.getElementById(id);
@@ -48,7 +58,7 @@ const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.05, 4
 camera.position.set(2.5, 2.2, 14.5);
 
 // ---------------------------------------------------------------- physics
-const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -GRAVITY, 0) });
 world.solver.iterations = 20;
 // The house is ~230 static boxes and only Lennie moves, so only test pairs
 // that involve a moving body. (SAP sorting breaks on the infinite planes.)
@@ -318,6 +328,8 @@ lennie.onCollide = (partName, e) => {
   const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
   const now = performance.now();
   const surf = e.body.surface;
+  // Bumping into anything but a floor ends an aimed launch's steering, so it can't shove him through a wall.
+  if (aim.guide && surf && Math.abs(e.contact.ni.y) < 0.7) aim.guide = null;
 
   if (!surf) {
     if (e.body !== handBody && v > 2 && now - lastSoundAt > 60) {
@@ -411,6 +423,7 @@ function smash(piece) {
     if (door) m.scale.set(1 + Math.random(), 1, 0.5 + Math.random() * 2.5);
     else m.scale.setScalar(0.6 + Math.random() * 1.2);
     m.castShadow = door;
+    m.userData.noAim = true;
     scene.add(m);
     const dir = Math.random() < 0.75 ? travel : -travel;
     const vel = piece.normal.clone().multiplyScalar(dir * (1 + Math.random() * 3))
@@ -472,6 +485,7 @@ const grabDot = new THREE.Mesh(
   new THREE.MeshBasicMaterial({ color: 0xff6b4a, depthTest: false }),
 );
 grabDot.renderOrder = 11;
+grabLine.userData.noAim = grabDot.userData.noAim = true;
 grabDot.visible = false;
 scene.add(grabDot);
 
@@ -530,6 +544,8 @@ function startGrab(pick, pointerId) {
   sfx.squeak();
   canvas.style.cursor = 'grabbing';
   grabLine.visible = grabDot.visible = true;
+  hideAim();
+  aim.guide = null;
   camAnim = null;
 }
 
@@ -589,6 +605,13 @@ function endGrab() {
   if (speed > 5) sfx.whoosh(Math.min(1, speed / 20));
   if (canvas.hasPointerCapture?.(grab.pointerId)) canvas.releasePointerCapture(grab.pointerId);
   grab = null;
+  beginFlight();
+  grabLine.visible = grabDot.visible = false;
+  canvas.style.cursor = idleCursor();
+  controls.enabled = true;
+}
+
+function beginFlight() {
   if (toss.startLevel === null) {
     const c = lennie.center(_center);
     toss.startLevel = house.levelOf(c);
@@ -598,9 +621,11 @@ function endGrab() {
   toss.time = 0;
   toss.settle = 0;
   toss.maxSpeed = 0;
-  grabLine.visible = grabDot.visible = false;
-  canvas.style.cursor = hoverPart ? 'grab' : '';
-  controls.enabled = true;
+}
+
+function idleCursor() {
+  if (hoverPart) return 'grab';
+  return aim.on ? 'crosshair' : '';
 }
 
 function setHover(name) {
@@ -608,7 +633,7 @@ function setHover(name) {
   if (hoverPart) lennie.highlight(hoverPart, false);
   hoverPart = name;
   if (hoverPart) lennie.highlight(hoverPart, true);
-  if (!grab) canvas.style.cursor = hoverPart ? 'grab' : '';
+  if (!grab) canvas.style.cursor = idleCursor();
 }
 
 // Registered before OrbitControls so a grab can disable orbiting in time.
@@ -617,7 +642,10 @@ canvas.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 || grab) return;
   setPointer(e);
   const pick = pickPart();
-  if (!pick) return;
+  if (!pick) {
+    if (aim.on) aim.press = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    return;
+  }
   controls.enabled = false;
   canvas.setPointerCapture(e.pointerId);
   setHover(pick.name);
@@ -626,6 +654,7 @@ canvas.addEventListener('pointerdown', (e) => {
 
 canvas.addEventListener('pointermove', (e) => {
   setPointer(e);
+  aim.hover = true;
   if (grab) {
     if (e.pointerId === grab.pointerId) moveGrab();
     return;
@@ -635,21 +664,35 @@ canvas.addEventListener('pointermove', (e) => {
 
 const release = (e) => {
   if (grab && e.pointerId === grab.pointerId) endGrab();
+  const press = aim.press;
+  aim.press = null;
+  // A click (not a drag, which orbits the camera) in aim mode throws Lennie there.
+  if (press && e.type === 'pointerup' && e.pointerId === press.id
+    && Math.hypot(e.clientX - press.x, e.clientY - press.y) < AIM_CLICK_PX) {
+    setPointer(e);
+    aimThrow();
+  }
 };
 canvas.addEventListener('pointerup', release);
 canvas.addEventListener('pointercancel', release);
 canvas.addEventListener('pointerleave', (e) => {
   if (!grab && e.pointerType === 'mouse') setHover(null);
+  if (e.pointerType === 'mouse') aim.hover = false;
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // Scroll while holding Lennie pushes him away from / towards the camera.
+// In aim mode, scrolling raises or lowers the arc instead of zooming.
 canvas.addEventListener('wheel', (e) => {
-  if (!grab) return;
+  if (!grab && !aim.on) return;
   e.preventDefault();
   e.stopImmediatePropagation();
-  grab.plane.constant += Math.sign(e.deltaY) * 0.25;
-  moveGrab();
+  if (grab) {
+    grab.plane.constant += Math.sign(e.deltaY) * 0.25;
+    moveGrab();
+  } else {
+    aim.loft = clamp(aim.loft - Math.sign(e.deltaY) * AIM_LOFT.step, AIM_LOFT.min, AIM_LOFT.max);
+  }
 }, { passive: false, capture: true });
 
 function updateGrabVisual() {
@@ -660,6 +703,290 @@ function updateGrabVisual() {
   pos.setXYZ(1, grab.target.x, grab.target.y, grab.target.z);
   pos.needsUpdate = true;
   grabDot.position.copy(grab.target);
+}
+
+// ---------------------------------------------------------------- aiming
+// Aim mode: point anywhere and a dotted arc shows the flight from Lennie to
+// there; a click sends him along it. The arc stops at the first thing in the
+// way, so it shows where he will really hit.
+const aim = {
+  on: false,
+  hover: false,
+  press: null,
+  loft: AIM_LOFT.start,
+  shot: null, // { v, blocked, tooFar } for the current pointer target
+  guide: null, // the launch still being steered, { v, t0, spin }
+};
+
+const AIM_DOTS = 90;
+const AIM_DOT_GAP = 0.3;
+const aimDots = new THREE.InstancedMesh(
+  new THREE.SphereGeometry(0.045, 10, 8),
+  new THREE.MeshBasicMaterial({ color: 0xff6b4a, transparent: true, opacity: 0.9, depthTest: false }),
+  AIM_DOTS,
+);
+const aimRing = new THREE.Mesh(
+  new THREE.RingGeometry(0.15, 0.24, 32),
+  new THREE.MeshBasicMaterial({ color: 0xff6b4a, side: THREE.DoubleSide, transparent: true, opacity: 0.95, depthTest: false }),
+);
+const aimMark = new THREE.Mesh(
+  new THREE.RingGeometry(0.05, 0.09, 24),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthTest: false }),
+);
+for (const m of [aimDots, aimRing, aimMark]) {
+  m.renderOrder = 12;
+  m.frustumCulled = false;
+  m.visible = false;
+  m.userData.noAim = true;
+  scene.add(m);
+}
+
+function hideAim() {
+  aimDots.visible = aimRing.visible = aimMark.visible = false;
+  aim.shot = null;
+}
+
+// Lennie's linear damping, as a drag rate per second, so the arc allows for it.
+const DRAG = -Math.log(1 - lennie.parts.chest.body.linearDamping);
+const reach = (t) => (1 - Math.exp(-DRAG * t)) / DRAG; // how far 1 m/s carries in t seconds
+
+/** Launch velocity that carries `from` to `to` in `t` seconds. */
+function launchVelocity(from, to, t, out = new THREE.Vector3()) {
+  const r = reach(t);
+  return out.set(
+    (to.x - from.x) / r,
+    (to.y - from.y + (GRAVITY * t) / DRAG) / r - GRAVITY / DRAG,
+    (to.z - from.z) / r,
+  );
+}
+
+/** Where a launch from `from` at velocity `v` is after `t` seconds. */
+function flightPoint(from, v, t, out) {
+  const r = reach(t);
+  return out.set(
+    from.x + v.x * r,
+    from.y + (v.y + GRAVITY / DRAG) * r - (GRAVITY / DRAG) * t,
+    from.z + v.z * r,
+  );
+}
+
+/** How hard a launch at `v` hits a surface facing `normal` after `t` seconds. */
+function impactSpeed(v, t, normal) {
+  const decay = Math.exp(-DRAG * t);
+  return -(v.x * decay * normal.x + ((v.y + GRAVITY / DRAG) * decay - GRAVITY / DRAG) * normal.y + v.z * decay * normal.z);
+}
+
+/**
+ * The throw to `to` whose arc tops out `aim.loft` above the higher end. If
+ * that one won't do, the nearest one that will: not too slow or too fast, and
+ * for a wall, door or window (`normal` facing sideways) hard enough to smash
+ * through. If none is hard enough, the hardest; if all are too fast, it's out of reach.
+ */
+function solveShot(from, to, normal) {
+  const top = Math.max(from.y, to.y) + aim.loft;
+  const want = Math.sqrt((2 * (top - from.y)) / GRAVITY) + Math.sqrt((2 * (top - to.y)) / GRAVITY);
+  const wall = Math.abs(normal.y) < 0.5;
+  const tv = new THREE.Vector3();
+  const rate = (t) => {
+    const speed = launchVelocity(from, to, t, tv).length();
+    const impact = wall ? impactSpeed(tv, t, normal) : Infinity;
+    return { speed, impact, ok: speed >= AIM_MIN_SPEED && speed <= AIM_MAX_SPEED && impact >= AIM_MIN_IMPACT };
+  };
+  let best = rate(want).ok ? want : null;
+  let hardest = null;
+  let slowest = null;
+  if (best === null) {
+    for (let t = 0.05; t < 5; t += 0.01) {
+      const r = rate(t);
+      if (r.ok && (best === null || Math.abs(t - want) < Math.abs(best - want))) best = t;
+      if (r.speed <= AIM_MAX_SPEED && (!hardest || r.impact > hardest.impact)) hardest = { t, impact: r.impact };
+      if (!slowest || r.speed < slowest.speed) slowest = { t, speed: r.speed };
+    }
+    best ??= hardest?.t ?? null;
+  }
+  if (best !== null) return { v: launchVelocity(from, to, best), time: best, tooFar: false };
+  return { v: launchVelocity(from, to, slowest.t).setLength(AIM_MAX_SPEED), time: slowest.t, tooFar: true };
+}
+
+/** Lennie's centre of mass. */
+function centerOfMass(out = new THREE.Vector3()) {
+  out.set(0, 0, 0);
+  let mass = 0;
+  for (const b of lennie.bodies) {
+    out.x += b.position.x * b.mass;
+    out.y += b.position.y * b.mass;
+    out.z += b.position.z * b.mass;
+    mass += b.mass;
+  }
+  return out.divideScalar(mass);
+}
+
+/** The visible scenery under the pointer, looking past faded walls, hidden floors and Lennie. */
+function aimTarget() {
+  raycaster.setFromCamera(ndc, camera);
+  for (const hit of raycaster.intersectObjects(scene.children, true)) {
+    const o = hit.object;
+    if (hit.distance > 100) break; // the sky
+    if (!o.isMesh || o.userData.part || o.userData.noAim || house.isFaded(o)) continue;
+    const normal = hit.face ? hit.face.normal.clone().transformDirection(o.matrixWorld) : new THREE.Vector3(0, 1, 0);
+    if (normal.dot(raycaster.ray.direction) > 0) normal.negate();
+    // The physics body behind what's under the pointer. Window and door bodies
+    // are thicker than they look, so the arc meets them a little early.
+    const d = raycaster.ray.direction;
+    _from.set(hit.point.x - d.x, hit.point.y - d.y, hit.point.z - d.z);
+    _to.set(hit.point.x + d.x * 0.3, hit.point.y + d.y * 0.3, hit.point.z + d.z * 0.3);
+    _rayHit.reset();
+    const body = world.raycastClosest(_from, _to, SCENERY_ONLY, _rayHit) ? _rayHit.body : null;
+    return { point: hit.point, normal, body };
+  }
+  return null;
+}
+
+const _aimFrom = new THREE.Vector3();
+const _aimA = new THREE.Vector3();
+const _aimB = new THREE.Vector3();
+const _aimM = new THREE.Matrix4();
+const _zAxis = new THREE.Vector3(0, 0, 1);
+
+function placeRing(ring, point, normal) {
+  ring.position.copy(point).addScaledVector(normal, 0.02);
+  ring.quaternion.setFromUnitVectors(_zAxis, normal);
+  ring.visible = true;
+}
+
+function updateAim() {
+  if (!aim.on || !aim.hover || grab || hoverPart || isAirborne()) return hideAim();
+  const target = aimTarget();
+  if (!target) return hideAim();
+  const from = centerOfMass(_aimFrom);
+  // Lennie hits the side facing him, which may not be the side facing the camera.
+  const facing = target.normal.clone();
+  if (facing.dot(_aimA.subVectors(from, target.point)) < 0) facing.negate();
+  const shot = solveShot(from, target.point, facing);
+
+  // Trace the arc through the scenery until it hits something, with a dot every AIM_DOT_GAP.
+  let dots = 0;
+  let carry = 0;
+  let impact = null;
+  _aimA.copy(from);
+  for (let t = 1 / 30; t < shot.time + 1.5; t += 1 / 30) {
+    flightPoint(from, shot.v, t, _aimB);
+    _from.set(_aimA.x, _aimA.y, _aimA.z);
+    _to.set(_aimB.x, _aimB.y, _aimB.z);
+    _rayHit.reset();
+    if (world.raycastClosest(_from, _to, SCENERY_ONLY, _rayHit)) {
+      const p = _rayHit.hitPointWorld;
+      const n = _rayHit.hitNormalWorld;
+      impact = { point: new THREE.Vector3(p.x, p.y, p.z), normal: new THREE.Vector3(n.x, n.y, n.z), body: _rayHit.body };
+      _aimB.copy(impact.point);
+    }
+    const seg = _aimA.distanceTo(_aimB);
+    for (let d = AIM_DOT_GAP - carry; d <= seg && dots < AIM_DOTS; d += AIM_DOT_GAP) {
+      const k = d / seg;
+      _aimM.makeTranslation(_aimA.x + (_aimB.x - _aimA.x) * k, _aimA.y + (_aimB.y - _aimA.y) * k, _aimA.z + (_aimB.z - _aimA.z) * k);
+      aimDots.setMatrixAt(dots++, _aimM);
+    }
+    carry = (carry + seg) % AIM_DOT_GAP;
+    _aimA.copy(_aimB);
+    if (impact || _aimB.y < -1) break;
+  }
+  aimDots.count = dots;
+  aimDots.instanceMatrix.needsUpdate = true;
+  aimDots.visible = dots > 0;
+
+  // Falling short of the pointer means something is in the way (or it's out of reach).
+  const end = impact ?? { point: _aimB.clone(), normal: target.normal };
+  const blocked = !shot.tooFar && end.point.distanceTo(target.point) > 0.5 && !(impact && impact.body === target.body);
+  placeRing(aimRing, end.point, end.normal);
+  aimRing.material.color.setHex(shot.tooFar || blocked ? 0xffffff : 0xff6b4a);
+  if (shot.tooFar || blocked) placeRing(aimMark, target.point, target.normal);
+  else aimMark.visible = false;
+  aim.shot = { v: shot.v, tooFar: shot.tooFar, blocked };
+}
+
+function aimThrow() {
+  if (grab) return;
+  if (isAirborne()) {
+    toast('Wait for Lennie to land, then aim again', 1400);
+    return;
+  }
+  aim.hover = true;
+  updateAim();
+  const shot = aim.shot;
+  if (!shot) return;
+
+  resetChain();
+  hideResult();
+  if (lennie.expression !== 'normal') lennie.setExpression('normal');
+  for (const b of lennie.bodies) {
+    b.velocity.set(shot.v.x, shot.v.y, shot.v.z);
+    b.angularVelocity.setZero();
+  }
+  // A somersault the way he's going, for once he's let go.
+  const ahead = new THREE.Vector3(shot.v.x, 0, shot.v.z);
+  if (ahead.lengthSq() < 1e-6) ahead.set(1, 0, 0);
+  const spin = new THREE.Vector3(0, 1, 0).cross(ahead.normalize()).multiplyScalar(1 + Math.random() * 2);
+  spin.y = (Math.random() - 0.5) * 2;
+  aim.guide = { v: shot.v.clone(), t0: world.time, spin };
+  sfx.squeak();
+  sfx.whoosh(Math.min(1, shot.v.length() / 20));
+  beginFlight();
+  hideAim();
+  camAnim = null;
+}
+
+/**
+ * Right after an aimed launch: nudges all of Lennie by the same amount so his
+ * centre of mass moves as planned (his limbs keep flailing among themselves).
+ */
+function guideLaunch() {
+  const g = aim.guide;
+  const t = world.time - g.t0;
+  if (t >= AIM_GUIDE_TIME || toss.state !== 'flying') {
+    aim.guide = null;
+    if (toss.state === 'flying') applySpin(g.spin);
+    return;
+  }
+  const decay = Math.exp(-DRAG * t);
+  let mass = 0;
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  for (const b of lennie.bodies) {
+    x += b.velocity.x * b.mass;
+    y += b.velocity.y * b.mass;
+    z += b.velocity.z * b.mass;
+    mass += b.mass;
+  }
+  const dx = g.v.x * decay - x / mass;
+  const dy = (g.v.y + GRAVITY / DRAG) * decay - GRAVITY / DRAG - y / mass;
+  const dz = g.v.z * decay - z / mass;
+  for (const b of lennie.bodies) {
+    b.velocity.x += dx;
+    b.velocity.y += dy;
+    b.velocity.z += dz;
+  }
+}
+
+/** Spins Lennie as a whole about his centre of mass, which leaves his centre on the arc. */
+function applySpin(w) {
+  const com = centerOfMass(_aimFrom);
+  const r = new THREE.Vector3();
+  for (const b of lennie.bodies) {
+    r.set(b.position.x - com.x, b.position.y - com.y, b.position.z - com.z).crossVectors(w, r);
+    b.velocity.x += r.x;
+    b.velocity.y += r.y;
+    b.velocity.z += r.z;
+    b.angularVelocity.set(w.x, w.y, w.z);
+  }
+}
+
+function toggleAim() {
+  aim.on = !aim.on;
+  btn.aim.setAttribute('aria-pressed', String(aim.on));
+  if (!aim.on) hideAim();
+  canvas.style.cursor = grab ? 'grabbing' : idleCursor();
+  toast(aim.on ? 'Aim mode: point where Lennie should go and click. Scroll for a higher or lower arc.' : 'Aim mode off', aim.on ? 3200 : 1200);
 }
 
 // ---------------------------------------------------------------- camera
@@ -743,6 +1070,7 @@ const btn = {
   sound: $('btn-sound'),
   drop: $('btn-drop'),
   help: $('btn-help'),
+  aim: $('btn-aim'),
 };
 
 const LEVEL_NAMES = ['floor 1', 'floor 2', 'floor 3', 'the roof'];
@@ -751,6 +1079,7 @@ function dropLennie(level) {
   const p = house.spawnPoint(level);
   lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
   guard.forget();
+  aim.guide = null;
   nudge();
   lennie.setExpression('normal');
   toss.state = 'idle';
@@ -795,6 +1124,7 @@ btn.focus.addEventListener('click', () => focusLennie());
 btn.follow.addEventListener('click', toggleFollow);
 btn.cutaway.addEventListener('click', toggleCutaway);
 btn.slowmo.addEventListener('click', toggleSlowmo);
+btn.aim.addEventListener('click', toggleAim);
 btn.sound.addEventListener('click', toggleSound);
 // Drop menu
 function setDropMenu(open) {
@@ -857,6 +1187,7 @@ addEventListener('keydown', (e) => {
     case 'KeyG': toggleFollow(); break;
     case 'KeyC': toggleCutaway(); break;
     case 'KeyZ': toggleSlowmo(); break;
+    case 'KeyT': toggleAim(); break;
     case 'KeyM': toggleSound(); break;
     case 'KeyH': setHelp(ui.help.hidden); break;
     case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': {
@@ -913,6 +1244,10 @@ function updateHud(dt, now) {
     const where = house.locate(lennie.center(_center));
     const place = `<b>${where[0].toUpperCase()}${where.slice(1)}</b>`;
     status = toss.state === 'scored' ? `Scored! Landed ${where}.` : `${place} · grab a limb and fling!`;
+    if (aim.on && !hoverPart) {
+      const warn = aim.shot?.tooFar ? ' · <b>too far</b>' : aim.shot?.blocked ? ' · <b>something is in the way</b>' : '';
+      status = `<b>Aim</b>: click where Lennie should go · scroll for a higher or lower arc${warn}`;
+    }
   }
   if (ui.status.innerHTML !== status) ui.status.innerHTML = status;
 }
@@ -945,7 +1280,9 @@ function subStep(h) {
     bodies.forEach((b, i) => preStep[i].scale(keep, b.velocity));
     for (const piece of pendingBreaks) smash(piece);
     pendingBreaks.clear();
+    aim.guide = null;
   }
+  if (aim.guide) guideLaunch();
   if (guard.check() === 'lost') rescueLost();
 }
 
@@ -978,6 +1315,7 @@ function tick(dt, now) {
   updateToss(dt * timeScale);
   updateGrabVisual();
   updateCamera(dt);
+  updateAim();
   house.updateView(camera, controls.target, dt, cutaway);
   updateShards(dt * timeScale);
   updateHud(dt, now);
@@ -988,7 +1326,7 @@ requestAnimationFrame(frame);
 // Handy for debugging from the console. advance() runs the game loop by hand,
 // e.g. when the tab is in the background and requestAnimationFrame is paused.
 window.lennie = {
-  lennie, world, camera, controls, toss, stats, house, guard,
+  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing,
   advance(seconds) {
     for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60, performance.now());
   },

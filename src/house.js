@@ -64,6 +64,7 @@ export function buildHouse(scene, world, physMats) {
     return g;
   });
   const lines = new Map();
+  const matLine = new Map(); // faded material clone → its line
   const windows = [];
   const doors = [];
   const stairBodies = [];
@@ -104,6 +105,7 @@ export function buildHouse(scene, world, physMats) {
       clone.transparent = true;
       entry.cache.set(mat, clone);
       entry.mats.add(clone);
+      matLine.set(clone, entry);
     }
     return clone;
   }
@@ -252,6 +254,7 @@ export function buildHouse(scene, world, physMats) {
     const [min, max] = extents(run, at, o.a, o.b, o.bottom, o.top, 0.03);
     const pane = new THREE.Mesh(new THREE.BoxGeometry(max[0] - min[0], max[1] - min[1], max[2] - min[2]), M.glass);
     pane.position.set((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2);
+    pane.userData.line = line; // the glass has its own material but fades out of the way with its wall
     group.add(pane);
     const midA = (o.a + o.b) / 2;
     const midY = (o.bottom + o.top) / 2;
@@ -661,6 +664,14 @@ export function buildHouse(scene, world, physMats) {
     }
   }
 
+  /** True when a mesh is hidden by the cutaway or faded out of the way, so aiming looks past it. */
+  function isFaded(mesh) {
+    for (let o = mesh; o; o = o.parent) if (!o.visible) return true;
+    const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+    const entry = matLine.get(mat) ?? lines.get(mesh.userData.line);
+    return !!entry && entry.opacity < 0.5;
+  }
+
   /** Smashes a window or a door out of its opening. */
   function breakPiece(piece) {
     if (piece.broken) return;
@@ -702,6 +713,7 @@ export function buildHouse(scene, world, physMats) {
     locate,
     spawnPoint,
     updateView,
+    isFaded,
     breakPiece,
     crackDoor,
     repairAll,

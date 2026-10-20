@@ -34,6 +34,9 @@ Couches, beds, the beanbag, bushes, tree tops and the trampoline are bouncy.
 | --- | --- |
 | Grab and fling | Drag any limb, then flick and release |
 | Push/pull while holding | Scroll wheel |
+| Aim mode on/off | T (or the arc button) |
+| Aimed toss (in aim mode) | Point where Lennie should go, click |
+| Higher/lower arc (in aim mode) | Scroll wheel |
 | Orbit camera | Drag empty space |
 | Pan / zoom | Right-drag / scroll |
 | Fly the camera | WASD, Q/E down/up |
@@ -45,6 +48,8 @@ Couches, beds, the beanbag, bushes, tree tops and the trampoline are bouncy.
 | Slow motion | Z |
 | Sound on/off | M |
 | How to play | H |
+
+In aim mode a dotted arc runs from Lennie to whatever you point at: a window, a doorway, a corner, the trampoline. It stops at the first thing in the way and the ring turns white when it won't reach, so you can see where he'll really hit. A click throws him along it with a little somersault. Dragging still orbits the camera, and grabbing a limb still works as usual.
 
 Walls and floors between the camera and the point it's looking at fade out automatically, so you can see Lennie anywhere in the house.
 
