@@ -42,7 +42,7 @@ export class StuckGuard {
 
   isEmbedded(p) {
     for (const b of this.scenery) {
-      if (!b.world) continue; // a smashed window
+      if (!b.world) continue; // a smashed window or door
       const shape = b.shapes[0];
       if (shape.type !== PLANE) {
         const lo = b.aabb.lowerBound;

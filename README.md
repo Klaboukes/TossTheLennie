@@ -23,6 +23,7 @@ Then open http://localhost:5173.
 - **Floor 3:** study (desk, bookshelf, armchair) and bathroom (a bathtub Lennie can land in)
 - A switchback staircase in the back hallway connects the floors, with open stairwells to fall down.
 - Every window has glass that shatters when Lennie hits it hard enough.
+- Every doorway has a closed door. Doors are a bit tougher than windows: a hard hit smashes one straight away, a lighter one only cracks it, and the next knock breaks it.
 - **Outside:** a pitched roof with a chimney, plus a fenced yard with bushes, trees and a trampoline.
 
 Couches, beds, the beanbag, bushes, tree tops and the trampoline are bouncy.
@@ -37,7 +38,7 @@ Couches, beds, the beanbag, bushes, tree tops and the trampoline are bouncy.
 | Pan / zoom | Right-drag / scroll |
 | Fly the camera | WASD, Q/E down/up |
 | Drop Lennie on floor 1 / 2 / 3 / the roof | 1 / 2 / 3 / 4 |
-| Fix the windows and put Lennie back downstairs | R |
+| Fix the windows and doors and put Lennie back downstairs | R |
 | Focus camera on Lennie | F |
 | Camera follows Lennie | G |
 | Cutaway (hide upper floors when looking down) | C |
@@ -52,13 +53,13 @@ Walls and floors between the camera and the point it's looking at fade out autom
 - **Contortion**: every joint (neck, spine, shoulders, elbows, hips, knees) is measured against its relaxed pose. A bit of bend counts as relaxed and is free; past that, points grow with the square of the bend.
 - **Pose tricks**: Upside down, The splits, Crossed/Pretzel legs, Tangled arm/Straitjacket, Foot in face, and Human knot (any three of those at once).
 - **House feats**: Defenestrated! (thrown out of the house), Hanging out the window!, Fell N floors, Stair tumble/Full flight, Stranded on the roof!, Trampoline bounces.
-- **Multiplier**: +0.1 per hard bounce, +0.25 per mid-air juggle (re-grabbing him while he's airborne), +0.3 per smashed window, up to ×4.
+- **Multiplier**: +0.1 per hard bounce, +0.25 per mid-air juggle (re-grabbing him while he's airborne), +0.3 per smashed window, +0.4 per smashed door, up to ×4.
 - A toss that's too gentle doesn't score.
 
 ## Files
 
-- `src/main.js`: scene, input, camera, toss state machine, breaking glass, HUD
-- `src/house.js`: the house (walls with windows and doors, floors, stairs, roof, furniture), plus cutaway and wall fading
+- `src/main.js`: scene, input, camera, toss state machine, breaking glass and doors, HUD
+- `src/house.js`: the house (walls with windows and breakable doors, floors, stairs, roof, furniture), plus cutaway and wall fading
 - `src/yard.js`: sky, lighting, lawn, fence, trees, bushes and the trampoline
 - `src/textures.js`: procedural textures (siding, wallpaper, wood, tiles, shingles, grass)
 - `src/ragdoll.js`: Lennie's bodies, joints and look

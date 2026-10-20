@@ -18,6 +18,7 @@ const HALL_Z = -2.4; // wall between the hallway (back) and the rooms (front)
 const MID_X = 1; // wall between the left and right rooms
 const WIN = { sill: 0.9, top: 2.2 };
 const DOOR_TOP = 2.15;
+const DOOR_COLORS = { inside: 0xc9935f, front: 0x9c2f2f };
 const FADED = 0.12;
 
 // Stairs: flight A climbs storey 0→1 along +x in the back strip; flight B
@@ -64,6 +65,7 @@ export function buildHouse(scene, world, physMats) {
   });
   const lines = new Map();
   const windows = [];
+  const doors = [];
   const stairBodies = [];
 
   // ------------------------------------------------------------ materials
@@ -78,6 +80,11 @@ export function buildHouse(scene, world, physMats) {
     soffit: std({ color: 0xe9e4da }),
     glass: new THREE.MeshPhysicalMaterial({ color: 0xcfe9ff, transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0, depthWrite: false }),
     brick: std({ color: 0xa4523e }),
+    door: std({ color: DOOR_COLORS.inside, roughness: 0.55 }),
+    doorPanel: std({ color: 0xb07a48, roughness: 0.55 }),
+    frontDoor: std({ color: DOOR_COLORS.front, roughness: 0.5 }),
+    frontDoorPanel: std({ color: 0x7e2323, roughness: 0.5 }),
+    handle: std({ color: 0xc9a74a, roughness: 0.3, metalness: 0.8 }),
   };
   const wallpaperCache = new Map();
   const wallpaper = (room) => {
@@ -192,8 +199,52 @@ export function buildHouse(scene, world, physMats) {
       if (o.glass) {
         trimBox(o.a - 0.1, o.b + 0.1, o.bottom - 0.05, o.bottom, thick + 0.12);
         addWindow(run, at, o, physThick, physOffset, story, outward, line);
+      } else {
+        addDoor(run, at, o, physThick, physOffset, story, line);
       }
     }
+  }
+
+  // A closed door filling the opening. A hard hit breaks it at once; a softer
+  // one cracks it, and the next knock finishes it off (see main.js).
+  function addDoor(run, at, o, physThick, physOffset, story, line) {
+    const midA = (o.a + o.b) / 2;
+    const midY = (o.bottom + o.top) / 2;
+    const [cmin, cmax] = extents(run, at, midA, midA, midY, midY, 0);
+    const center = new THREE.Vector3(...cmin);
+    const group = new THREE.Group();
+    group.position.copy(center);
+    const part = (a, b, ya, yb, depth, mat) => {
+      const [min, max] = extents(run, at, a, b, ya, yb, depth);
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(max[0] - min[0], max[1] - min[1], max[2] - min[2]), lineMat(line, mat));
+      mesh.position.set((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2).sub(center);
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    };
+    part(o.a + 0.01, o.b - 0.01, o.bottom + 0.01, o.top - 0.01, 0.06, o.front ? M.frontDoor : M.door);
+    // raised panels on both faces, and a lever handle on each side
+    const panel = o.front ? M.frontDoorPanel : M.doorPanel;
+    part(o.a + 0.14, o.b - 0.14, o.bottom + 1.15, o.top - 0.16, 0.08, panel);
+    part(o.a + 0.14, o.b - 0.14, o.bottom + 0.18, o.bottom + 0.98, 0.08, panel);
+    part(o.b - 0.2, o.b - 0.07, o.bottom + 1.0, o.bottom + 1.03, 0.2, M.handle);
+    groups[story].add(group);
+
+    const [pmin, pmax] = extents(run, at, o.a, o.b, o.bottom, o.top, physThick, physOffset);
+    const door = {
+      kind: 'door',
+      group,
+      broken: false,
+      cracked: false,
+      story,
+      color: o.front ? DOOR_COLORS.front : DOOR_COLORS.inside,
+      center,
+      normal: run === 'x' ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0),
+      width: o.b - o.a,
+      height: o.top - o.bottom,
+      body: null,
+    };
+    door.body = body(pmin, pmax, physMats.hard, { kind: 'door', piece: door });
+    doors.push(door);
   }
 
   function addWindow(run, at, o, physThick, physOffset, story, outward, line) {
@@ -214,6 +265,7 @@ export function buildHouse(scene, world, physMats) {
 
     const [pmin, pmax] = extents(run, at, o.a, o.b, o.bottom, o.top, physThick, physOffset);
     const win = {
+      kind: 'window',
       group,
       broken: false,
       story,
@@ -223,7 +275,7 @@ export function buildHouse(scene, world, physMats) {
       height: o.top - o.bottom,
       body: null,
     };
-    win.body = body(pmin, pmax, physMats.glass, { kind: 'glass', window: win });
+    win.body = body(pmin, pmax, physMats.glass, { kind: 'glass', piece: win });
     windows.push(win);
   }
 
@@ -245,14 +297,14 @@ export function buildHouse(scene, world, physMats) {
     const y1 = (k + 1) * H - T;
     const R = ROOMS[k];
     const win = ([a, b]) => ({ a, b, bottom: y0 + WIN.sill, top: y0 + WIN.top, glass: true });
-    const door = ([a, b]) => ({ a, b, bottom: y0, top: y0 + DOOR_TOP });
+    const door = ([a, b], front = false) => ({ a, b, bottom: y0, top: y0 + DOOR_TOP, front });
     const roomAt = (x, z) => (z < HALL_Z ? R.hall : x < MID_X ? R.left : R.right);
     const common = { y0, y1, story: k, thick: EXT, physThick: EXT_PHYS };
     const off = (EXT_PHYS - EXT) / 2;
 
     wall({
       ...common, run: 'x', at: HOUSE.z1, from: OUT.x0, to: OUT.x1, physOffset: off, outward: 1, line: `south-${k}`,
-      openings: [...OPENINGS.south.map(win), ...(k === 0 ? [door(FRONT_DOOR)] : [])],
+      openings: [...OPENINGS.south.map(win), ...(k === 0 ? [door(FRONT_DOOR, true)] : [])],
       mats: { pos: M.siding, neg: (x) => wallpaper(roomAt(x, 0)) },
     });
     wall({
@@ -609,25 +661,40 @@ export function buildHouse(scene, world, physMats) {
     }
   }
 
-  function breakWindow(win) {
-    if (win.broken) return;
-    win.broken = true;
-    win.group.visible = false;
-    world.removeBody(win.body);
+  /** Smashes a window or a door out of its opening. */
+  function breakPiece(piece) {
+    if (piece.broken) return;
+    piece.broken = true;
+    piece.group.visible = false;
+    world.removeBody(piece.body);
   }
 
-  function repairWindows() {
-    for (const win of windows) {
-      if (!win.broken) continue;
-      win.broken = false;
-      win.group.visible = true;
-      world.addBody(win.body);
+  /** A door that took a knock sags in its frame, pushed towards `dir` (±1 along its normal). */
+  function crackDoor(door, dir) {
+    door.cracked = true;
+    door.group.position.copy(door.center).addScaledVector(door.normal, 0.03 * dir);
+    if (door.normal.z) door.group.rotation.z = 0.03 * dir;
+    else door.group.rotation.x = 0.03 * dir;
+  }
+
+  function repairAll() {
+    for (const piece of [...windows, ...doors]) {
+      if (piece.kind === 'door') {
+        piece.cracked = false;
+        piece.group.position.copy(piece.center);
+        piece.group.rotation.set(0, 0, 0);
+      }
+      if (!piece.broken) continue;
+      piece.broken = false;
+      piece.group.visible = true;
+      world.addBody(piece.body);
     }
   }
 
   return {
     nearHouse,
     windows,
+    doors,
     stairBodies,
     isInside,
     isOnRoof,
@@ -635,8 +702,9 @@ export function buildHouse(scene, world, physMats) {
     locate,
     spawnPoint,
     updateView,
-    breakWindow,
-    repairWindows,
+    breakPiece,
+    crackDoor,
+    repairAll,
     get cutLevel() { return level; },
   };
 }

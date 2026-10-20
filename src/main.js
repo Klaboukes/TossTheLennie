@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildHouse } from './house.js';
+import { buildHouse, HOUSE } from './house.js';
 import { buildYard, YARD } from './yard.js';
 import { Ragdoll } from './ragdoll.js';
 import { measureContortion, evaluateToss, chainMultiplier } from './scoring.js';
@@ -20,6 +20,10 @@ const MAX_TOSS_TIME = 14;
 const MIN_TOSS_SPEED = 3.5;
 const BOUNCE_IMPACT = 4;
 const GLASS_BREAK_SPEED = 4.5;
+// Doors are a bit tougher: a hard hit breaks one at once, a window-breaking
+// hit only cracks it, and the next such knock (a moment later) finishes it.
+const DOOR_BREAK_SPEED = 7;
+const DOOR_CRACK_SPEED = GLASS_BREAK_SPEED;
 const SLOWMO_SCALE = 0.25;
 const CAMERA_SPEED = 6;
 const SOFT = new Set(['cushion', 'leaves', 'trampoline']);
@@ -209,6 +213,7 @@ const toss = {
   bounces: 0,
   juggles: 0,
   smashed: 0,
+  doors: 0,
   trampoline: 0,
   stairs: new Set(),
   startLevel: null,
@@ -219,6 +224,7 @@ function resetChain() {
   toss.bounces = 0;
   toss.juggles = 0;
   toss.smashed = 0;
+  toss.doors = 0;
   toss.trampoline = 0;
   toss.stairs = new Set();
   toss.startLevel = null;
@@ -249,7 +255,7 @@ function houseBonuses(center) {
 }
 
 function finishToss() {
-  if (toss.maxSpeed < MIN_TOSS_SPEED && !toss.smashed) {
+  if (toss.maxSpeed < MIN_TOSS_SPEED && !toss.smashed && !toss.doors) {
     toss.state = 'idle';
     resetChain();
     toast('Too gentle! Give Lennie a proper fling.');
@@ -261,6 +267,7 @@ function finishToss() {
     bounces: toss.bounces,
     juggles: toss.juggles,
     smashed: toss.smashed,
+    doors: toss.doors,
     bonuses: houseBonuses(center),
   });
   stats.total += result.total;
@@ -296,7 +303,7 @@ function updateToss(simDt) {
   if ((toss.time > 0.6 && toss.settle > SETTLE_TIME) || toss.time > MAX_TOSS_TIME) finishToss();
 }
 
-// ---------------------------------------------------------------- collisions & breaking glass
+// ---------------------------------------------------------------- collisions & breaking glass and doors
 let lastSoundAt = 0;
 const EXCLAIM = ['OOF!', 'BONK!', 'WHEE!', 'OUCH!', 'THUD!', 'OW!', 'YIKES!'];
 const pendingBreaks = new Set();
@@ -321,12 +328,27 @@ lennie.onCollide = (partName, e) => {
   }
 
   if (surf.kind === 'glass') {
-    if (!surf.window.broken && v > GLASS_BREAK_SPEED) pendingBreaks.add(surf.window);
+    if (!surf.piece.broken && v > GLASS_BREAK_SPEED) pendingBreaks.add(surf.piece);
     else if (v > 1.5 && now - lastSoundAt > 60) {
       lastSoundAt = now;
       sfx.thud(Math.min(1, v / 16));
     }
     return;
+  }
+  if (surf.kind === 'door' && !surf.piece.broken && v > DOOR_CRACK_SPEED) {
+    const door = surf.piece;
+    // The cooldown stops one impact (several limbs at once) from counting twice.
+    if (v > DOOR_BREAK_SPEED || (door.cracked && now - door.crackedAt > 300)) {
+      pendingBreaks.add(door);
+      return;
+    }
+    if (!door.cracked) {
+      house.crackDoor(door, Math.sign(e.target.velocity.dot(door.normal)) || 1);
+      door.crackedAt = now;
+      lastSoundAt = now;
+      sfx.crack();
+      popAt(door.center, 'CRACK!');
+    }
   }
   if (v < 1.2) return;
 
@@ -356,7 +378,7 @@ lennie.onCollide = (partName, e) => {
 };
 
 // Lennie's velocities before each physics step, so that smashing through a
-// window doesn't also bounce him off it.
+// window or door doesn't also bounce him off it.
 const preStep = lennie.bodies.map(() => new CANNON.Vec3());
 
 const shards = [];
@@ -365,27 +387,42 @@ const shardGeo = new THREE.BufferGeometry().setFromPoints([
 ]);
 shardGeo.computeVertexNormals();
 const shardMat = new THREE.MeshStandardMaterial({ color: 0xd8efff, transparent: true, opacity: 0.8, roughness: 0.05, side: THREE.DoubleSide });
+const splinterGeo = new THREE.BoxGeometry(0.035, 0.035, 0.2);
+const splinterMats = new Map();
+const splinterMat = (color) => {
+  if (!splinterMats.has(color)) splinterMats.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.6 }));
+  return splinterMats.get(color);
+};
 
-function smash(win) {
-  house.breakWindow(win);
-  sfx.crash();
-  const along = new THREE.Vector3().crossVectors(win.normal, new THREE.Vector3(0, 1, 0));
-  for (let i = 0; i < 26; i++) {
-    const m = new THREE.Mesh(shardGeo, shardMat);
-    m.position.copy(win.center)
-      .addScaledVector(along, (Math.random() - 0.5) * win.width)
-      .add(new THREE.Vector3(0, (Math.random() - 0.5) * win.height, 0));
+function smash(piece) {
+  house.breakPiece(piece);
+  const door = piece.kind === 'door';
+  if (door) sfx.splinter();
+  else sfx.crash();
+  // Most of the debris flies the way Lennie was going.
+  const travel = Math.sign(lennie.parts.chest.body.velocity.dot(piece.normal)) || 1;
+  const along = new THREE.Vector3().crossVectors(piece.normal, new THREE.Vector3(0, 1, 0));
+  for (let i = 0; i < (door ? 22 : 26); i++) {
+    const m = door ? new THREE.Mesh(splinterGeo, splinterMat(piece.color)) : new THREE.Mesh(shardGeo, shardMat);
+    m.position.copy(piece.center)
+      .addScaledVector(along, (Math.random() - 0.5) * piece.width)
+      .add(new THREE.Vector3(0, (Math.random() - 0.5) * piece.height, 0));
     m.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
-    m.scale.setScalar(0.6 + Math.random() * 1.2);
+    if (door) m.scale.set(1 + Math.random(), 1, 0.5 + Math.random() * 2.5);
+    else m.scale.setScalar(0.6 + Math.random() * 1.2);
+    m.castShadow = door;
     scene.add(m);
-    const dir = Math.random() < 0.75 ? 1 : -1;
-    const vel = win.normal.clone().multiplyScalar(dir * (1 + Math.random() * 3))
+    const dir = Math.random() < 0.75 ? travel : -travel;
+    const vel = piece.normal.clone().multiplyScalar(dir * (1 + Math.random() * 3))
       .addScaledVector(along, (Math.random() - 0.5) * 2)
       .add(new THREE.Vector3(0, Math.random() * 2, 0));
-    shards.push({ m, vel, spin: new THREE.Vector3(Math.random() * 10, Math.random() * 10, 0), t: 0 });
+    shards.push({ m, vel, spin: new THREE.Vector3(Math.random() * 10, Math.random() * 10, 0), t: 0, floor: piece.story * HOUSE.H });
   }
-  if (toss.state === 'flying' || toss.state === 'held') toss.smashed += 1;
-  popAt(win.center.clone().addScaledVector(win.normal, 0.6), 'SMASH!', 'big');
+  if (toss.state === 'flying' || toss.state === 'held') {
+    if (door) toss.doors += 1;
+    else toss.smashed += 1;
+  }
+  popAt(piece.center.clone().addScaledVector(piece.normal, 0.6 * travel), door ? 'CRASH!' : 'SMASH!', 'big');
   lennie.setExpression('ouch', 1);
 }
 
@@ -395,8 +432,10 @@ function updateShards(dt) {
     s.t += dt;
     s.vel.y -= 9.8 * dt;
     s.m.position.addScaledVector(s.vel, dt);
-    if (s.m.position.y < 0.02) {
-      s.m.position.y = 0.02;
+    // Debris that stays indoors lands on its own floor, the rest in the yard.
+    const floor = (house.isInside(s.m.position) ? s.floor : 0) + 0.02;
+    if (s.m.position.y < floor) {
+      s.m.position.y = floor;
       s.vel.set(0, 0, 0);
       s.spin.set(0, 0, 0);
     }
@@ -721,10 +760,10 @@ function dropLennie(level) {
 }
 
 function resetAll() {
-  house.repairWindows();
+  house.repairAll();
   clearShards();
   dropLennie(0);
-  toast('Windows fixed, Lennie back downstairs', 1500);
+  toast('Windows and doors fixed, Lennie back downstairs', 1500);
 }
 
 function toggleFollow() {
@@ -867,6 +906,7 @@ function updateHud(dt, now) {
     const bits = [plural(toss.bounces, 'bounce')];
     if (toss.juggles) bits.push(plural(toss.juggles, 'juggle'));
     if (toss.smashed) bits.push(plural(toss.smashed, 'window'));
+    if (toss.doors) bits.push(plural(toss.doors, 'door'));
     if (toss.stairs.size) bits.push(plural(toss.stairs.size, 'step'));
     status = `Flying! ${bits.join(' · ')}${combo}`;
   } else {
@@ -899,9 +939,11 @@ function subStep(h) {
   bodies.forEach((b, i) => preStep[i].copy(b.velocity));
   world.step(h);
   if (pendingBreaks.size) {
-    // Lennie crashes through: undo this step's bounce, minus a little drag.
-    bodies.forEach((b, i) => preStep[i].scale(0.8, b.velocity));
-    for (const win of pendingBreaks) smash(win);
+    // Lennie crashes through: undo this step's bounce, minus a little drag
+    // (more for a door).
+    const keep = [...pendingBreaks].some((p) => p.kind === 'door') ? 0.65 : 0.8;
+    bodies.forEach((b, i) => preStep[i].scale(keep, b.velocity));
+    for (const piece of pendingBreaks) smash(piece);
     pendingBreaks.clear();
   }
   if (guard.check() === 'lost') rescueLost();

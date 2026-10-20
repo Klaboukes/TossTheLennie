@@ -80,12 +80,12 @@ const RATINGS = [
 
 /** Multiplier earned during a toss; shared by the live HUD and the final score. */
 export function chainMultiplier(chain) {
-  return Math.min(4, 1 + 0.1 * chain.bounces + 0.25 * chain.juggles + 0.3 * chain.smashed);
+  return Math.min(4, 1 + 0.1 * chain.bounces + 0.25 * chain.juggles + 0.3 * chain.smashed + 0.4 * chain.doors);
 }
 
 /**
  * Scores a finished toss. `chain` holds what happened during the flight:
- * { bounces, juggles, smashed, bonuses: [{ label, value }] }, where bonuses
+ * { bounces, juggles, smashed, doors, bonuses: [{ label, value }] }, where bonuses
  * are the house-specific feats (falling floors, stairs, defenestration...).
  */
 export function evaluateToss(ragdoll, chain) {
@@ -101,6 +101,7 @@ export function evaluateToss(ragdoll, chain) {
   if (chain.bounces) multParts.push(plural(chain.bounces, 'bounce'));
   if (chain.juggles) multParts.push(plural(chain.juggles, 'juggle'));
   if (chain.smashed) multParts.push(plural(chain.smashed, 'window'));
+  if (chain.doors) multParts.push(plural(chain.doors, 'door'));
   if (mult > 1) lines.push({ label: multParts.join(' · '), value: `×${mult.toFixed(2)}`, mult: true });
 
   const total = Math.round(base * mult);

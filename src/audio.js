@@ -126,6 +126,68 @@ export class Sfx {
     }
   }
 
+  /** A door giving way: a sharp crack, the boom of the panel and snapping wood. */
+  splinter() {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const src = this.#noiseSource(t, 0.4);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1400;
+    bp.Q.value = 0.8;
+    const g = ctx.createGain();
+    this.#env(g, t, 0.6, 0.002, 0.3);
+    src.connect(bp).connect(g).connect(this.master);
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(120, t);
+    osc.frequency.exponentialRampToValueAtTime(45, t + 0.25);
+    const og = ctx.createGain();
+    this.#env(og, t, 0.6, 0.003, 0.3);
+    osc.connect(og).connect(this.master);
+    osc.start(t);
+    osc.stop(t + 0.35);
+
+    for (let i = 0; i < 6; i++) {
+      const tt = t + 0.03 + Math.random() * 0.3;
+      const snap = this.#noiseSource(tt, 0.05);
+      const sf = ctx.createBiquadFilter();
+      sf.type = 'bandpass';
+      sf.frequency.value = 600 + Math.random() * 1400;
+      sf.Q.value = 4;
+      const sg = ctx.createGain();
+      this.#env(sg, tt, 0.2 + Math.random() * 0.15, 0.002, 0.04);
+      snap.connect(sf).connect(sg).connect(this.master);
+    }
+  }
+
+  /** A door cracking but holding. */
+  crack() {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const src = this.#noiseSource(t, 0.15);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1100;
+    bp.Q.value = 1.5;
+    const g = ctx.createGain();
+    this.#env(g, t, 0.35, 0.002, 0.12);
+    src.connect(bp).connect(g).connect(this.master);
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(140, t);
+    osc.frequency.exponentialRampToValueAtTime(60, t + 0.15);
+    const og = ctx.createGain();
+    this.#env(og, t, 0.4, 0.003, 0.18);
+    osc.connect(og).connect(this.master);
+    osc.start(t);
+    osc.stop(t + 0.25);
+  }
+
   /** Soft flop of limbs hitting each other. */
   flop(strength) {
     if (!this.ready) return;
