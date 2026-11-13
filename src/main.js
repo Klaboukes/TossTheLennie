@@ -56,6 +56,16 @@ const SOFT = new Set(['cushion', 'leaves', 'trampoline']);
 // A block is a neighbour's house, which is solid and doesn't fade.
 const CAM_BLOCKERS = new Set(['furniture', 'cushion', 'leaves', 'tree', 'trampoline', 'block']);
 const AIM_TAP_PX = 44; // on a touch screen, a second tap this close to the first one throws
+// The slingshot: grab Lennie and pull back, away from where he should go.
+const SLING = {
+  dead: 18, // px: a shorter pull than this (or letting go back on Lennie) throws nothing
+  reach: 0.33, // a pull this long, as a share of the screen's shorter side, is full power
+  minSpeed: 4.5, // m/s at the gentlest throw (still enough to score)
+  maxSpeed: AIM_MAX_SPEED,
+  stretch: 0.35, // m: how far the held limb gives towards the pointer while pulling
+  arcTime: 4, // s of flight shown in the preview
+};
+const SLING_ANGLE = { start: 35, min: 5, max: 80, step: 5 }; // launch angle above level, degrees
 const BIG_TOSS = 1500; // from this score a toss gets confetti and a "Big toss!" sticker
 const TOSSES_PER_PLAYER = 5;
 const PLAYER_COLORS = ['#ff6b4a', '#3f5fd6', '#22a06b', '#b04ad6'];
@@ -163,6 +173,8 @@ const ui = {
   replayBtn: $('r-replay'),
   replayBadge: $('replay-badge'),
   aimPad: $('aim-pad'),
+  slingPower: $('sling-power'),
+  slingFill: $('sling-fill'),
   hint: $('grab-hint'),
   hintText: $('grab-hint-text'),
   challenge: $('challenge'),
@@ -759,14 +771,13 @@ const _to = new CANNON.Vec3();
 const _rayHit = new CANNON.RaycastResult();
 const SCENERY_ONLY = { collisionFilterMask: 1, skipBackfaces: true };
 
-function moveGrab() {
-  const hit = raycaster.ray.intersectPlane(grab.plane, new THREE.Vector3());
-  if (!hit) return;
-  clampInWorld(hit, 0.3);
-  // The hand can't pass through walls, floors or ceilings: stop it just short
-  // of the first one between the held point and the pointer. Otherwise it
-  // drags a limb into the scenery and tears Lennie apart.
-  grab.part.body.pointToWorldFrame(grab.local, _from);
+/**
+ * The hand can't pass through walls, floors or ceilings: stops `hit` just short
+ * of the first one between the held point and it. Otherwise the hand drags a
+ * limb into the scenery and tears Lennie apart.
+ */
+function keepHandOut(hold, hit) {
+  hold.part.body.pointToWorldFrame(hold.local, _from);
   _to.set(hit.x, hit.y, hit.z);
   _rayHit.reset();
   if (world.raycastClosest(_from, _to, SCENERY_ONLY, _rayHit)) {
@@ -775,6 +786,14 @@ function moveGrab() {
     const len = back.length();
     hit.set(p.x, p.y, p.z).addScaledVector(back.normalize(), Math.min(0.25, len));
   }
+  return hit;
+}
+
+function moveGrab() {
+  const hit = raycaster.ray.intersectPlane(grab.plane, new THREE.Vector3());
+  if (!hit) return;
+  clampInWorld(hit, 0.3);
+  keepHandOut(grab, hit);
   grab.target.copy(hit);
   const now = performance.now();
   grab.samples.push({ t: now, p: hit.clone() });
@@ -823,6 +842,140 @@ function endGrab() {
   controls.enabled = true;
 }
 
+// ---------------------------------------------------------------- slingshot
+// Grab Lennie while he's down and pull back, away from where he should go: a
+// dotted arc shows his flight while you pull, a longer pull throws harder, and
+// letting go sends him along the arc. Pulling down (towards you) throws him
+// into the picture, pulling left throws him right. The launch angle goes up
+// and down with the scroll wheel or the Arc buttons.
+let sling = null;
+let slingAngle = SLING_ANGLE.start;
+
+function startSling(pick, e) {
+  // Still rolling from the last toss: that one ends here.
+  if (toss.state === 'flying') finishToss();
+  const part = lennie.parts[pick.name];
+  const p = pick.hit.point;
+  const local = part.body.pointToLocalFrame(new CANNON.Vec3(p.x, p.y, p.z));
+  handBody.position.set(p.x, p.y, p.z);
+  handBody.velocity.setZero();
+  const constraint = new CANNON.PointToPointConstraint(part.body, local, handBody, new CANNON.Vec3(), GRAB_FORCE);
+  world.addConstraint(constraint);
+  sling = {
+    part,
+    local,
+    constraint,
+    pointerId: e.pointerId,
+    pointerType: e.pointerType,
+    x0: e.clientX,
+    y0: e.clientY,
+    x: e.clientX,
+    y: e.clientY,
+    anchor: p.clone(),
+    plane: new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), p),
+    band: p.clone(), // the end of the rubber band, under the pointer
+    target: p.clone(), // where the hand holds the limb
+  };
+  hint.on = false;
+  hideResult();
+  if (lennie.expression !== 'normal') lennie.setExpression('normal');
+  sfx.squeak();
+  canvas.style.cursor = 'grabbing';
+  grabLine.visible = grabDot.visible = true;
+  hideAim();
+  aim.pin = null;
+  aim.guide = null;
+  camAnim = null;
+}
+
+function moveSling(e) {
+  sling.x = e.clientX;
+  sling.y = e.clientY;
+  const hit = raycaster.ray.intersectPlane(sling.plane, new THREE.Vector3());
+  if (!hit) return;
+  sling.band.copy(hit);
+  // The limb gives a little towards the pointer, so he leans into the pull.
+  const pull = hit.sub(sling.anchor);
+  if (pull.length() > SLING.stretch) pull.setLength(SLING.stretch);
+  sling.target.copy(keepHandOut(sling, clampInWorld(pull.add(sling.anchor), 0.3)));
+}
+
+const _slFwd = new THREE.Vector3();
+const _slUp = new THREE.Vector3();
+const _slRight = new THREE.Vector3();
+
+/** The launch the current pull gives: { v, power }, or null for a pull too short to throw. */
+function slingShot(s = sling) {
+  const dx = s.x - s.x0;
+  const dy = s.y - s.y0;
+  const len = Math.hypot(dx, dy);
+  if (len < SLING.dead) return null;
+  const full = SLING.reach * Math.min(innerWidth, innerHeight);
+  const power = clamp((len - SLING.dead) / Math.max(1, full - SLING.dead), 0, 1);
+  // "Into the screen" along the ground. Looking straight ahead that's where the
+  // camera looks; looking down it's the top of the screen. Adding both, flattened,
+  // works for every angle in between.
+  camera.getWorldDirection(_slFwd).setY(0);
+  _slUp.set(0, 1, 0).applyQuaternion(camera.quaternion).setY(0);
+  _slFwd.add(_slUp).normalize();
+  _slRight.set(1, 0, 0).applyQuaternion(camera.quaternion).setY(0).normalize();
+  // Throw the opposite way to the pull.
+  const dir = new THREE.Vector3().addScaledVector(_slFwd, dy / len).addScaledVector(_slRight, -dx / len).normalize();
+  const speed = THREE.MathUtils.lerp(SLING.minSpeed, SLING.maxSpeed, power);
+  const a = THREE.MathUtils.degToRad(slingAngle);
+  const v = dir.multiplyScalar(Math.cos(a) * speed);
+  v.y = Math.sin(a) * speed;
+  return { v, power };
+}
+
+/** Draws the arc and the power bar for the current pull. */
+function updateSling() {
+  const shot = slingShot();
+  if (!shot) {
+    hideAim();
+    ui.slingPower.hidden = true;
+    return;
+  }
+  const from = centerOfMass(_aimFrom);
+  const end = traceArc(from, shot.v, SLING.arcTime);
+  placeRing(aimRing, end.point, end.normal);
+  aimRing.material.color.setHex(0xff6b4a);
+  aimMark.visible = false;
+  ui.slingPower.hidden = false;
+  ui.slingPower.style.left = `${sling.x}px`;
+  ui.slingPower.style.top = `${sling.y}px`;
+  ui.slingFill.style.width = `${Math.round(shot.power * 100)}%`;
+}
+
+/** Lets go of the slingshot: throws him along the arc, or (`throwIt` false) just puts him down. */
+function endSling(throwIt = true) {
+  const s = sling;
+  if (!s) return;
+  sling = null;
+  world.removeConstraint(s.constraint);
+  handBody.velocity.setZero();
+  if (canvas.hasPointerCapture?.(s.pointerId)) canvas.releasePointerCapture(s.pointerId);
+  if (s.pointerType !== 'mouse') setHover(null);
+  grabLine.visible = grabDot.visible = false;
+  ui.slingPower.hidden = true;
+  hideAim();
+  canvas.style.cursor = idleCursor();
+  controls.enabled = true;
+  if (!throwIt) return;
+  const shot = slingShot(s);
+  if (shot) launch(shot.v);
+  else toast('Pull Lennie back, then let go to throw him', 1800);
+}
+
+function changeSlingAngle(steps) {
+  const before = slingAngle;
+  slingAngle = clamp(slingAngle + steps * SLING_ANGLE.step, SLING_ANGLE.min, SLING_ANGLE.max);
+  if (sling) return;
+  // Nothing on screen shows it yet, so say so.
+  if (slingAngle === before) toast(steps > 0 ? 'That\'s the highest arc' : 'That\'s the lowest arc', 1000);
+  else toast(steps > 0 ? 'Higher arc' : 'Lower arc', 800);
+}
+
 /**
  * Where the toss starts from: where Lennie was when he was picked up (not
  * where he was let go, or lifting him up to the ceiling and dropping him
@@ -855,7 +1008,7 @@ function setHover(name) {
   if (hoverPart) lennie.highlight(hoverPart, false);
   hoverPart = name;
   if (hoverPart) lennie.highlight(hoverPart, true);
-  if (!grab) canvas.style.cursor = idleCursor();
+  if (!grab && !sling) canvas.style.cursor = idleCursor();
 }
 
 // Registered before OrbitControls so a grab can disable orbiting in time.
@@ -865,7 +1018,7 @@ canvas.addEventListener('pointerdown', (e) => {
     stopReplay();
     return;
   }
-  if (e.button !== 0 || grab) return;
+  if (e.button !== 0 || grab || sling) return;
   setPointer(e);
   // Between turns, Lennie waits for the next player to press Go.
   const pick = ui.turnCard.hidden && ui.setup.hidden && !turnPending ? pickPart() : null;
@@ -876,7 +1029,9 @@ canvas.addEventListener('pointerdown', (e) => {
   controls.enabled = false;
   canvas.setPointerCapture(e.pointerId);
   setHover(pick.name);
-  startGrab(pick, e.pointerId, e.pointerType);
+  // Caught in mid-air he swings from your hand (a juggle); lying down, he goes in the slingshot.
+  if (toss.state === 'flying' && isAirborne()) startGrab(pick, e.pointerId, e.pointerType);
+  else startSling(pick, e);
 });
 
 canvas.addEventListener('pointermove', (e) => {
@@ -887,11 +1042,16 @@ canvas.addEventListener('pointermove', (e) => {
     if (e.pointerId === grab.pointerId) moveGrab();
     return;
   }
+  if (sling) {
+    if (e.pointerId === sling.pointerId) moveSling(e);
+    return;
+  }
   if (e.pointerType === 'mouse' && e.buttons === 0) setHover(pickPart()?.name ?? null);
 });
 
 const release = (e) => {
   if (grab && e.pointerId === grab.pointerId) endGrab();
+  if (sling && e.pointerId === sling.pointerId) endSling(e.type === 'pointerup');
   const press = aim.press;
   aim.press = null;
   // A click (not a drag, which orbits the camera) in aim mode throws Lennie there.
@@ -924,18 +1084,20 @@ function pinAim(e) {
 canvas.addEventListener('pointerup', release);
 canvas.addEventListener('pointercancel', release);
 canvas.addEventListener('pointerleave', (e) => {
-  if (!grab && e.pointerType === 'mouse') setHover(null);
+  if (!grab && !sling && e.pointerType === 'mouse') setHover(null);
   if (e.pointerType === 'mouse') aim.hover = false;
 });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // Scroll while holding Lennie pushes him away from / towards the camera.
-// In aim mode, scrolling raises or lowers the arc instead of zooming.
+// In the slingshot and in aim mode, scrolling raises or lowers the arc instead of zooming.
 canvas.addEventListener('wheel', (e) => {
-  if (!grab && !aim.on) return;
+  if (!grab && !sling && !aim.on) return;
   e.preventDefault();
   e.stopImmediatePropagation();
-  if (grab) {
+  if (sling) {
+    changeSlingAngle(-Math.sign(e.deltaY));
+  } else if (grab) {
     grab.plane.constant += Math.sign(e.deltaY) * 0.25;
     moveGrab();
   } else {
@@ -944,13 +1106,16 @@ canvas.addEventListener('wheel', (e) => {
 }, { passive: false, capture: true });
 
 function updateGrabVisual() {
-  if (!grab) return;
-  const p = grab.part.body.pointToWorldFrame(grab.local);
+  const hold = grab ?? sling;
+  if (!hold) return;
+  // In the slingshot the line is the rubber band, out to the pointer.
+  const end = grab ? grab.target : sling.band;
+  const p = hold.part.body.pointToWorldFrame(hold.local);
   const pos = grabLine.geometry.attributes.position;
   pos.setXYZ(0, p.x, p.y, p.z);
-  pos.setXYZ(1, grab.target.x, grab.target.y, grab.target.z);
+  pos.setXYZ(1, end.x, end.y, end.z);
   pos.needsUpdate = true;
-  grabDot.position.copy(grab.target);
+  grabDot.position.copy(end);
 }
 
 // ---------------------------------------------------------------- aiming
@@ -967,7 +1132,7 @@ const aim = {
   guide: null, // the launch still being steered, { v, t0, spin }
 };
 
-const AIM_DOTS = 90;
+const AIM_DOTS = 150;
 const AIM_DOT_GAP = 0.3;
 const aimDots = new THREE.InstancedMesh(
   new THREE.SphereGeometry(0.045, 10, 8),
@@ -1104,32 +1269,18 @@ function placeRing(ring, point, normal) {
   ring.visible = true;
 }
 
-function updateAim() {
-  if (!aim.on || (!aim.hover && !aim.pin) || grab || hoverPart || isAirborne()) return hideAim();
-  const target = aim.pin ?? aimTarget();
-  if (!target) return hideAim();
-  const from = centerOfMass(_aimFrom);
-  // Lennie hits the side facing him, which may not be the side facing the camera.
-  const facing = target.normal.clone();
-  if (facing.dot(_aimA.subVectors(from, target.point)) < 0) facing.negate();
-  // A door is aimed at no lower than its lower panel (aimed at its foot he
-  // skids into it along the floor), and thrown at harder than a window: the
-  // somersault means the limb that hits it may be going slower than his middle.
-  const door = target.body?.surface?.kind === 'door' && !target.body.surface.piece.broken ? target.body.surface.piece : null;
-  let to = target.point;
-  if (door) {
-    const low = door.center.y - door.height / 2 + DOOR_AIM_LOW;
-    if (to.y < low) to = _aimTo.copy(to).setY(low);
-  }
-  const shot = solveShot(from, to, facing, door ? DOOR_AIM_IMPACT : AIM_MIN_IMPACT);
-
-  // Trace the arc through the scenery until it hits something, with a dot every AIM_DOT_GAP.
+/**
+ * Draws the dotted arc of a launch from `from` at `v`, for up to `maxTime`
+ * seconds, through the scenery until it hits something. Returns where it ends:
+ * { point, normal, impact }, with `impact` (point, normal, body) if it hit something.
+ */
+function traceArc(from, v, maxTime) {
   let dots = 0;
   let carry = 0;
   let impact = null;
   _aimA.copy(from);
-  for (let t = 1 / 30; t < shot.time + 1.5; t += 1 / 30) {
-    flightPoint(from, shot.v, t, _aimB);
+  for (let t = 1 / 30; t < maxTime; t += 1 / 30) {
+    flightPoint(from, v, t, _aimB);
     _from.set(_aimA.x, _aimA.y, _aimA.z);
     _to.set(_aimB.x, _aimB.y, _aimB.z);
     _rayHit.reset();
@@ -1152,9 +1303,33 @@ function updateAim() {
   aimDots.count = dots;
   aimDots.instanceMatrix.needsUpdate = true;
   aimDots.visible = dots > 0;
+  const point = _aimB.clone();
+  return { point, normal: impact?.normal ?? new THREE.Vector3(0, 1, 0), impact };
+}
+
+function updateAim() {
+  if (sling) return updateSling();
+  if (!aim.on || (!aim.hover && !aim.pin) || grab || hoverPart || isAirborne()) return hideAim();
+  const target = aim.pin ?? aimTarget();
+  if (!target) return hideAim();
+  const from = centerOfMass(_aimFrom);
+  // Lennie hits the side facing him, which may not be the side facing the camera.
+  const facing = target.normal.clone();
+  if (facing.dot(_aimA.subVectors(from, target.point)) < 0) facing.negate();
+  // A door is aimed at no lower than its lower panel (aimed at its foot he
+  // skids into it along the floor), and thrown at harder than a window: the
+  // somersault means the limb that hits it may be going slower than his middle.
+  const door = target.body?.surface?.kind === 'door' && !target.body.surface.piece.broken ? target.body.surface.piece : null;
+  let to = target.point;
+  if (door) {
+    const low = door.center.y - door.height / 2 + DOOR_AIM_LOW;
+    if (to.y < low) to = _aimTo.copy(to).setY(low);
+  }
+  const shot = solveShot(from, to, facing, door ? DOOR_AIM_IMPACT : AIM_MIN_IMPACT);
+  const { impact, point } = traceArc(from, shot.v, shot.time + 1.5);
 
   // Falling short of the pointer means something is in the way (or it's out of reach).
-  const end = impact ?? { point: _aimB.clone(), normal: target.normal };
+  const end = impact ?? { point, normal: target.normal };
   const blocked = !shot.tooFar && end.point.distanceTo(target.point) > 0.5 && !(impact && impact.body === target.body);
   placeRing(aimRing, end.point, end.normal);
   aimRing.material.color.setHex(shot.tooFar || blocked ? 0xffffff : 0xff6b4a);
@@ -1164,7 +1339,7 @@ function updateAim() {
 }
 
 function aimThrow() {
-  if (grab || turnPending || !ui.setup.hidden) return;
+  if (grab || sling || turnPending || !ui.setup.hidden) return;
   if (isAirborne()) {
     toast('Wait for Lennie to land, then aim again', 1400);
     return;
@@ -1175,26 +1350,36 @@ function aimThrow() {
   const shot = aim.shot;
   aim.pin = null;
   if (!shot) return;
+  sfx.squeak();
+  launch(shot.v);
+}
+
+/**
+ * Sends all of Lennie off at `v` (an aimed throw or the slingshot): his centre
+ * follows the planned arc, and once he's clear he somersaults the way he's going.
+ */
+function launch(v) {
   replay.start();
   hint.on = false;
-
   resetChain();
   hideResult();
   if (lennie.expression !== 'normal') lennie.setExpression('normal');
   for (const b of lennie.bodies) {
-    b.velocity.set(shot.v.x, shot.v.y, shot.v.z);
+    b.velocity.set(v.x, v.y, v.z);
     b.angularVelocity.setZero();
   }
   // A somersault the way he's going, for once he's let go.
-  const ahead = new THREE.Vector3(shot.v.x, 0, shot.v.z);
+  const ahead = new THREE.Vector3(v.x, 0, v.z);
   if (ahead.lengthSq() < 1e-6) ahead.set(1, 0, 0);
   const spin = new THREE.Vector3(0, 1, 0).cross(ahead.normalize()).multiplyScalar(1 + Math.random() * 2);
   spin.y = (Math.random() - 0.5) * 2;
-  aim.guide = { v: shot.v.clone(), t0: world.time, spin };
-  sfx.squeak();
-  sfx.whoosh(Math.min(1, shot.v.length() / 20));
-  sfx.voice('whee');
-  lennie.setExpression('whee', 1.2);
+  aim.guide = { v: v.clone(), t0: world.time, spin };
+  const speed = v.length();
+  sfx.whoosh(Math.min(1, speed / 20));
+  if (speed > 7) {
+    sfx.voice('whee');
+    lennie.setExpression('whee', 1.2);
+  }
   beginFlight();
   hideAim();
   camAnim = null;
@@ -1251,7 +1436,6 @@ function toggleAim() {
   btn.aim.setAttribute('aria-pressed', String(aim.on));
   if (!aim.on) hideAim();
   aim.pin = null;
-  ui.aimPad.hidden = !aim.on;
   canvas.style.cursor = grab ? 'grabbing' : idleCursor();
   const how = document.body.classList.contains('touch')
     ? 'tap where Lennie should go, then tap there again to throw'
@@ -1361,7 +1545,7 @@ function updateCamera(dt) {
     controls.target.lerpVectors(camAnim.fromT, camAnim.toT, e);
     camera.position.lerpVectors(camAnim.fromC, camAnim.toC, e);
     if (k >= 1) camAnim = null;
-  } else if (replayCenter || ((follow || chase) && !grab)) {
+  } else if (replayCenter || ((follow || chase) && !grab && !sling)) {
     // a chase keeps up more tightly, so a fast fall doesn't leave him behind
     const rate = chase && !follow && !replayCenter ? 10 : 4;
     const d = (replayCenter ? _center.copy(replayCenter) : lennie.center(_center)).sub(controls.target).multiplyScalar(1 - Math.exp(-dt * rate));
@@ -1516,6 +1700,7 @@ const btn = {
 const LEVEL_NAMES = ['floor 1', 'floor 2', 'floor 3', 'the roof'];
 function dropLennie(level) {
   if (grab) endGrab();
+  endSling(false);
   stopReplay();
   replay.stop(false);
   const p = house.spawnPoint(level);
@@ -1537,7 +1722,7 @@ let settleFocus = { t: 0 };
 function updateSettleFocus(dt) {
   if (!settleFocus) return;
   settleFocus.t += dt;
-  if (grab || toss.state !== 'idle' || settleFocus.t > 6) {
+  if (grab || sling || toss.state !== 'idle' || settleFocus.t > 6) {
     settleFocus = null;
   } else if (settleFocus.t > 0.8 && !camAnim && lennie.maxSpeed() < 0.4) {
     settleFocus = null;
@@ -1635,6 +1820,7 @@ addEventListener('keydown', (e) => {
   }
   if (e.repeat) return;
   if (e.code === 'Escape') {
+    endSling(false);
     setDropMenu(false);
     if (!ui.help.hidden) setHelp(false);
     if (!ui.setup.hidden) setSetup(false);
@@ -1672,7 +1858,7 @@ addEventListener('resize', () => {
 
 // ---------------------------------------------------------------- instant replay
 function playReplay() {
-  if (grab || replay.playing || !replay.play(0.4)) return;
+  if (grab || sling || replay.playing || !replay.play(0.4)) return;
   camAnim = null;
   aim.guide = null;
   hideAim();
@@ -1708,7 +1894,7 @@ ui.replayBtn.addEventListener('click', () => {
 // ---------------------------------------------------------------- "Grab me!" hint
 const _hintPos = new THREE.Vector3();
 function updateHint() {
-  const show = hint.on && toss.state === 'idle' && !grab && !replay.playing
+  const show = hint.on && toss.state === 'idle' && !grab && !sling && !replay.playing
     && ui.help.hidden && ui.turnCard.hidden && ui.setup.hidden;
   if (show) {
     const head = lennie.parts.head.body.position;
@@ -1956,8 +2142,13 @@ ui.boardEnd.addEventListener('click', () => {
   toast('Game ended: free play', 1400);
 });
 
-ui.aimPad.querySelector('#aim-higher').addEventListener('click', () => { aim.loft = clamp(aim.loft + AIM_LOFT.step * 2, AIM_LOFT.min, AIM_LOFT.max); });
-ui.aimPad.querySelector('#aim-lower').addEventListener('click', () => { aim.loft = clamp(aim.loft - AIM_LOFT.step * 2, AIM_LOFT.min, AIM_LOFT.max); });
+// The Arc buttons: the arc of aimed throws in aim mode, the slingshot's launch angle otherwise.
+function changeArc(steps) {
+  if (aim.on) aim.loft = clamp(aim.loft + steps * AIM_LOFT.step * 2, AIM_LOFT.min, AIM_LOFT.max);
+  else changeSlingAngle(steps);
+}
+ui.aimPad.querySelector('#aim-higher').addEventListener('click', () => changeArc(1));
+ui.aimPad.querySelector('#aim-lower').addEventListener('click', () => changeArc(-1));
 renderChallenge();
 
 // ---------------------------------------------------------------- HUD per frame
@@ -1983,7 +2174,12 @@ function updateHud(dt, now) {
   const combo = mult > 1 ? ` · <b>×${mult.toFixed(2)}</b>` : '';
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
   let status;
-  if (toss.state === 'held') {
+  if (sling) {
+    const arc = document.body.classList.contains('touch') ? '▲ ▼ arc' : 'scroll: arc';
+    status = slingShot()
+      ? `<b>Let go</b> to throw · further = harder · ${arc}`
+      : 'Pull Lennie <b>back</b>, away from where he should go';
+  } else if (toss.state === 'held') {
     status = `Holding Lennie's <b>${grab?.part.label ?? 'limb'}</b>. Flick and let go!${combo}`;
   } else if (toss.state === 'flying') {
     const bits = [plural(toss.bounces, 'bounce')];
@@ -1995,7 +2191,7 @@ function updateHud(dt, now) {
   } else {
     const where = locate(lennie.center(_center));
     const place = `<b>${where[0].toUpperCase()}${where.slice(1)}</b>`;
-    status = toss.state === 'scored' ? `Scored! Landed ${where}.` : `${place} · grab a limb and fling!`;
+    status = toss.state === 'scored' ? `Scored! Landed ${where}.` : `${place} · grab Lennie, pull back and let go!`;
     if (aim.on && !hoverPart) {
       const warn = aim.shot?.tooFar ? ' · <b>too far</b>' : aim.shot?.blocked ? ' · <b>something is in the way</b>' : '';
       status = document.body.classList.contains('touch')
@@ -2018,9 +2214,10 @@ function stepPhysics(h) {
 }
 
 function subStep(h) {
-  if (grab) {
+  const hold = grab ?? sling;
+  if (hold) {
     const hp = handBody.position;
-    const v = new CANNON.Vec3((grab.target.x - hp.x) / h, (grab.target.y - hp.y) / h, (grab.target.z - hp.z) / h);
+    const v = new CANNON.Vec3((hold.target.x - hp.x) / h, (hold.target.y - hp.y) / h, (hold.target.z - hp.z) / h);
     const sp = v.length();
     if (sp > MAX_HAND_SPEED) v.scale(MAX_HAND_SPEED / sp, v);
     handBody.velocity.copy(v);
@@ -2039,10 +2236,10 @@ function subStep(h) {
   if (aim.guide) guideLaunch();
   const guarded = guard.check();
   if (guarded === 'lost') rescueLost();
-  else if (guarded === 'rescued' && grab) {
+  else if (guarded === 'rescued' && hold) {
     // Put back in one piece while held: the hand starts again from the
     // limb, rather than going on tugging it apart from where it got to.
-    grab.part.body.pointToWorldFrame(grab.local, handBody.position);
+    hold.part.body.pointToWorldFrame(hold.local, handBody.position);
     handBody.velocity.setZero();
   } else if (bodies.some((b) => outsideArea(b.position, 0.3))) putBackNearEdge();
 }
@@ -2094,6 +2291,7 @@ function putBackNearEdge() {
 /** After teleporting Lennie: the same tidy-up as dropping him in. */
 function placedBack(message) {
   if (grab) endGrab();
+  endSling(false);
   stopReplay();
   replay.stop(false);
   guard.forget();

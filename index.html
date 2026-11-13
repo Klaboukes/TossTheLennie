@@ -101,7 +101,7 @@
       <div class="meter-track"><div id="meter-fill" class="meter-fill"></div></div>
       <span id="meter-value" class="meter-value">0%</span>
     </div>
-    <div id="toss-status" class="status">Grab one of Lennie's limbs and fling him!</div>
+    <div id="toss-status" class="status">Grab Lennie, pull back and let go!</div>
   </div>
 
   <aside id="result" class="glass" aria-live="polite">
@@ -120,7 +120,9 @@
 
   <div id="grab-hint" class="grab-hint" aria-hidden="true" hidden><span id="grab-hint-text">Grab me!</span></div>
 
-  <div id="aim-pad" class="glass" hidden>
+  <div id="sling-power" aria-hidden="true" hidden><i id="sling-fill"></i></div>
+
+  <div id="aim-pad" class="glass">
     <span class="aim-pad-label">Arc</span>
     <button id="aim-higher" class="aim-btn" aria-label="Higher arc">▲</button>
     <button id="aim-lower" class="aim-btn" aria-label="Lower arc">▼</button>
@@ -156,19 +158,22 @@
 
   <div id="help" class="glass" role="dialog" aria-labelledby="help-title" hidden>
     <h2 id="help-title">How to play</h2>
-    <p class="help-lede">Grab Lennie by an arm or a leg and fling him through the house, out of the window or across the street into the supermarket. When he comes to rest you score: the more twisted up he is, the more points. Smashed windows, bounces and catching him in mid-air multiply it, and landing somewhere funny (the bath, the loo, the freezer...) earns a bonus.</p>
+    <p class="help-lede">Grab Lennie and pull him back like a slingshot, then let go to fling him through the house, out of the window or across the street into the supermarket. When he comes to rest you score: the more twisted up he is, the more points. Smashed windows, bounces and catching him in mid-air multiply it, and landing somewhere funny (the bath, the loo, the freezer...) earns a bonus.</p>
     <dl class="help-keys touch-only">
-      <dt>Drag Lennie</dt><dd>grab him, swipe and let go to fling him</dd>
+      <dt>Pull Lennie back</dt><dd>like a slingshot: the dots show where he'll fly, pull further for harder, let go to throw</dd>
+      <dt>▲ ▼</dt><dd>a higher or lower arc</dd>
+      <dt>Catch him in mid-air</dt><dd>swing him around and fling him again</dd>
       <dt>Drag empty space</dt><dd>turn the camera</dd>
       <dt>Two fingers</dt><dd>pinch to zoom, slide to move the camera</dd>
-      <dt>Aim button</dt><dd>tap a spot to see his flight path, tap it again to throw; ▲ ▼ for a higher or lower arc</dd>
+      <dt>Aim button</dt><dd>tap a spot to see his flight path, tap it again to throw</dd>
       <dt>Arrow button</dt><dd>drop Lennie on a floor or the roof</dd>
       <dt>People button</dt><dd>take turns with 2–4 players</dd>
     </dl>
     <dl class="help-keys mouse-only">
-      <dt>Drag a limb</dt><dd>grab, flick and let go</dd>
-      <dt>Scroll while holding</dt><dd>push him away or pull him closer</dd>
-      <dt><kbd>T</kbd> aim mode</dt><dd>point anywhere to see his flight path, click to toss him there, scroll for a higher or lower arc</dd>
+      <dt>Pull Lennie back</dt><dd>like a slingshot: the dots show where he'll fly, pull further for harder, let go to throw</dd>
+      <dt>Scroll while pulling · ▲ ▼</dt><dd>a higher or lower arc</dd>
+      <dt>Grab him in mid-air</dt><dd>swing him around and flick him again; scroll pushes him away or closer</dd>
+      <dt><kbd>T</kbd> aim mode</dt><dd>point anywhere to see his flight path, click to toss him there</dd>
       <dt>Drag empty space</dt><dd>orbit the camera</dd>
       <dt>Right-drag · Scroll</dt><dd>pan · zoom</dd>
       <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>Q</kbd><kbd>E</kbd></dt><dd>fly the camera</dd>

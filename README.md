@@ -1,6 +1,6 @@
 # Toss the Lennie
 
-Lennie lives in a typical Dutch rowhouse, with a supermarket across the street. Grab him by any limb and toss him around like a ragdoll: through the rooms, down the stairs, out of the windows, over the road and into the supermarket. Each toss scores points once he comes to rest, and the more contorted he ends up, the more it's worth.
+Lennie lives in a typical Dutch rowhouse, with a supermarket across the street. Grab him, pull him back like a slingshot and let go to toss him around like a ragdoll: through the rooms, down the stairs, out of the windows, over the road and into the supermarket. Each toss scores points once he comes to rest, and the more contorted he ends up, the more it's worth.
 
 Lennie's house and the supermarket are where the game happens. The neighbours' houses, the street and the townhouses further along are there for decoration, so the neighbourhood looks like the real one.
 
@@ -58,8 +58,11 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 
 | Action | Input |
 | --- | --- |
-| Grab and fling | Drag any limb, then flick and release |
-| Push/pull while holding | Scroll wheel |
+| Slingshot throw | Drag Lennie back, away from where he should go, and let go |
+| Higher/lower arc | Scroll wheel while pulling, or the ▲ ▼ buttons |
+| Cancel a throw | Let go back on Lennie, or Esc |
+| Catch him in mid-air (juggle) | Grab him while he's flying, flick and let go |
+| Push/pull while juggling | Scroll wheel |
 | Aim mode on/off | T (or the arc button) |
 | Aimed toss (in aim mode) | Point where Lennie should go, click |
 | Higher/lower arc (in aim mode) | Scroll wheel, or the ▲ ▼ buttons |
@@ -78,7 +81,9 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 | How to play | H |
 | Close the help, a menu or a replay | Esc |
 
-**On a tablet or phone:** drag Lennie to fling him, drag empty space to turn the camera, and pinch or slide two fingers to zoom and move. In aim mode, tap a spot to see the flight path and tap it again to throw. The help screen shows the touch controls on a touch screen and the mouse and keyboard ones on a computer.
+**On a tablet or phone:** pull Lennie back and let go to fling him (▲ ▼ for a higher or lower arc), drag empty space to turn the camera, and pinch or slide two fingers to zoom and move. In aim mode, tap a spot to see the flight path and tap it again to throw. The help screen shows the touch controls on a touch screen and the mouse and keyboard ones on a computer.
+
+The slingshot works like this: grab Lennie anywhere while he's lying down and pull back, away from where he should go. While you pull, a dotted arc shows exactly where he'll fly and a power bar fills: the further you pull, the harder he goes. Pulling down (towards you) throws him into the picture, pulling left throws him right. The arc's height is set with the scroll wheel or the ▲ ▼ buttons and is kept for the next throw. A pull that's too short throws nothing. Grabbed in mid-air, Lennie isn't in the slingshot: he swings from your hand and a flick throws him again, for juggles.
 
 In aim mode a dotted arc runs from Lennie to whatever you point at: a window, a doorway, a corner, the trampoline. It stops at the first thing in the way and the ring turns white when it won't reach, so you can see where he'll really hit. A click throws him along it with a little somersault, hard enough to smash through a window or door he's aimed at. Dragging still orbits the camera, and grabbing a limb still works as usual.
 

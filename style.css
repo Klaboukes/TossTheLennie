@@ -588,6 +588,30 @@ body:not(.touch) .touch-only { display: none !important; }
 .aim-btn:active { transform: scale(0.92); }
 
 /* ---------- Replay ---------- */
+/* The slingshot's power bar, just under the finger or pointer while pulling */
+#sling-power {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 64px;
+  height: 10px;
+  margin: 26px 0 0 -32px;
+  pointer-events: none;
+  background: rgba(43, 36, 51, 0.55);
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+#sling-power[hidden] { display: none; }
+.touch #sling-power { margin-top: -56px; } /* above the finger, not under it */
+#sling-power i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #ffd23f, var(--accent) 60%, var(--accent-deep));
+}
+
 #replay-badge {
   /* below the toolbar, which reaches the middle on a laptop-sized window */
   top: 74px;
