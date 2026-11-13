@@ -50,7 +50,10 @@ export function buildYard(scene, world, physMats) {
   scene.add(sun, sun.target);
 
   // ------------------------------------------------------------ ground
-  const grass = new THREE.Mesh(floorGeometry(-90, -90, 90, 90), std({ map: tex.grass, roughness: 1 }));
+  // The grass is nudged back in the depth test, so anything lying exactly at
+  // ground level (the top of the house's foundation, seen when a wall fades)
+  // always draws over it instead of flickering against it.
+  const grass = new THREE.Mesh(floorGeometry(-90, -90, 90, 90), std({ map: tex.grass, roughness: 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 4 }));
   grass.receiveShadow = true;
   scene.add(grass);
   const ground = new CANNON.Body({ mass: 0, material: physMats.ground, shape: new CANNON.Plane() });

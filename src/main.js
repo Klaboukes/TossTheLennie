@@ -56,7 +56,7 @@ const SOFT = new Set(['cushion', 'leaves', 'trampoline']);
 // A block is a neighbour's house, which is solid and doesn't fade.
 const CAM_BLOCKERS = new Set(['furniture', 'cushion', 'leaves', 'tree', 'trampoline', 'block']);
 const AIM_TAP_PX = 44; // on a touch screen, a second tap this close to the first one throws
-const BIG_TOSS = 1500; // from this score the replay plays by itself
+const BIG_TOSS = 1500; // from this score a toss gets confetti and a "Big toss!" sticker
 const TOSSES_PER_PLAYER = 5;
 const PLAYER_COLORS = ['#ff6b4a', '#3f5fd6', '#22a06b', '#b04ad6'];
 
@@ -152,6 +152,7 @@ const ui = {
   rTitle: $('r-title'),
   rRating: $('r-rating'),
   rTotal: $('r-total'),
+  rBadge: $('r-badge'),
   rLines: $('r-lines'),
   rFoot: $('r-foot'),
   toast: $('toast'),
@@ -239,9 +240,49 @@ function popAt(position, text, cls = '') {
   setTimeout(() => el.remove(), 1200);
 }
 
+const CONFETTI = ['#ff6b4a', '#3f5fd6', '#22a06b', '#ffd166', '#d63384', '#4cc9f0'];
+/** A short burst of confetti from a point in the scene; `gold` adds gold and makes it bigger. */
+function confettiAt(position, gold = false) {
+  const v = new THREE.Vector3().copy(position).project(camera);
+  if (v.z > 1) return;
+  const x = THREE.MathUtils.clamp((v.x * 0.5 + 0.5) * innerWidth, 0, innerWidth);
+  const y = THREE.MathUtils.clamp((-v.y * 0.5 + 0.5) * innerHeight, 0, innerHeight);
+  const colors = gold ? [...CONFETTI, '#f5b301', '#f5b301', '#ffe08a'] : CONFETTI;
+  const n = gold ? 56 : 30;
+  for (let i = 0; i < n; i++) {
+    const el = document.createElement('i');
+    el.className = 'confetti';
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.2; // mostly upwards
+    const power = (gold ? 170 : 130) * (0.5 + Math.random());
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    el.style.background = colors[i % colors.length];
+    el.style.setProperty('--dx', `${(Math.cos(angle) * power).toFixed(0)}px`);
+    el.style.setProperty('--dy', `${(Math.sin(angle) * power).toFixed(0)}px`);
+    el.style.setProperty('--fall', `${(120 + Math.random() * 140).toFixed(0)}px`);
+    el.style.setProperty('--spin', `${(Math.random() * 1440 - 720).toFixed(0)}deg`);
+    el.style.animationDelay = `${(Math.random() * 0.12).toFixed(2)}s`;
+    if (i % 3 === 0) el.style.borderRadius = '50%';
+    ui.pops.appendChild(el);
+    setTimeout(() => el.remove(), 1900);
+  }
+}
+
 let resultTimer = 0;
 let countUp = null;
-function showResult(result, where) {
+/** `cheer` is 'best' (a new best), 'big' (a big toss) or null. */
+function showResult(result, where, cheer = null) {
+  ui.rBadge.hidden = !cheer;
+  ui.rBadge.textContent = cheer === 'best' ? 'New best!' : 'Big toss!';
+  ui.rBadge.classList.toggle('best', cheer === 'best');
+  // A good one invites a replay (it never plays by itself).
+  ui.replayBtn.classList.toggle('invite', !!cheer);
+  for (const el of [ui.rBadge, ui.replayBtn]) {
+    // start the sticker and the glow over when two good tosses come in a row
+    el.style.animation = 'none';
+    void el.offsetWidth;
+    el.style.animation = '';
+  }
   ui.rTitle.textContent = `Toss #${stats.tosses}`;
   ui.rRating.textContent = result.rating;
   ui.rLines.innerHTML = '';
@@ -385,17 +426,17 @@ function finishToss() {
   stats.last = result.total;
   stats.tosses += 1;
   const newBest = result.total > stats.best;
+  // (the very first toss ever beats a best of 0, which isn't worth a party)
+  const beatBest = newBest && stats.best > 0;
   if (newBest) {
     stats.best = result.total;
     try { localStorage.setItem(BEST_KEY, String(stats.best)); } catch { /* ignore */ }
   }
   renderStats();
   bump(ui.total);
-  if (newBest && stats.tosses > 1) {
-    bump(ui.best);
-    toast(`New best toss: ${fmt(result.total)}!`);
-  }
-  showResult(result, locate(center));
+  if (beatBest) bump(ui.best);
+  const cheer = beatBest ? 'best' : result.total >= BIG_TOSS ? 'big' : null;
+  showResult(result, locate(center), cheer);
   sfx.score(result.total > 1600 ? 3 : result.total > 900 ? 2 : result.total > 400 ? 1 : 0);
   sfx.voice(result.total >= 900 ? 'ohh' : 'oof');
   // A good toss leaves him seeing stars until he's picked up again.
@@ -403,6 +444,10 @@ function finishToss() {
   else lennie.setExpression('ouch', 4);
   const head = lennie.parts.head.body.position;
   popAt(new THREE.Vector3(head.x, head.y + 0.4, head.z), `+${fmt(result.total)}`, 'big');
+  if (cheer) {
+    confettiAt(lennie.center(new THREE.Vector3()), cheer === 'best');
+    if (cheer === 'best') setTimeout(() => sfx.chime(), 550);
+  }
   const said = result.tricks.find((t) => t.say);
   if (said) setTimeout(() => popAt(new THREE.Vector3(head.x, head.y + 0.9, head.z), said.say, 'good'), 450);
   focusLennie(1.0);
@@ -415,15 +460,8 @@ function finishToss() {
     turnPending = true;
     clearTimeout(turnTimer);
     turnTimer = setTimeout(showTurnCard, 2400);
-  } else if (result.total >= BIG_TOSS || newBest) {
-    // Big ones get an instant replay, once the score has counted up.
-    clearTimeout(autoReplayTimer);
-    autoReplayTimer = setTimeout(() => {
-      if (toss.state === 'scored' && !grab) playReplay();
-    }, 1700);
   }
 }
-let autoReplayTimer = 0;
 let turnTimer = 0;
 let turnPending = false; // a match turn has ended and the next player hasn't pressed Go yet
 
@@ -706,7 +744,6 @@ function startGrab(pick, pointerId, pointerType = 'mouse') {
   }
   toss.state = 'held';
   hint.on = false;
-  clearTimeout(autoReplayTimer);
   hideResult();
   if (lennie.expression !== 'normal') lennie.setExpression('normal');
   sfx.squeak();
@@ -1140,7 +1177,6 @@ function aimThrow() {
   if (!shot) return;
   replay.start();
   hint.on = false;
-  clearTimeout(autoReplayTimer);
 
   resetChain();
   hideResult();
@@ -1637,7 +1673,6 @@ addEventListener('resize', () => {
 // ---------------------------------------------------------------- instant replay
 function playReplay() {
   if (grab || replay.playing || !replay.play(0.4)) return;
-  clearTimeout(autoReplayTimer);
   camAnim = null;
   aim.guide = null;
   hideAim();
