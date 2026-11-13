@@ -14,7 +14,7 @@ import * as THREE from 'three';
 // It works by adding a few lines to the shaders of all scenery materials, so
 // it costs nothing per object. Lennie's own materials are left alone.
 
-const REACH = 1.25; // metres around Lennie's middle that must stay visible (he's 1.90 m)
+const REACH = 2.5; // metres around Lennie's middle that must stay visible (he's 1.90 m)
 const IN_FRONT = 0.3; // only cut what's at least this much closer to the camera than his middle
 const BELOW = 0.05; // nothing lower than this under his middle is cut
 const LENS = 0.45; // anything closer to the camera than this is cut
@@ -51,7 +51,7 @@ const FRAGMENT_BODY = `
     float seeCut = 1.0 - smoothstep(${LENS.toFixed(3)}, ${(LENS + LENS_SOFT).toFixed(3)}, seeD);
     if (seeOn > 0.5) {
       float seeR = length(gl_FragCoord.xy - seeCenter);
-      float seeRing = 1.0 - smoothstep(seeRadius * 0.65, seeRadius, seeR);
+      float seeRing = 1.0 - smoothstep(seeRadius * 0.75, seeRadius, seeR);
       float seeNear = 1.0 - smoothstep(seeDist - ${(IN_FRONT + 0.35).toFixed(3)}, seeDist - ${IN_FRONT.toFixed(3)}, seeD);
       seeCut = max(seeCut, seeRing * seeNear);
     }
@@ -115,7 +115,7 @@ export function createSeeThrough(scene, renderer, skip) {
     state.cx = (v.x * 0.5 + 0.5) * _size.x;
     state.cy = (v.y * 0.5 + 0.5) * _size.y;
     const pxPerM = _size.y / 2 / (Math.max(state.dist, 0.3) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
-    state.radius = THREE.MathUtils.clamp(REACH * pxPerM, 0.08 * _size.y, 0.6 * _size.y);
+    state.radius = THREE.MathUtils.clamp(REACH * pxPerM, 0.18 * _size.y, 0.9 * _size.y);
     state.floor = center.y - BELOW;
     uniforms.seeCenter.value.set(state.cx, state.cy);
     uniforms.seeRadius.value = state.radius;
