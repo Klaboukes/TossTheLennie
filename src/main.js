@@ -17,8 +17,12 @@ const MAX_HAND_SPEED = 20;
 const THROW_BOOST = 0.4; // fraction of the flick velocity added to the whole body on release
 const MAX_PART_SPEED = 20; // capped so Lennie can't tunnel through walls
 const FAST_SUBSTEP_SPEED = 5; // above this, physics takes two half steps per tick
-const SETTLE_SPEED = 0.3;
-const SETTLE_TIME = 0.8;
+// He has come to rest when his body is still and his arms and legs at most
+// drift a little, for SETTLE_TIME. (Waiting for every limb to be dead still
+// left him lying there for seconds, twitching, before the score came.)
+const SETTLE_CORE_SPEED = 0.15;
+const SETTLE_LIMB_SPEED = 0.6;
+const SETTLE_TIME = 0.5;
 const MAX_TOSS_TIME = 14;
 const MIN_TOSS_SPEED = 3.5;
 const BOUNCE_IMPACT = 4;
@@ -415,7 +419,7 @@ function updateToss(simDt) {
   if (toss.state !== 'flying') return;
   toss.time += simDt;
   toss.maxSpeed = Math.max(toss.maxSpeed, lennie.coreSpeed());
-  if (lennie.maxSpeed() < SETTLE_SPEED) toss.settle += simDt;
+  if (lennie.coreSpeed() < SETTLE_CORE_SPEED && lennie.maxSpeed() < SETTLE_LIMB_SPEED) toss.settle += simDt;
   else toss.settle = 0;
   if ((toss.time > 0.6 && toss.settle > SETTLE_TIME) || toss.time > MAX_TOSS_TIME) finishToss();
 }
