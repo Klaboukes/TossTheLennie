@@ -10,6 +10,7 @@ import { Sfx } from './audio.js';
 import { StuckGuard } from './guard.js';
 import { Replay } from './replay.js';
 import { Challenges, CHALLENGE_BONUS } from './challenges.js';
+import { createSeeThrough } from './seethrough.js';
 
 const FIXED_DT = 1 / 120;
 // Scales with Lennie's weight (100 kg), so he swings the same however heavy he is.
@@ -48,7 +49,8 @@ const AIM_LOFT = { start: 0.9, min: 0.1, max: 8, step: 0.3 }; // arc top, metres
 const AIM_CLICK_PX = 6; // a press that moves further than this orbits the camera instead of throwing
 const SOFT = new Set(['cushion', 'leaves', 'trampoline']);
 // Scenery the camera mustn't end up inside. Walls, floors and roofs fade out of
-// the way instead, so they aren't on this list.
+// the way instead, so they aren't on this list. (Things merely between the
+// camera and Lennie don't push the camera: they turn see-through, seethrough.js.)
 const CAM_BLOCKERS = new Set(['furniture', 'cushion', 'leaves', 'tree', 'trampoline']);
 const AIM_TAP_PX = 44; // on a touch screen, a second tap this close to the first one throws
 const BIG_TOSS = 1500; // from this score the replay plays by itself
@@ -1026,7 +1028,7 @@ function aimTarget() {
   for (const hit of raycaster.intersectObjects(scene.children, true)) {
     const o = hit.object;
     if (hit.distance > 100) break; // the sky
-    if (!o.isMesh || o.userData.part || o.userData.noAim || house.isFaded(o) || shop.isFaded(o)) continue;
+    if (!o.isMesh || o.userData.part || o.userData.noAim || house.isFaded(o) || shop.isFaded(o) || seeThrough.hides(hit.point, camera)) continue;
     const normal = hit.face ? hit.face.normal.clone().transformDirection(o.matrixWorld) : new THREE.Vector3(0, 1, 0);
     if (normal.dot(raycaster.ray.direction) > 0) normal.negate();
     // The physics body behind what's under the pointer. Window and door bodies
@@ -1201,6 +1203,21 @@ function toggleAim() {
 }
 
 // ---------------------------------------------------------------- camera
+// Whatever is between the camera and Lennie turns see-through (not Lennie
+// himself, his dizzy stars or the aiming and grabbing marks).
+const seeThrough = createSeeThrough(scene, renderer, (o) => {
+  if (o.userData.part || o.userData.noAim) return true;
+  for (let p = o; p; p = p.parent) if (p === lennie.stars) return true;
+  return false;
+});
+const _seeCenter = new THREE.Vector3();
+/** Lennie's middle as drawn (during a replay that's not where his physics bodies are). */
+function lennieOnScreen(out) {
+  const a = lennie.parts.chest.group.position;
+  const b = lennie.parts.pelvis.group.position;
+  return out.set((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+}
+
 const controls = new OrbitControls(camera, canvas);
 controls.target.set(-2.4, 0.5, 1.6);
 controls.enableDamping = true;
@@ -1312,26 +1329,87 @@ function updateCamera(dt) {
   camWanted = _arm.length();
   if (camWanted < 1e-4) return;
   _arm.divideScalar(camWanted);
-  // Furniture, bushes and trees between Lennie and the camera pull it in front
-  // of them at once; when they're out of the way it eases back out.
-  const block = obstacleLimit(controls.target, _arm, camWanted);
-  camBlock = block < camBlock ? block : camBlock + (block - camBlock) * (1 - Math.exp(-dt * 3));
-  camera.position.copy(controls.target).addScaledVector(_arm, Math.min(camWanted, armLimit(controls.target, _arm), camBlock));
+  // Only when the spot the camera wants is inside furniture, a bush or a tree
+  // does it move in, gliding to just in front of it; once that spot is free
+  // again it glides back out. Things merely in between turn see-through, so
+  // turning round in a cramped aisle doesn't make the camera hop in and out.
+  const free = freeDistance(controls.target, _arm, camWanted);
+  const wasFree = camFree >= camWantedBefore - 1e-3; // not held in last frame, so zooming out isn't slowed down
+  camFree = Math.min(camFree, camWanted);
+  if (wasFree && free >= camFree) {
+    camFree = free;
+    camFreeSpeed = 0;
+  } else {
+    camFree = glide(camFree, free, free < camFree ? 0.22 : 0.5, dt);
+  }
+  camWantedBefore = camWanted;
+  camera.position.copy(controls.target).addScaledVector(_arm, Math.min(camWanted, armLimit(controls.target, _arm), camFree));
 }
 
-let camBlock = 1e3;
-const _camFrom = new CANNON.Vec3();
-const _camTo = new CANNON.Vec3();
-const CAM_RAY = { collisionFilterMask: 1, skipBackfaces: true };
-/** How far the camera can be from `o` along `dir` before it is inside furniture, a bush or a tree. */
-function obstacleLimit(o, dir, dist) {
-  _camFrom.set(o.x, o.y, o.z);
-  _camTo.set(o.x + dir.x * (dist + 0.4), o.y + dir.y * (dist + 0.4), o.z + dir.z * (dist + 0.4));
-  let nearest = 1e3;
-  world.raycastAll(_camFrom, _camTo, CAM_RAY, (r) => {
-    if (CAM_BLOCKERS.has(r.body.surface?.kind)) nearest = Math.min(nearest, r.distance);
-  });
-  return nearest === 1e3 ? 1e3 : Math.max(0.5, nearest - 0.35);
+let camFree = 1e3; // how far out the camera may be right now (glides towards freeDistance)
+let camFreeSpeed = 0;
+let camWantedBefore = 0;
+/** Moves camFree towards `to` like on a soft spring that doesn't overshoot, taking about `time` seconds. */
+function glide(from, to, time, dt) {
+  const w = 2 / time;
+  const x = w * dt;
+  const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+  const change = from - to;
+  const temp = (camFreeSpeed + w * change) * dt;
+  camFreeSpeed = (camFreeSpeed - w * temp) * decay;
+  return to + (change + temp) * decay;
+}
+const CAM_RADIUS = 0.3; // the camera keeps this far from furniture, bushes and trees
+let camBoxes = [];
+let camBoxesFor = -1;
+/** Furniture, bushes and trees as boxes, grown by CAM_RADIUS: [minX, minY, minZ, maxX, maxY, maxZ]. */
+function camBlockers() {
+  if (camBoxesFor === world.bodies.length) return camBoxes;
+  camBoxesFor = world.bodies.length;
+  camBoxes = [];
+  for (const b of world.bodies) {
+    if (b.mass !== 0 || !CAM_BLOCKERS.has(b.surface?.kind)) continue;
+    b.updateAABB();
+    const { lowerBound: lo, upperBound: hi } = b.aabb;
+    camBoxes.push([lo.x - CAM_RADIUS, lo.y - CAM_RADIUS, lo.z - CAM_RADIUS, hi.x + CAM_RADIUS, hi.y + CAM_RADIUS, hi.z + CAM_RADIUS]);
+  }
+  return camBoxes;
+}
+
+/**
+ * How far out from `o` along `dir` (at most `want`) the camera can be without
+ * being inside furniture, a bush or a tree. Something Lennie is lying on or
+ * leaning against (`o` is in it) doesn't count: that part turns see-through.
+ */
+function freeDistance(o, dir, want) {
+  const oa = [o.x, o.y, o.z];
+  const da = [dir.x, dir.y, dir.z];
+  const boxes = camBlockers();
+  let t = want;
+  for (let pass = 0; pass < 8; pass++) {
+    let moved = false;
+    for (const box of boxes) {
+      let enter = -Infinity;
+      let exit = Infinity;
+      for (let i = 0; i < 3 && enter < exit; i++) {
+        if (Math.abs(da[i]) < 1e-9) {
+          if (oa[i] < box[i] || oa[i] > box[i + 3]) enter = Infinity;
+          continue;
+        }
+        const s1 = (box[i] - oa[i]) / da[i];
+        const s2 = (box[i + 3] - oa[i]) / da[i];
+        enter = Math.max(enter, Math.min(s1, s2));
+        exit = Math.min(exit, Math.max(s1, s2));
+      }
+      if (enter >= exit || enter <= 0.05) continue;
+      if (t > enter && t < exit) {
+        t = enter;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return Math.max(t, 0.4);
 }
 
 // ---------------------------------------------------------------- buttons & keys
@@ -1979,6 +2057,7 @@ function tick(dt, now) {
   updateHint();
   house.updateView(camera, controls.target, dt, cutaway);
   shop.updateView(camera, controls.target, dt);
+  seeThrough.update(camera, lennieOnScreen(_seeCenter), dt);
   updateShards(dt * timeScale);
   if (!replay.playing) shop.update(dt * timeScale);
   updateHud(dt, now);

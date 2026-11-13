@@ -82,7 +82,7 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 
 In aim mode a dotted arc runs from Lennie to whatever you point at: a window, a doorway, a corner, the trampoline. It stops at the first thing in the way and the ring turns white when it won't reach, so you can see where he'll really hit. A click throws him along it with a little somersault. Dragging still orbits the camera, and grabbing a limb still works as usual.
 
-Walls, floors and the roof between the camera and the point it's looking at fade out automatically, so you can see Lennie anywhere in the house. Furniture, bushes and trees don't fade, so the camera stops in front of them instead of ending up inside one. Turning the camera goes no lower than eye level, so it can't dip under the floor.
+Walls, floors and the roof between the camera and the point it's looking at fade out automatically, so you can see Lennie anywhere in the house. Anything else between the camera and Lennie (a shelf, a freezer, the couch, a tree, a pile of fallen groceries) turns see-through in a soft circle around him, and so does anything right in front of the lens, so he's never hidden. The camera only moves in when it would otherwise end up inside furniture, a bush or a tree, and glides there and back instead of hopping. Turning the camera goes no lower than eye level, so it can't dip under the floor.
 
 During a toss the camera stays put while Lennie is in view; once he's about to fly out of the picture (on a phone that's almost straight away), it chases him until he lands.
 
@@ -121,6 +121,7 @@ Lennie reacts: a grin and a "wheee!" when he's flung, "ow!" and "oof" when he hi
 - `src/yard.js`: sky, lighting, lawn, back-garden fence, the play area's edges, garden trees, bushes, the hedge and the trampoline
 - `src/streetscape.js`: the street in front: cycle path, verge trees and lamps, road and the townhouses
 - `src/supermarket.js`: the supermarket across the road, inside and out (the breakable shop window, aisles, freezers and fridges), with its own fading walls and roof
+- `src/seethrough.js`: the see-through circle that keeps Lennie in view through whatever is between him and the camera
 - `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking
 - `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, breeze blocks, wallpaper, wood, floor tiles, grass)
 - `src/ragdoll.js`: Lennie's bodies, joints and look (1.90 m and 100 kg, with a bit of a belly, a scruffy greying beard, a receding hairline and glasses, in a worn hoodie and joggers)
