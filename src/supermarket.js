@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { floorGeometry, meterBoxUVs } from './textures.js';
-import { createStock, ASSORTMENT } from './products.js';
+import { createStock, ASSORTMENT, PRODUCTS, halfSize } from './products.js';
 
 // The supermarket across the road, after the real one: a long orange box
 // under a zigzag of grey gables, with a brick-and-glass entrance and a big
@@ -422,11 +422,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   // a little seeded randomness so the shelves look the same every time
   let seed = 11;
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-  const _m = new THREE.Matrix4();
-  const _q = new THREE.Quaternion();
-  const _s = new THREE.Vector3();
-  const _p = new THREE.Vector3();
-  const _c = new THREE.Color();
+  const _out = new THREE.Vector3();
 
   // ---------------------------------------------------------------- checkouts by the windows
   const counterMat = std({ color: 0xf2f0ea, roughness: 0.6 });
@@ -445,34 +441,44 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   }
 
   // ---------------------------------------------------------------- fruit and veg crates with offer signs
+  // The fruit and veg are loose products (products.js), like the groceries on
+  // the shelves: a knock against a crate table sends them rolling, off the
+  // table and across the floor.
   const crate = std({ color: 0x4b7f33, roughness: 0.8 });
-  const produceKinds = [
-    { color: 0xe8473b, r: 0.085 }, // apples
-    { color: 0xf59a23, r: 0.085 }, // oranges
-    { color: 0x8cc63f, r: 0.16 }, // cabbages
-    { color: 0xf6d04d, r: 0.07 }, // lemons
-    { color: 0xd8312a, r: 0.06 }, // tomatoes
-    { color: 0x7a3e9d, r: 0.075 }, // plums
-    { color: 0x3e8f3a, r: 0.05 }, // green beans (in bunches)
-    { color: 0xe07b2a, r: 0.06 }, // carrots
-    { color: 0xa5d36b, r: 0.08 }, // pears
-  ];
-  const produce = [];
+  const produceKinds = ['appel', 'sinaasappel', 'kool', 'citroen', 'tomaat', 'pruim', 'boontjes', 'wortel', 'peer'];
   const prices = ['0,99', '1,49', '2,49', '0,79', '1,99', '0,89'];
-  const tables = [[0.6, 4.1], [4.6, 8.1], [8.6, 12.1]];
-  tables.forEach(([x0, x1], t) => {
-    const z0 = IN.z0 + 2.0;
-    const z1 = z0 + 1.6;
-    boxAt([x0, 0, z0], [x1, 0.72, z1], crate, { cast: true });
-    solid([x0, 0, z0], [x1, 0.8, z1], 'furniture');
+  const CRATE = { z0: IN.z0 + 2.0, z1: IN.z0 + 3.6, top: 0.72 };
+  const crateXs = [[0.6, 4.1], [4.6, 8.1], [8.6, 12.1]];
+  const stock = createStock(scene, { bounds: IN, tables: crateXs.map(([x0, x1]) => ({ x0, x1, z0: CRATE.z0, z1: CRATE.z1, y: CRATE.top })) });
+  const _mid = new THREE.Vector3();
+  crateXs.forEach(([x0, x1], t) => {
+    const { z0, z1, top } = CRATE;
+    boxAt([x0, 0, z0], [x1, top, z1], crate, { cast: true });
+    const table = solid([x0, 0, z0], [x1, 0.8, z1], 'furniture');
+    const section = stock.section();
+    table.surface.mess = 'Clean-up at the veg!';
+    table.surface.onHit = (point, strength, push) => {
+      if (point.y > 0.77) {
+        // on top: the fruit scatters away from where he lands, the way he was going
+        _out.set(push?.x ?? 0, 0, push?.z ?? 0);
+        if (_out.lengthSq() < 1) _out.add(_mid.set(point.x - (x0 + x1) / 2, 0, point.z - (z0 + z1) / 2).normalize());
+        return stock.knock(section, point, _out.normalize(), strength, push, { radius: Math.min(0.9, 0.3 + strength * 0.06) });
+      }
+      // a side: the fruit along that edge rolls off it
+      const dx = Math.min(point.x - x0, x1 - point.x);
+      const dz = Math.min(point.z - z0, z1 - point.z);
+      if (dx < dz) _out.set(point.x < (x0 + x1) / 2 ? -1 : 1, 0, 0);
+      else _out.set(0, 0, point.z < (z0 + z1) / 2 ? -1 : 1);
+      return stock.knock(section, _mid.set(point.x, top, point.z), _out, strength, push, { chance: 0.8 });
+    };
     const parts = 3;
     const w = (x1 - x0) / parts;
     for (let p = 0; p < parts; p++) {
-      const kind = produceKinds[(t * parts + p) % produceKinds.length];
-      const r = kind.r;
+      const id = produceKinds[(t * parts + p) % produceKinds.length];
+      const r = halfSize(PRODUCTS[id])[0];
       for (let x = x0 + p * w + r + 0.05; x < x0 + (p + 1) * w - r - 0.03; x += r * 2.05) {
         for (let z = z0 + r + 0.05; z < z1 - r - 0.03; z += r * 2.05) {
-          produce.push([x + (rnd() - 0.5) * 0.02, 0.72 + r * (0.85 + rnd() * 0.3), z, r, kind.color]);
+          stock.place(id, x + (rnd() - 0.5) * 0.02, top + r * (rnd() - 0.5) * 0.3, z, rnd() * Math.PI * 2, section);
         }
       }
       // the red offer card on a pole behind each compartment
@@ -482,26 +488,16 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
       boxAt([cx - 0.24, 1.45, z1 - 0.06], [cx + 0.24, 2.05, z1 - 0.03], faces(card, card, card, card, card, card));
     }
   });
-  const ball = new THREE.IcosahedronGeometry(1, 1);
-  const fruit = new THREE.InstancedMesh(ball, std({ color: 0xffffff, roughness: 0.55, flatShading: true }), produce.length);
-  produce.forEach(([x, y, z, r, color], i) => {
-    fruit.setMatrixAt(i, _m.compose(_p.set(x, y, z), _q.identity(), _s.set(r, r, r)));
-    fruit.setColorAt(i, _c.setHex(color));
-  });
-  fruit.castShadow = true;
-  scene.add(fruit);
 
   // ---------------------------------------------------------------- aisles of shelves
   // Each aisle is stocked with products that belong there (products.js); a
   // hard knock against a shelf sends the ones near the impact tumbling out.
-  const stock = createStock(scene, { bounds: IN });
   const shelfMat = std({ color: 0xd9dcdf, roughness: 0.5, metalness: 0.2 });
   const endCap = green;
   const AISLE = { z0: 36.2, z1: 42.4, h: 1.95, half: 0.55 };
   const shelfYs = [0.12, 0.55, 0.98, 1.41];
   const aisleNames = ['BROOD', 'ZUIVEL', 'KAAS', 'SNOEP', 'DRINKEN', 'PASTA & SOEP'];
   const aisleXs = [-18, -13, -8, -3, 2, 7];
-  const _out = new THREE.Vector3();
   aisleXs.forEach((cx, a) => {
     const { z0, z1, h, half } = AISLE;
     boxAt([cx - half, 0, z0], [cx + half, 0.12, z1], shelfMat);

@@ -6,7 +6,8 @@ import * as THREE from 'three';
 // names are plain Dutch words, not real brands.
 //
 // All products of one kind share one InstancedMesh, so thousands of them cost
-// a few draw calls. When Lennie crashes into a shelf, the products near the
+// a few draw calls. When Lennie crashes into a shelf (or the fruit and veg
+// crates), the products near the
 // impact tumble off: they fly, bounce and come to rest on the floor (simple
 // hand-rolled motion, not physics bodies, so they never slow the game down or
 // get in Lennie's way). restock() puts everything back.
@@ -73,6 +74,16 @@ export const PRODUCTS = {
   friet: { shape: 'box', w: 0.2, h: 0.3, d: 0.07, face: { bg: '#3b7dd8', band: '#e2231a', text: 'FRIET', art: ['fries'] } },
   doperwten: { shape: 'box', w: 0.2, h: 0.28, d: 0.06, face: { bg: '#2e8b57', band: '#ffffff', fg: '#2e8b57', text: 'DOPERWTEN', art: ['peas'] } },
   vissticks: { shape: 'box', w: 0.2, h: 0.06, d: 0.12, stack: true, face: { bg: '#3b7dd8', fg: '#ffffff', text: 'VISSTICKS', art: ['fish'] } },
+  // fruit and veg, loose on the crate tables by the door (veg: a faceted, matt ball)
+  appel: { shape: 'ball', veg: true, r: 0.085, face: { bg: '#e8473b' } },
+  sinaasappel: { shape: 'ball', veg: true, r: 0.085, face: { bg: '#f59a23' } },
+  kool: { shape: 'ball', veg: true, r: 0.16, face: { bg: '#8cc63f' } },
+  citroen: { shape: 'ball', veg: true, r: 0.07, face: { bg: '#f6d04d' } },
+  tomaat: { shape: 'ball', veg: true, r: 0.06, face: { bg: '#d8312a' } },
+  pruim: { shape: 'ball', veg: true, r: 0.075, face: { bg: '#7a3e9d' } },
+  boontjes: { shape: 'ball', veg: true, r: 0.05, face: { bg: '#3e8f3a' } },
+  wortel: { shape: 'ball', veg: true, r: 0.06, face: { bg: '#e07b2a' } },
+  peer: { shape: 'ball', veg: true, r: 0.08, face: { bg: '#a5d36b' } },
 };
 
 // What goes on each shelf (bottom to top) of each aisle, the freezers and the drinks fridges.
@@ -364,6 +375,7 @@ function buildLook(p) {
       return { geo: new THREE.CylinderGeometry(p.r, p.r, p.h, 24), material: [side, cap, cap] };
     }
     case 'ball': {
+      if (p.veg) return { geo: new THREE.IcosahedronGeometry(p.r, 1), material: mat({ color: f.bg, flatShading: true }) };
       return { geo: new THREE.SphereGeometry(p.r, 14, 10), material: mat({ color: f.bg, roughness: 0.35 }) };
     }
     case 'bottle': {
@@ -402,9 +414,10 @@ const UP = new THREE.Vector3(0, 1, 0);
 
 /**
  * All the products in the shop. `bounds` keeps tumbling products inside the
- * shop floor ({x0, x1, z0, z1}); `floorY` is the floor's height.
+ * shop floor ({x0, x1, z0, z1}); `floorY` is the floor's height. `tables`
+ * ({x0, x1, z0, z1, y}) are flat tops products can land and roll on (and off).
  */
-export function createStock(scene, { bounds, floorY = 0.012 }) {
+export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
   const kinds = new Map(); // product id → { look, items, mesh }
   const items = [];
   const flying = new Set();
@@ -431,7 +444,7 @@ export function createStock(scene, { bounds, floorY = 0.012 }) {
       homeQ: new THREE.Quaternion().setFromAxisAngle(UP, yaw + (rnd() - 0.5) * 0.08),
       pos: new THREE.Vector3(), quat: new THREE.Quaternion(),
       vel: new THREE.Vector3(), spin: new THREE.Vector3(),
-      state: 'home', restQ: null, t: 0,
+      state: 'home', restQ: null, t: 0, ground: floorY,
     };
     k.items.push(item);
     items.push(item);
@@ -540,6 +553,32 @@ export function createStock(scene, { bounds, floorY = 0.012 }) {
     return Math.abs(e[1]) * hx + Math.abs(e[5]) * hy + Math.abs(e[9]) * hz;
   }
 
+  /** What a product would land on right below it: a table top it's above, or the floor. */
+  function groundUnder(item, low) {
+    let g = floorY;
+    const bottom = item.pos.y - low + 0.03;
+    for (const t of tables) {
+      if (t.y > g && t.y <= bottom && item.pos.x > t.x0 && item.pos.x < t.x1 && item.pos.z > t.z0 && item.pos.z < t.z1) g = t.y;
+    }
+    return g;
+  }
+
+  /** Below a table's top its sides are solid: push a product back out and bounce it off. */
+  function keepOutOfTables(item, low) {
+    const r = Math.max(item.k.half[0], item.k.half[2]);
+    const p = item.pos;
+    for (const t of tables) {
+      if (p.y - low > t.y - 0.02) continue;
+      if (p.x < t.x0 - r || p.x > t.x1 + r || p.z < t.z0 - r || p.z > t.z1 + r) continue;
+      // out through the nearest side
+      const sides = [[t.x0 - r - p.x, 'x'], [t.x1 + r - p.x, 'x'], [t.z0 - r - p.z, 'z'], [t.z1 + r - p.z, 'z']];
+      let [d, axis] = sides[0];
+      for (const s of sides) if (Math.abs(s[0]) < Math.abs(d)) [d, axis] = s;
+      p[axis] += d;
+      if (item.vel[axis] * d < 0) item.vel[axis] *= -0.3;
+    }
+  }
+
   /** Moves everything that's falling, bouncing or settling. */
   function update(dt) {
     if (!flying.size || dt <= 0) return 0;
@@ -555,8 +594,12 @@ export function createStock(scene, { bounds, floorY = 0.012 }) {
         if (item.pos.x < bounds.x0 + 0.1 || item.pos.x > bounds.x1 - 0.1) { item.pos.x = Math.min(bounds.x1 - 0.1, Math.max(bounds.x0 + 0.1, item.pos.x)); item.vel.x *= -0.3; }
         if (item.pos.z < bounds.z0 + 0.1 || item.pos.z > bounds.z1 - 0.1) { item.pos.z = Math.min(bounds.z1 - 0.1, Math.max(bounds.z0 + 0.1, item.pos.z)); item.vel.z *= -0.3; }
         const low = lowest(item);
-        if (item.pos.y - low < floorY) {
-          item.pos.y = floorY + low;
+        // both judged from where it was before this step, so landing on a table top isn't hitting its side
+        keepOutOfTables(item, low + item.vel.y * dt);
+        const ground = groundUnder(item, low + item.vel.y * dt);
+        if (item.pos.y - low < ground) {
+          item.pos.y = ground + low;
+          item.ground = ground;
           if (item.vel.y < -1.4 && item.t < 3) {
             item.vel.y *= -0.3;
             item.vel.x *= 0.6;
@@ -579,10 +622,20 @@ export function createStock(scene, { bounds, floorY = 0.012 }) {
         item.pos.z += item.vel.z * dt;
         item.pos.x = Math.min(bounds.x1 - 0.1, Math.max(bounds.x0 + 0.1, item.pos.x));
         item.pos.z = Math.min(bounds.z1 - 0.1, Math.max(bounds.z0 + 0.1, item.pos.z));
-        item.pos.y = floorY + lowest(item);
+        const low = lowest(item);
+        if (item.ground < 0.1) keepOutOfTables(item, low); // rolling on the floor
+        const ground = groundUnder(item, low);
+        if (ground < item.ground - 0.01) {
+          // rolled off the edge of a table: fall again
+          item.state = 'flying';
+          item.t = 0;
+          write(item);
+          continue;
+        }
+        item.pos.y = ground + low;
         if (item.t > 0.6 && item.vel.lengthSq() < 0.0004) {
           item.quat.copy(item.restQ);
-          item.pos.y = floorY + lowest(item);
+          item.pos.y = ground + lowest(item);
           item.state = 'down';
           flying.delete(item);
         }
