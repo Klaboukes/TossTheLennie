@@ -1033,7 +1033,33 @@ const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _move = new THREE.Vector3();
 
+// The camera stays inside the play area like on a spring: when turning it
+// would take it past an edge or under the ground, it slides in closer to what
+// it's looking at instead of getting stuck, and moves back out once there's
+// room again. camWanted is the distance the player chose (by zooming).
+let camWanted = null;
+const _arm = new THREE.Vector3();
+const CAM_BOX = { margin: 0.2, top: 30 };
+function armLimit(o, dir) {
+  const h = YARD.half - CAM_BOX.margin;
+  const lo = [-h, CAM_BOX.margin, -h];
+  const hi = [h, CAM_BOX.top, YARD.front - CAM_BOX.margin];
+  const oa = [o.x, o.y, o.z];
+  const da = [dir.x, dir.y, dir.z];
+  let t = Infinity;
+  for (let i = 0; i < 3; i++) {
+    if (da[i] > 1e-6) t = Math.min(t, (hi[i] - oa[i]) / da[i]);
+    else if (da[i] < -1e-6) t = Math.min(t, (lo[i] - oa[i]) / da[i]);
+  }
+  return Math.max(t, 0.05);
+}
+
 function updateCamera(dt) {
+  // put the camera back out at the chosen distance before the controls turn it
+  if (camWanted !== null) {
+    _arm.subVectors(camera.position, controls.target);
+    if (_arm.lengthSq() > 1e-8) camera.position.copy(controls.target).addScaledVector(_arm.normalize(), camWanted);
+  }
   if (camAnim) {
     camAnim.t += dt;
     const k = Math.min(1, camAnim.t / camAnim.dur);
@@ -1069,8 +1095,12 @@ function updateCamera(dt) {
   }
 
   controls.update();
-  clampInWorld(camera.position, 0.2);
   clampInWorld(controls.target, 0.05);
+  _arm.subVectors(camera.position, controls.target);
+  camWanted = _arm.length();
+  if (camWanted < 1e-4) return;
+  _arm.divideScalar(camWanted);
+  camera.position.copy(controls.target).addScaledVector(_arm, Math.min(camWanted, armLimit(controls.target, _arm)));
 }
 
 // ---------------------------------------------------------------- buttons & keys
@@ -1298,10 +1328,70 @@ function subStep(h) {
   }
   if (aim.guide) guideLaunch();
   if (guard.check() === 'lost') rescueLost();
+  else if (bodies.some((b) => outsideArea(b.position, 0.3))) putBackNearEdge();
+}
+
+// The play area (yard.js): the invisible walls stand just outside these lines.
+const AREA = { x0: -YARD.half, x1: YARD.half, z0: -YARD.half, z1: YARD.front };
+function outsideArea(p, slack = 0) {
+  return p.x < AREA.x0 - slack || p.x > AREA.x1 + slack || p.z < AREA.z0 - slack || p.z > AREA.z1 + slack;
+}
+
+/**
+ * Lennie got out of the play area (a fast limb slipped through an invisible
+ * wall): stand him on the ground just inside, as close as possible to where he
+ * left. Returns false if there's no free spot nearby.
+ */
+const EDGE_INSET = 1.2;
+function putBackNearEdge() {
+  const c = lennie.center(_center);
+  const inX = (x) => clamp(x, AREA.x0 + EDGE_INSET, AREA.x1 - EDGE_INSET);
+  const inZ = (z) => clamp(z, AREA.z0 + EDGE_INSET, AREA.z1 - EDGE_INSET);
+  const bx = inX(c.x);
+  const bz = inZ(c.z);
+  const tried = new Set();
+  // the nearest spot first, then rings around it, keeping only open ground
+  for (let r = 0; r <= 12; r += 1) {
+    const n = r === 0 ? 1 : 8 + r * 4;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const x = inX(bx + Math.cos(a) * r);
+      const z = inZ(bz + Math.sin(a) * r);
+      const key = `${x.toFixed(1)},${z.toFixed(1)}`;
+      if (tried.has(key)) continue;
+      tried.add(key);
+      _from.set(x, 25, z);
+      _to.set(x, -1, z);
+      _rayHit.reset();
+      if (!world.raycastClosest(_from, _to, SCENERY_ONLY, _rayHit)) continue;
+      const ground = _rayHit.hitPointWorld.y;
+      if (ground > 0.6) continue; // a roof, a car, a hedge: not the ground
+      lennie.reset({ x, z, height: ground + 0.05, yaw: Math.atan2(bx - c.x, bz - c.z) });
+      if (bodies.some((b) => guard.isEmbedded(b.position))) continue;
+      placedBack("Lennie left the play area, so he's back by the edge");
+      return true;
+    }
+  }
+  return false;
+}
+
+/** After teleporting Lennie: the same tidy-up as dropping him in. */
+function placedBack(message) {
+  if (grab) endGrab();
+  guard.forget();
+  aim.guide = null;
+  nudge();
+  lennie.setExpression('normal');
+  toss.state = 'idle';
+  resetChain();
+  hideResult();
+  focusLennie(0.8);
+  toast(message, 1800);
 }
 
 // Last resort when Lennie is stuck in the scenery with no good pose to go back to.
 function rescueLost() {
+  if (bodies.some((b) => outsideArea(b.position, 0.05)) && putBackNearEdge()) return;
   const level = Math.min(2, house.levelOf(lennie.center(_center)));
   dropLennie(level);
   toast(`Lennie got stuck, so he's back on floor ${level + 1}`, 1800);

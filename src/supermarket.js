@@ -260,6 +260,24 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     const overEntrance = x === -8.5 || x === -3.5;
     const m = add(new THREE.Mesh(gableGeo, overEntrance ? glazed : slate), { cast: true, fade: x > SHOP.hall ? 'roof' : null });
     m.position.set(x, SHOP.h, SHOP.z0 + 0.2);
+    gableBody(x, gableW, gableH, SHOP.z0 + 0.2, SHOP.z1 - 0.2);
+  }
+  /** A solid triangular prism under one gable, so Lennie lands on (and slides down) its slopes. */
+  function gableBody(cx, w, hgt, za, zb) {
+    const y = SHOP.h;
+    const pts = [[cx - w / 2, y, za], [cx + w / 2, y, za], [cx, y + hgt, za], [cx - w / 2, y, zb], [cx + w / 2, y, zb], [cx, y + hgt, zb]];
+    const c = [0, 1, 2].map((i) => pts.reduce((s, p) => s + p[i], 0) / pts.length);
+    const verts = pts.map((p) => new CANNON.Vec3(p[0] - c[0], p[1] - c[1], p[2] - c[2]));
+    const faceList = [[0, 1, 2], [3, 4, 5], [0, 1, 4, 3], [1, 2, 5, 4], [2, 0, 3, 5]].map((f) => {
+      const [a, b, d] = f.map((i) => verts[i]);
+      const n = b.vsub(a).cross(d.vsub(a));
+      const mid = f.reduce((s, i) => s.vadd(verts[i]), new CANNON.Vec3()).scale(1 / f.length);
+      return n.dot(mid) < 0 ? [...f].reverse() : f; // normals point away from the centre
+    });
+    const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.ConvexPolyhedron({ vertices: verts, faces: faceList }) });
+    b.position.set(...c);
+    b.surface = { kind: 'roof' };
+    world.addBody(b);
   }
 
   // ---------------------------------------------------------------- the entrance: brick and glass under the logo
