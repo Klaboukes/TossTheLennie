@@ -30,19 +30,29 @@ function shade(hex, amount) {
   return `#${c.getHexString()}`;
 }
 
-/** Horizontal lap siding, white-ish so the material colour tints it. */
-function siding() {
-  return canvasTexture(256, 1, (g, s) => {
-    const rows = 8;
+/** Running-bond brickwork, drawn in its own colours (not tinted). */
+function brick(base, mortar, seed) {
+  const r = rng(seed);
+  return canvasTexture(512, 1.2, (g, s) => {
+    const rows = 12; // 10 cm courses
+    const cols = 4; // 30 cm bricks: chunky, comic-sized
     const h = s / rows;
+    const w = s / cols;
+    const m = 4; // mortar joint
+    g.fillStyle = mortar;
+    g.fillRect(0, 0, s, s);
     for (let i = 0; i < rows; i++) {
-      const grad = g.createLinearGradient(0, i * h, 0, (i + 1) * h);
-      grad.addColorStop(0, '#ffffff');
-      grad.addColorStop(1, '#dedede');
-      g.fillStyle = grad;
-      g.fillRect(0, i * h, s, h);
-      g.fillStyle = '#a9a9a9';
-      g.fillRect(0, (i + 1) * h - 3, s, 3);
+      const off = i % 2 ? w / 2 : 0;
+      for (let x = -w; x < s + w; x += w) {
+        const bx = x + off + m / 2;
+        const by = i * h + m / 2;
+        g.fillStyle = shade(base, (r() - 0.5) * 0.09);
+        g.fillRect(bx, by, w - m, h - m);
+        g.fillStyle = 'rgba(255,255,255,0.12)';
+        g.fillRect(bx, by, w - m, 2);
+        g.fillStyle = 'rgba(0,0,0,0.16)';
+        g.fillRect(bx, by + h - m - 3, w - m, 3);
+      }
     }
   });
 }
@@ -137,22 +147,86 @@ function grass() {
   });
 }
 
-function shingles() {
+/** Dark Dutch roof pantiles: rows of wavy tiles with a highlight on each crest. */
+function pantiles() {
   const r = rng(5);
   return canvasTexture(256, 1.2, (g, s) => {
-    const rows = 6;
+    const rows = 5;
+    const cols = 4;
     const h = s / rows;
-    const w = s / 5;
-    g.fillStyle = '#5a2a22';
+    const w = s / cols;
+    g.fillStyle = '#231d1b';
     g.fillRect(0, 0, s, s);
     for (let i = 0; i < rows; i++) {
-      const off = i % 2 ? w / 2 : 0;
-      for (let x = -w; x < s + w; x += w) {
-        g.fillStyle = shade('#9a3d2f', (r() - 0.5) * 0.12);
-        g.fillRect(x + off + 1.5, i * h, w - 3, h - 4);
-        g.fillStyle = 'rgba(0,0,0,0.25)';
-        g.fillRect(x + off + 1.5, i * h + h - 8, w - 3, 4);
+      for (let j = 0; j < cols; j++) {
+        const x = j * w;
+        const y = i * h;
+        const tone = shade('#463a36', (r() - 0.5) * 0.06);
+        const grad = g.createLinearGradient(x, 0, x + w, 0);
+        grad.addColorStop(0, '#2a2321');
+        grad.addColorStop(0.35, tone);
+        grad.addColorStop(0.5, shade(tone, 0.08));
+        grad.addColorStop(0.75, '#2e2624');
+        grad.addColorStop(1, '#2a2321');
+        g.fillStyle = grad;
+        g.fillRect(x + 1, y + 1, w - 2, h - 6);
+        g.fillStyle = 'rgba(0,0,0,0.35)';
+        g.fillRect(x, y + h - 6, w, 5);
       }
+    }
+  });
+}
+
+/** Horizontally grooved panel between stacked windows; white, so the material colour tints it. */
+function grooves() {
+  return canvasTexture(128, 0.5, (g, s) => {
+    const n = 4; // 12.5 cm grooves
+    const h = s / n;
+    for (let i = 0; i < n; i++) {
+      g.fillStyle = '#d6d6d6';
+      g.fillRect(0, i * h, s, h);
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, i * h, s, 3);
+      g.fillStyle = '#9a9a9a';
+      g.fillRect(0, i * h + h - 4, s, 4);
+    }
+  });
+}
+
+/** Cartoon window glass for the neighbours: a flat colour with diagonal glints. */
+function fakeGlass(color, glint) {
+  return canvasTexture(256, 2, (g, s) => {
+    g.fillStyle = color;
+    g.fillRect(0, 0, s, s);
+    g.strokeStyle = glint;
+    g.lineCap = 'butt';
+    // stripes drawn three times (shifted by the tile size) so they wrap seamlessly
+    for (const off of [-s, 0, s]) {
+      for (const [x, w] of [[0.2, 26], [0.36, 9]]) {
+        g.lineWidth = w;
+        g.beginPath();
+        g.moveTo(x * s + off - s / 2, s);
+        g.lineTo(x * s + off + s / 2, 0);
+        g.stroke();
+      }
+    }
+  });
+}
+
+/** A concrete decorative "breeze block" with a rounded cut-out pattern; one per face. */
+function breezeBlock() {
+  return canvasTexture(128, 1, (g, s) => {
+    g.fillStyle = '#d9d4cb';
+    g.fillRect(0, 0, s, s);
+    g.strokeStyle = '#a49d92';
+    g.lineWidth = 4;
+    g.strokeRect(2, 2, s - 4, s - 4);
+    g.fillStyle = '#3a3330';
+    const q = s / 4;
+    for (const [cx, cy] of [[q * 1.35, q * 1.35], [q * 2.65, q * 1.35], [q * 1.35, q * 2.65], [q * 2.65, q * 2.65]]) {
+      g.beginPath();
+      g.arc(cx, cy, q * 0.48, 0, Math.PI * 2);
+      g.fill();
     }
   });
 }
@@ -175,13 +249,18 @@ let cache = null;
 export function textures() {
   if (!cache) {
     cache = {
-      siding: siding(),
+      brick: brick('#8e5a48', '#bdb1a5', 21),
+      brickLight: brick('#a58a7a', '#d2c8bd', 23),
       wallpaper: wallpaper(),
       wood: wood(),
       tiles: tiles(),
       carpet: carpet(),
       grass: grass(),
-      shingles: shingles(),
+      pantiles: pantiles(),
+      grooves: grooves(),
+      glassSky: fakeGlass('#8cc4e8', 'rgba(255,255,255,0.55)'),
+      glassWarm: fakeGlass('#f0a75e', 'rgba(255,236,190,0.45)'),
+      breezeBlock: breezeBlock(),
       stone: stone(),
     };
   }

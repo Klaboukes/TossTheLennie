@@ -3,6 +3,7 @@ import * as CANNON from 'cannon-es';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildHouse, HOUSE } from './house.js';
 import { buildYard, YARD } from './yard.js';
+import { STREET } from './streetscape.js';
 import { Ragdoll } from './ragdoll.js';
 import { measureContortion, evaluateToss, chainMultiplier } from './scoring.js';
 import { Sfx } from './audio.js';
@@ -92,7 +93,7 @@ contact(physMats.trampoline, 0.5, 0.97);
 contact(physMats.ground, 0.8, 0.2);
 contact(lennieMat, 0.4, 0.05);
 
-buildYard(scene, world, physMats);
+const { shop } = buildYard(scene, world, physMats);
 const house = buildHouse(scene, world, physMats);
 const lennie = new Ragdoll(world, scene, lennieMat);
 // A little shove so he flops over instead of landing on his feet.
@@ -254,6 +255,8 @@ function houseBonuses(center) {
   const fell = (toss.startLevel ?? 0) - endLevel;
   if (fell >= 1) bonuses.push({ label: `Fell ${fell} floor${fell === 1 ? '' : 's'}`, value: 150 * fell });
   if (onRoof && toss.startLevel < 3) bonuses.push({ label: 'Stranded on the roof!', value: 350 });
+  if (shop.isInside(center) && !toss.startInShop) bonuses.push({ label: 'Went shopping!', value: 300 });
+  if (shop.isOnRoof(center) && !toss.startOnShopRoof) bonuses.push({ label: 'On the supermarket roof!', value: 350 });
   const steps = toss.stairs.size;
   if (steps >= 10) bonuses.push({ label: `Full flight! (${steps} steps)`, value: 400 });
   else if (steps >= 3) bonuses.push({ label: `Stair tumble (${steps} steps)`, value: 200 });
@@ -294,7 +297,7 @@ function finishToss() {
     bump(ui.best);
     toast(`New best toss: ${fmt(result.total)}!`);
   }
-  showResult(result, house.locate(center));
+  showResult(result, locate(center));
   sfx.score(result.total > 1600 ? 3 : result.total > 900 ? 2 : result.total > 400 ? 1 : 0);
   lennie.setExpression(result.total > 900 || toss.bounces >= 5 ? 'dizzy' : 'ouch', result.total > 900 ? 0 : 2.5);
   const head = lennie.parts.head.body.position;
@@ -500,11 +503,20 @@ function pickPart() {
   return hit ? { hit, name: hit.object.userData.part } : null;
 }
 
+/** Where a point is, in words: a room of the house, the supermarket, the street... */
+function locate(p) {
+  if (shop.isInside(p)) return 'in the supermarket';
+  if (shop.isOnRoof(p)) return 'on the supermarket roof';
+  const where = house.locate(p);
+  if (where === 'in the yard' && p.z > STREET.cycle[0] - 0.6) return p.z > STREET.road[0] && p.z < STREET.road[1] ? 'in the road' : 'in the street';
+  return where;
+}
+
 function clampInWorld(v, margin) {
   const h = YARD.half - margin;
   v.x = clamp(v.x, -h, h);
   v.y = clamp(v.y, margin, 30);
-  v.z = clamp(v.z, -h, h);
+  v.z = clamp(v.z, -h, YARD.front - margin);
   return v;
 }
 
@@ -616,6 +628,8 @@ function beginFlight() {
     const c = lennie.center(_center);
     toss.startLevel = house.levelOf(c);
     toss.startInside = house.isInside(c);
+    toss.startInShop = shop.isInside(c);
+    toss.startOnShopRoof = shop.isOnRoof(c);
   }
   toss.state = 'flying';
   toss.time = 0;
@@ -827,7 +841,7 @@ function aimTarget() {
   for (const hit of raycaster.intersectObjects(scene.children, true)) {
     const o = hit.object;
     if (hit.distance > 100) break; // the sky
-    if (!o.isMesh || o.userData.part || o.userData.noAim || house.isFaded(o)) continue;
+    if (!o.isMesh || o.userData.part || o.userData.noAim || house.isFaded(o) || shop.isFaded(o)) continue;
     const normal = hit.face ? hit.face.normal.clone().transformDirection(o.matrixWorld) : new THREE.Vector3(0, 1, 0);
     if (normal.dot(raycaster.ray.direction) > 0) normal.negate();
     // The physics body behind what's under the pointer. Window and door bodies
@@ -1241,7 +1255,7 @@ function updateHud(dt, now) {
     if (toss.stairs.size) bits.push(plural(toss.stairs.size, 'step'));
     status = `Flying! ${bits.join(' · ')}${combo}`;
   } else {
-    const where = house.locate(lennie.center(_center));
+    const where = locate(lennie.center(_center));
     const place = `<b>${where[0].toUpperCase()}${where.slice(1)}</b>`;
     status = toss.state === 'scored' ? `Scored! Landed ${where}.` : `${place} · grab a limb and fling!`;
     if (aim.on && !hoverPart) {
@@ -1317,6 +1331,7 @@ function tick(dt, now) {
   updateCamera(dt);
   updateAim();
   house.updateView(camera, controls.target, dt, cutaway);
+  shop.updateView(camera, controls.target, dt);
   updateShards(dt * timeScale);
   updateHud(dt, now);
   renderer.render(scene, camera);

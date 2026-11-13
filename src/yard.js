@@ -1,8 +1,22 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { textures, floorGeometry } from './textures.js';
+import { buildStreet, STREET } from './streetscape.js';
+import { SHOP } from './supermarket.js';
 
-export const YARD = { half: 22 };
+// The play area: x and the back garden reach ±half; at the front it runs
+// across the street and through the supermarket to its back wall (see
+// streetscape.js and supermarket.js).
+export const YARD = { half: 22, front: SHOP.z1 - SHOP.t };
+
+// Deterministic pseudo-random, so the hedge looks the same every load.
+function rng(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
 
 export function buildYard(scene, world, physMats) {
   const tex = textures();
@@ -44,51 +58,55 @@ export function buildYard(scene, world, physMats) {
   ground.surface = { kind: 'ground' };
   world.addBody(ground);
 
-  const path = new THREE.Mesh(floorGeometry(-1.3, 5.15, 0, YARD.half), std({ map: tex.stone }));
+  // garden path from the front door (house.js FRONT_DOOR is x −2.2 … −1.1) to the cycle path
+  const path = new THREE.Mesh(floorGeometry(-2.3, 5.15, -1.0, STREET.cycle[0]), std({ map: tex.stone }));
   path.position.y = 0.006;
   path.receiveShadow = true;
   scene.add(path);
-  const drive = new THREE.Mesh(floorGeometry(7, 1, 10.2, YARD.half), std({ color: 0x8d8f93, roughness: 0.95 }));
-  drive.position.y = 0.005;
-  drive.receiveShadow = true;
-  scene.add(drive);
 
-  // ------------------------------------------------------------ fence (visual) + invisible boundary planes
+  // ------------------------------------------------------------ back-garden fence (visual) + invisible boundary planes
+  // Like the real street, the front gardens are open to the street; only the
+  // back gardens are fenced. The invisible sides run all the way to the front.
   const h = YARD.half;
   const spacing = 0.28;
   const perSide = Math.floor((2 * h) / spacing);
-  const pickets = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 1.0, 0.04), std({ color: 0xffffff, roughness: 0.7 }), perSide * 4);
+  const rowGap = 5.3; // the side fences stop at the end houses of the row (z > −5.125)
+  const pickets = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 1.0, 0.04), std({ color: 0xffffff, roughness: 0.7 }), perSide * 3);
   const m = new THREE.Matrix4();
   let n = 0;
   for (let i = 0; i < perSide; i++) {
     const a = -h + (i + 0.5) * spacing;
-    m.makeTranslation(a, 0.5, h); pickets.setMatrixAt(n++, m);
     m.makeTranslation(a, 0.5, -h); pickets.setMatrixAt(n++, m);
+    if (a > -rowGap) continue;
     m.makeRotationY(Math.PI / 2).setPosition(h, 0.5, a); pickets.setMatrixAt(n++, m);
     m.makeRotationY(Math.PI / 2).setPosition(-h, 0.5, a); pickets.setMatrixAt(n++, m);
   }
+  pickets.count = n;
   pickets.castShadow = true;
   scene.add(pickets);
   const railMat = std({ color: 0xf2f0ea });
   for (const y of [0.3, 0.75]) {
+    const rx = new THREE.Mesh(new THREE.BoxGeometry(2 * h, 0.08, 0.05), railMat);
+    rx.position.set(0, y, -(h - 0.05));
+    scene.add(rx);
     for (const s of [1, -1]) {
-      const rx = new THREE.Mesh(new THREE.BoxGeometry(2 * h, 0.08, 0.05), railMat);
-      rx.position.set(0, y, s * (h - 0.05));
-      scene.add(rx);
-      const rz = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 2 * h), railMat);
-      rz.position.set(s * (h - 0.05), y, 0);
+      const rz = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, h - rowGap), railMat);
+      rz.position.set(s * (h - 0.05), y, -(h + rowGap) / 2);
       scene.add(rz);
     }
   }
-  for (const [axis, sign] of [['x', 1], ['x', -1], ['z', 1], ['z', -1]]) {
+  for (const [axis, sign, at] of [['x', 1, h], ['x', -1, h], ['z', 1, YARD.front], ['z', -1, h]]) {
     const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Plane() });
     // Plane normal is local +z; point it back into the yard.
     if (axis === 'x') b.quaternion.setFromEuler(0, sign > 0 ? -Math.PI / 2 : Math.PI / 2, 0);
     else b.quaternion.setFromEuler(0, sign > 0 ? Math.PI : 0, 0);
-    b.position[axis] = sign * (h + 0.1);
+    b.position[axis] = sign * (at + 0.1);
     b.surface = { kind: 'fence' };
     world.addBody(b);
   }
+
+  // ------------------------------------------------------------ the street in front
+  const shop = buildStreet(scene, world, physMats, { std, tex });
 
   // ------------------------------------------------------------ trees and bushes
   const trunkMat = std({ color: 0x7a5232 });
@@ -116,24 +134,64 @@ export function buildYard(scene, world, physMats) {
   }
   tree(-13, -9, 1.2);
   tree(14, -12, 1.0);
-  tree(-15, 12, 1.1);
-  tree(16, 15, 0.9);
 
-  const bushMat = std({ color: 0x3f8a3a, flatShading: true });
-  for (const [x, z, r] of [[-5.2, 6.2, 0.8], [-3.4, 6.3, 0.7], [2.0, 6.2, 0.75], [3.8, 6.3, 0.8], [5.4, 6.1, 0.65]]) {
-    const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), bushMat);
-    bush.scale.set(1, 0.8, 1);
-    bush.position.set(x, r * 0.6, z);
-    bush.castShadow = true;
-    scene.add(bush);
-    const b = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Sphere(r * 0.85) });
-    b.position.set(x, r * 0.45, z);
+  const leaves = (x, y, z, r) => {
+    const b = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Sphere(r) });
+    b.position.set(x, y, z);
     b.surface = { kind: 'leaves' };
     world.addBody(b);
+  };
+  const bushMats = new Map();
+  const bushMat = (color) => {
+    if (!bushMats.has(color)) bushMats.set(color, std({ color, flatShading: true }));
+    return bushMats.get(color);
+  };
+  const blob = (x, y, z, r, color, squash = 0.8) => {
+    const mesh = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), bushMat(color));
+    mesh.scale.set(1, squash, 1);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+  };
+
+  // The big dark lumpy shrub in front of the window column, as in the photo:
+  // a cluster of blobs in a few greens, bouncy all over.
+  const SHRUB = { x: 2.7, z: 6.6 };
+  for (const [dx, dy, dz, r, c] of [
+    [-1.9, 0.55, 0.15, 0.8, 0x2f6b34], [-0.9, 0.8, -0.1, 1.05, 0x3b7d3a], [0.3, 0.9, 0.2, 1.1, 0x2f6b34],
+    [1.5, 0.75, -0.05, 0.95, 0x285e2e], [2.5, 0.5, 0.25, 0.7, 0x3b7d3a], [-0.4, 1.6, 0.05, 0.75, 0x46893a],
+    [0.9, 1.55, -0.15, 0.7, 0x3b7d3a], [-1.4, 1.25, 0.35, 0.55, 0x285e2e], [0.1, 0.45, 0.75, 0.6, 0x46893a],
+  ]) blob(SHRUB.x + dx, dy, SHRUB.z + dz, r, c, 0.85);
+  for (const [dx, y, r] of [[-1.5, 0.6, 0.8], [0, 0.85, 1.0], [1.6, 0.6, 0.8]]) leaves(SHRUB.x + dx, y, SHRUB.z, r);
+
+  // smaller shrubs in the neighbours' front gardens (yellow-green ones on the right, like the photo)
+  for (const [x, z, r, c] of [
+    [-4.2, 7.4, 0.6, 0x3f8a3a],
+    [9.4, 6.9, 0.9, 0x8db843], [16.9, 7.4, 0.65, 0x8db843], [19.2, 7.8, 0.5, 0x3f8a3a],
+    [-15.0, 6.9, 1.0, 0x2f6b34], [-12.6, 7.7, 0.6, 0x3f8a3a], [-20.6, 6.9, 0.85, 0x3f8a3a],
+  ]) {
+    blob(x, r * 0.6, z, r, c);
+    leaves(x, r * 0.45, z, r * 0.85);
   }
 
-  // ------------------------------------------------------------ trampoline
-  const T = { x: 11, z: 10, half: 1.6, y: 0.85 };
+  // A low yellow-green hedge along the front of all the gardens, by the cycle
+  // path, with a gap for the garden path.
+  const HEDGE = { z: STREET.cycle[0] - 0.55, depth: 0.8, height: 0.75 };
+  const hedgeR = rng(17);
+  for (const [x0, x1] of [[-h - 12, -2.6], [-0.7, h + 12]]) {
+    for (let x = x0 + 0.35; x < x1 - 0.2; x += 0.55) {
+      const r = 0.42 + hedgeR() * 0.12;
+      blob(x, HEDGE.height - r * 0.55, HEDGE.z + (hedgeR() - 0.5) * 0.12, r, hedgeR() < 0.5 ? 0x9cba4a : 0x8db843, 0.95);
+    }
+    const hb = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Box(new CANNON.Vec3((x1 - x0) / 2, HEDGE.height / 2, HEDGE.depth / 2)) });
+    hb.position.set((x0 + x1) / 2, HEDGE.height / 2, HEDGE.z);
+    hb.surface = { kind: 'leaves' };
+    world.addBody(hb);
+  }
+
+  // ------------------------------------------------------------ trampoline (in the back garden)
+  const T = { x: 5, z: -12.5, half: 1.6, y: 0.85 };
   const mat = new THREE.Mesh(new THREE.BoxGeometry(T.half * 2, 0.04, T.half * 2), std({ color: 0x1d1d22, roughness: 0.6 }));
   mat.position.set(T.x, T.y, T.z);
   mat.receiveShadow = true;
@@ -166,4 +224,5 @@ export function buildYard(scene, world, physMats) {
     leg.castShadow = true;
     scene.add(leg);
   }
+  return { shop };
 }

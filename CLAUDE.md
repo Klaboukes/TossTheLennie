@@ -3,7 +3,7 @@
 Guidance for Claude Code (and humans) working in this repository.
 
 ## Project
-**Toss the Lennie** is a browser game: fling Lennie, a ragdoll, around a three-storey house and score points for how contorted he lands. Plain JavaScript modules with [three.js](https://threejs.org/) and [cannon-es](https://github.com/pmndrs/cannon-es), both loaded from a CDN through the import map in `index.html`. There is no build step and there are no dependencies. [README.md](README.md) describes the house, controls, scoring and what each file in `src/` does.
+**Toss the Lennie** is a browser game: fling Lennie, a ragdoll, around a Dutch terraced house (two floors and an attic) and score points for how contorted he lands. Plain JavaScript modules with [three.js](https://threejs.org/) and [cannon-es](https://github.com/pmndrs/cannon-es), both loaded from a CDN through the import map in `index.html`. There is no build step and there are no dependencies. [README.md](README.md) describes the house, controls, scoring and what each file in `src/` does.
 
 The project owner doesn't write code. Talk to them in plain language about outcomes and the actions they need to take.
 
