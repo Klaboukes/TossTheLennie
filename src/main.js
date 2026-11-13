@@ -60,6 +60,8 @@ const AIM_TAP_PX = 44; // on a touch screen, a second tap this close to the firs
 const SLING = {
   dead: 18, // px: a shorter pull than this (or letting go back on Lennie) throws nothing
   reach: 0.33, // a pull this long, as a share of the screen's shorter side, is full power
+  minDistance: 2, // m he goes (on level ground) at the shortest pull
+  maxDistance: 30, // and at full power, as long as the arc isn't too flat or steep for it
   minSpeed: 4.5, // m/s at the gentlest throw (still enough to score)
   maxSpeed: AIM_MAX_SPEED,
   stretch: 0.35, // m: how far the held limb gives towards the pointer while pulling
@@ -844,10 +846,10 @@ function endGrab() {
 
 // ---------------------------------------------------------------- slingshot
 // Grab Lennie while he's down and pull back, away from where he should go: a
-// dotted arc shows his flight while you pull, a longer pull throws harder, and
+// dotted arc shows his flight while you pull, a longer pull throws further, and
 // letting go sends him along the arc. Pulling down (towards you) throws him
-// into the picture, pulling left throws him right. The launch angle goes up
-// and down with the scroll wheel or the Arc buttons.
+// into the picture, pulling left throws him right. The scroll wheel or the Arc
+// buttons make him fly higher or flatter without changing how far he goes.
 let sling = null;
 let slingAngle = SLING_ANGLE.start;
 
@@ -921,11 +923,35 @@ function slingShot(s = sling) {
   _slRight.set(1, 0, 0).applyQuaternion(camera.quaternion).setY(0).normalize();
   // Throw the opposite way to the pull.
   const dir = new THREE.Vector3().addScaledVector(_slFwd, dy / len).addScaledVector(_slRight, -dx / len).normalize();
-  const speed = THREE.MathUtils.lerp(SLING.minSpeed, SLING.maxSpeed, power);
+  // The pull sets how far he goes (measured on level ground) and the Arc only
+  // how high he goes on the way, so a higher arc lands him just as far away.
+  // (Squared, so short pulls give fine control indoors.)
+  const distance = THREE.MathUtils.lerp(SLING.minDistance, SLING.maxDistance, power * power);
   const a = THREE.MathUtils.degToRad(slingAngle);
-  const v = dir.multiplyScalar(Math.cos(a) * speed);
-  v.y = Math.sin(a) * speed;
-  return { v, power };
+  const v = launchAtAngle(dir, distance, a);
+  // Very flat or very steep arcs can't reach as far: then it's his fastest throw at that angle.
+  const speed = v.length();
+  const maxed = speed > SLING.maxSpeed;
+  if (maxed) v.setLength(SLING.maxSpeed);
+  else if (speed < SLING.minSpeed) v.setLength(SLING.minSpeed);
+  return { v, power, maxed };
+}
+
+/** The launch at `angle` above level, heading along `dir`, that comes down to the same height `distance` away. */
+function launchAtAngle(dir, distance, angle) {
+  const from = _aimA.set(0, 0, 0);
+  const to = _aimB.copy(dir).multiplyScalar(distance);
+  const v = new THREE.Vector3();
+  // The longer the flight, the steeper the launch: find the flight time that gives this angle.
+  let lo = 0.01;
+  let hi = 20;
+  for (let i = 0; i < 40; i++) {
+    const t = (lo + hi) / 2;
+    launchVelocity(from, to, t, v);
+    if (Math.atan2(v.y, Math.hypot(v.x, v.z)) < angle) lo = t;
+    else hi = t;
+  }
+  return launchVelocity(from, to, (lo + hi) / 2, v);
 }
 
 /** Draws the arc and the power bar for the current pull. */
@@ -945,6 +971,7 @@ function updateSling() {
   ui.slingPower.style.left = `${sling.x}px`;
   ui.slingPower.style.top = `${sling.y}px`;
   ui.slingFill.style.width = `${Math.round(shot.power * 100)}%`;
+  ui.slingPower.classList.toggle('maxed', shot.maxed);
 }
 
 /** Lets go of the slingshot: throws him along the arc, or (`throwIt` false) just puts him down. */
@@ -2177,7 +2204,7 @@ function updateHud(dt, now) {
   if (sling) {
     const arc = document.body.classList.contains('touch') ? '▲ ▼ arc' : 'scroll: arc';
     status = slingShot()
-      ? `<b>Let go</b> to throw · further = harder · ${arc}`
+      ? `<b>Let go</b> to throw · pull more to go further · ${arc}`
       : 'Pull Lennie <b>back</b>, away from where he should go';
   } else if (toss.state === 'held') {
     status = `Holding Lennie's <b>${grab?.part.label ?? 'limb'}</b>. Flick and let go!${combo}`;

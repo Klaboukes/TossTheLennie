@@ -604,6 +604,9 @@ body:not(.touch) .touch-only { display: none !important; }
   overflow: hidden;
 }
 #sling-power[hidden] { display: none; }
+/* as far as he can go at this arc: pulling further does nothing more */
+#sling-power.maxed { border-color: var(--accent-deep); }
+#sling-power.maxed i { background: var(--accent-deep); }
 .touch #sling-power { margin-top: -56px; } /* above the finger, not under it */
 #sling-power i {
   display: block;
