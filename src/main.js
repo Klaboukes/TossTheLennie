@@ -40,7 +40,9 @@ const CAMERA_SPEED = 6;
 const GRAVITY = 9.82;
 const AIM_MAX_SPEED = MAX_PART_SPEED - 2; // leaves room for the somersault spin
 const AIM_MIN_SPEED = 6; // short throws become line drives rather than limp lobs
-const AIM_MIN_IMPACT = DOOR_BREAK_SPEED + 1.5; // aimed at a wall, door or window, he hits it at least this hard
+const AIM_MIN_IMPACT = DOOR_BREAK_SPEED + 1.5; // aimed at a wall or window, he hits it at least this hard
+const DOOR_AIM_IMPACT = DOOR_BREAK_SPEED + 4; // and a door this hard, so it smashes whichever limb hits first
+const DOOR_AIM_LOW = 0.8; // aimed at a door, he goes for no lower than this above its foot
 // For this long after an aimed launch the "hand" keeps his centre on the arc,
 // while he peels off the floor (his limbs and joints tugging against it would
 // knock him off course); then he's on his own and starts his somersault.
@@ -51,7 +53,8 @@ const SOFT = new Set(['cushion', 'leaves', 'trampoline']);
 // Scenery the camera mustn't end up inside. Walls, floors and roofs fade out of
 // the way instead, so they aren't on this list. (Things merely between the
 // camera and Lennie don't push the camera: they turn see-through, seethrough.js.)
-const CAM_BLOCKERS = new Set(['furniture', 'cushion', 'leaves', 'tree', 'trampoline']);
+// A block is a neighbour's house, which is solid and doesn't fade.
+const CAM_BLOCKERS = new Set(['furniture', 'cushion', 'leaves', 'tree', 'trampoline', 'block']);
 const AIM_TAP_PX = 44; // on a touch screen, a second tap this close to the first one throws
 const BIG_TOSS = 1500; // from this score the replay plays by itself
 const TOSSES_PER_PLAYER = 5;
@@ -698,6 +701,7 @@ function startGrab(pick, pointerId, pointerType = 'mouse') {
     popAt(p, `JUGGLE ×${toss.juggles}`, 'good');
   } else {
     resetChain();
+    markStart();
     replay.start();
   }
   toss.state = 'held';
@@ -782,14 +786,21 @@ function endGrab() {
   controls.enabled = true;
 }
 
+/**
+ * Where the toss starts from: where Lennie was when he was picked up (not
+ * where he was let go, or lifting him up to the ceiling and dropping him
+ * would count as falling a floor).
+ */
+function markStart() {
+  const c = lennie.center(_center);
+  toss.startLevel = house.levelOf(c);
+  toss.startInside = house.isInside(c);
+  toss.startInShop = shop.isInside(c);
+  toss.startOnShopRoof = shop.isOnRoof(c);
+}
+
 function beginFlight() {
-  if (toss.startLevel === null) {
-    const c = lennie.center(_center);
-    toss.startLevel = house.levelOf(c);
-    toss.startInside = house.isInside(c);
-    toss.startInShop = shop.isInside(c);
-    toss.startOnShopRoof = shop.isOnRoof(c);
-  }
+  if (toss.startLevel === null) markStart();
   replay.launched();
   toss.state = 'flying';
   toss.time = 0;
@@ -983,7 +994,7 @@ function impactSpeed(v, t, normal) {
  * for a wall, door or window (`normal` facing sideways) hard enough to smash
  * through. If none is hard enough, the hardest; if all are too fast, it's out of reach.
  */
-function solveShot(from, to, normal) {
+function solveShot(from, to, normal, minImpact = AIM_MIN_IMPACT) {
   const top = Math.max(from.y, to.y) + aim.loft;
   const want = Math.sqrt((2 * (top - from.y)) / GRAVITY) + Math.sqrt((2 * (top - to.y)) / GRAVITY);
   const wall = Math.abs(normal.y) < 0.5;
@@ -991,7 +1002,7 @@ function solveShot(from, to, normal) {
   const rate = (t) => {
     const speed = launchVelocity(from, to, t, tv).length();
     const impact = wall ? impactSpeed(tv, t, normal) : Infinity;
-    return { speed, impact, ok: speed >= AIM_MIN_SPEED && speed <= AIM_MAX_SPEED && impact >= AIM_MIN_IMPACT };
+    return { speed, impact, ok: speed >= AIM_MIN_SPEED && speed <= AIM_MAX_SPEED && impact >= minImpact };
   };
   let best = rate(want).ok ? want : null;
   let hardest = null;
@@ -1044,6 +1055,7 @@ function aimTarget() {
 }
 
 const _aimFrom = new THREE.Vector3();
+const _aimTo = new THREE.Vector3();
 const _aimA = new THREE.Vector3();
 const _aimB = new THREE.Vector3();
 const _aimM = new THREE.Matrix4();
@@ -1063,7 +1075,16 @@ function updateAim() {
   // Lennie hits the side facing him, which may not be the side facing the camera.
   const facing = target.normal.clone();
   if (facing.dot(_aimA.subVectors(from, target.point)) < 0) facing.negate();
-  const shot = solveShot(from, target.point, facing);
+  // A door is aimed at no lower than its lower panel (aimed at its foot he
+  // skids into it along the floor), and thrown at harder than a window: the
+  // somersault means the limb that hits it may be going slower than his middle.
+  const door = target.body?.surface?.kind === 'door' && !target.body.surface.piece.broken ? target.body.surface.piece : null;
+  let to = target.point;
+  if (door) {
+    const low = door.center.y - door.height / 2 + DOOR_AIM_LOW;
+    if (to.y < low) to = _aimTo.copy(to).setY(low);
+  }
+  const shot = solveShot(from, to, facing, door ? DOOR_AIM_IMPACT : AIM_MIN_IMPACT);
 
   // Trace the arc through the scenery until it hits something, with a dot every AIM_DOT_GAP.
   let dots = 0;
@@ -1259,6 +1280,7 @@ const _move = new THREE.Vector3();
 let camWanted = null;
 const _arm = new THREE.Vector3();
 const CAM_BOX = { margin: 0.2, top: 30 };
+const CAM_MIN_Y = 0.4; // the lowest the camera looks at (and, being no lower than level, looks from)
 function armLimit(o, dir) {
   const h = YARD.half - CAM_BOX.margin;
   const lo = [-h, CAM_BOX.margin, -h];
@@ -1277,7 +1299,16 @@ function updateCamera(dt) {
   // put the camera back out at the chosen distance before the controls turn it
   if (camWanted !== null) {
     _arm.subVectors(camera.position, controls.target);
-    if (_arm.lengthSq() > 1e-8) camera.position.copy(controls.target).addScaledVector(_arm.normalize(), camWanted);
+    const d = _arm.length();
+    if (d > 1e-4) {
+      // The controls zoom straight away (scroll, pinch), between frames: a
+      // camera nearer or further than where it was left is a zoom, by that
+      // much, of the distance the player chose.
+      if (Math.abs(d - camShown) > 1e-4 && camShown > 1e-4) {
+        camWanted = clamp(camWanted * (d / camShown), controls.minDistance, controls.maxDistance);
+      }
+      camera.position.copy(controls.target).addScaledVector(_arm.divideScalar(d), camWanted);
+    }
   }
   // During a toss the camera starts chasing Lennie once he's about to fly out
   // of the picture (on a narrow phone screen that's almost at once), and keeps
@@ -1325,6 +1356,12 @@ function updateCamera(dt) {
 
   controls.update();
   clampInWorld(controls.target, 0.05);
+  // Flying down (Q) or panning stops with the camera still a bit above the
+  // ground, not with its lens on the floor.
+  if (controls.target.y < CAM_MIN_Y) {
+    camera.position.y += CAM_MIN_Y - controls.target.y;
+    controls.target.y = CAM_MIN_Y;
+  }
   _arm.subVectors(camera.position, controls.target);
   camWanted = _arm.length();
   if (camWanted < 1e-4) return;
@@ -1343,9 +1380,11 @@ function updateCamera(dt) {
     camFree = glide(camFree, free, free < camFree ? 0.22 : 0.5, dt);
   }
   camWantedBefore = camWanted;
-  camera.position.copy(controls.target).addScaledVector(_arm, Math.min(camWanted, armLimit(controls.target, _arm), camFree));
+  camShown = Math.min(camWanted, armLimit(controls.target, _arm), camFree);
+  camera.position.copy(controls.target).addScaledVector(_arm, camShown);
 }
 
+let camShown = 0; // how far out the camera was left last frame
 let camFree = 1e3; // how far out the camera may be right now (glides towards freeDistance)
 let camFreeSpeed = 0;
 let camWantedBefore = 0;
@@ -1371,15 +1410,24 @@ function camBlockers() {
     if (b.mass !== 0 || !CAM_BLOCKERS.has(b.surface?.kind)) continue;
     b.updateAABB();
     const { lowerBound: lo, upperBound: hi } = b.aabb;
-    camBoxes.push([lo.x - CAM_RADIUS, lo.y - CAM_RADIUS, lo.z - CAM_RADIUS, hi.x + CAM_RADIUS, hi.y + CAM_RADIUS, hi.z + CAM_RADIUS]);
+    const r = CAM_RADIUS;
+    // [...grown box, then for a neighbour's house its true size]
+    const box = [lo.x - r, lo.y - r, lo.z - r, hi.x + r, hi.y + r, hi.z + r];
+    if (b.surface.kind === 'block') box.push(lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
+    camBoxes.push(box);
   }
   return camBoxes;
 }
+
+/** Whether `o` is inside a neighbour's house itself (not just near it). */
+const inBlock = (box, oa) => box.length > 6 && oa.every((v, i) => v > box[6 + i] && v < box[9 + i]);
 
 /**
  * How far out from `o` along `dir` (at most `want`) the camera can be without
  * being inside furniture, a bush or a tree. Something Lennie is lying on or
  * leaning against (`o` is in it) doesn't count: that part turns see-through.
+ * A neighbour's house does count, unless `o` is inside it (flown in with WASD):
+ * it's far too big to see through.
  */
 function freeDistance(o, dir, want) {
   const oa = [o.x, o.y, o.z];
@@ -1401,9 +1449,11 @@ function freeDistance(o, dir, want) {
         enter = Math.max(enter, Math.min(s1, s2));
         exit = Math.min(exit, Math.max(s1, s2));
       }
-      if (enter >= exit || enter <= 0.05) continue;
-      if (t > enter && t < exit) {
-        t = enter;
+      if (enter >= exit) continue;
+      if (enter <= 0.05 && (box.length === 6 || inBlock(box, oa))) continue;
+      const stop = Math.max(enter, 0);
+      if (t > stop && t < exit) {
+        t = stop;
         moved = true;
       }
     }
@@ -1952,8 +2002,14 @@ function subStep(h) {
     aim.guide = null;
   }
   if (aim.guide) guideLaunch();
-  if (guard.check() === 'lost') rescueLost();
-  else if (bodies.some((b) => outsideArea(b.position, 0.3))) putBackNearEdge();
+  const guarded = guard.check();
+  if (guarded === 'lost') rescueLost();
+  else if (guarded === 'rescued' && grab) {
+    // Put back in one piece while held: the hand starts again from the
+    // limb, rather than going on tugging it apart from where it got to.
+    grab.part.body.pointToWorldFrame(grab.local, handBody.position);
+    handBody.velocity.setZero();
+  } else if (bodies.some((b) => outsideArea(b.position, 0.3))) putBackNearEdge();
 }
 
 // The play area (yard.js): the invisible walls stand just outside these lines.

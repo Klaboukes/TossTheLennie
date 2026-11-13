@@ -556,7 +556,8 @@ body:not(.touch) .touch-only { display: none !important; }
 
 /* ---------- Replay ---------- */
 #replay-badge {
-  top: calc(var(--gap) + 4px);
+  /* below the toolbar, which reaches the middle on a laptop-sized window */
+  top: 74px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
