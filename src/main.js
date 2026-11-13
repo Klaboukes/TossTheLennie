@@ -12,7 +12,8 @@ import { Replay } from './replay.js';
 import { Challenges, CHALLENGE_BONUS } from './challenges.js';
 
 const FIXED_DT = 1 / 120;
-const GRAB_FORCE = 3000;
+// Scales with Lennie's weight (100 kg), so he swings the same however heavy he is.
+const GRAB_FORCE = 7300;
 const MAX_HAND_SPEED = 20;
 const THROW_BOOST = 0.4; // fraction of the flick velocity added to the whole body on release
 const MAX_PART_SPEED = 20; // capped so Lennie can't tunnel through walls

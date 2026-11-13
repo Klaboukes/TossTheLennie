@@ -123,7 +123,7 @@ Lennie reacts: a grin and a "wheee!" when he's flung, "ow!" and "oof" when he hi
 - `src/supermarket.js`: the supermarket across the road, inside and out (the breakable shop window, aisles, freezers and fridges), with its own fading walls and roof
 - `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking
 - `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, breeze blocks, wallpaper, wood, floor tiles, grass)
-- `src/ragdoll.js`: Lennie's bodies, joints and look
+- `src/ragdoll.js`: Lennie's bodies, joints and look (1.90 m and 100 kg, with a bit of a belly, a scruffy greying beard, a receding hairline and glasses, in a worn hoodie and joggers)
 - `src/scoring.js`: contortion measurement, trick detection and the multiplier
 - `src/challenges.js`: the list of challenges and the progress kept in the browser
 - `src/replay.js`: records each toss and plays it back in slow motion
