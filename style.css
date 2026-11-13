@@ -421,7 +421,7 @@ body:not(.touch) .touch-only { display: none !important; }
   max-width: min(380px, calc(100vw - 2 * var(--gap)));
   border-radius: 16px;
 }
-.side-pill[hidden] { display: none; }
+.side-pill[hidden], #challenge[hidden] { display: none; }
 #challenge {
   display: flex;
   align-items: center;

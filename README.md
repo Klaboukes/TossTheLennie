@@ -77,7 +77,9 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 
 In aim mode a dotted arc runs from Lennie to whatever you point at: a window, a doorway, a corner, the trampoline. It stops at the first thing in the way and the ring turns white when it won't reach, so you can see where he'll really hit. A click throws him along it with a little somersault. Dragging still orbits the camera, and grabbing a limb still works as usual.
 
-Walls, floors and the roof between the camera and the point it's looking at fade out automatically, so you can see Lennie anywhere in the house. Furniture, bushes and trees don't fade, so the camera stops in front of them instead of ending up inside one.
+Walls, floors and the roof between the camera and the point it's looking at fade out automatically, so you can see Lennie anywhere in the house. Furniture, bushes and trees don't fade, so the camera stops in front of them instead of ending up inside one. Turning the camera goes no lower than eye level, so it can't dip under the floor.
+
+During a toss the camera stays put while Lennie is in view; once he's about to fly out of the picture (on a phone that's almost straight away), it chases him until he lands.
 
 The game opens close up on Lennie with a "Grab me!" bubble over him, which stays until he's first picked up.
 
@@ -101,7 +103,7 @@ The people button starts a game for 2–4 players, with their names (remembered 
 
 ## Replay and reactions
 
-Every toss is recorded. *Watch the replay* on the score card (or P) plays it back in slow motion with the camera following Lennie; a big toss (1,500 or more, or a new best) replays by itself. A tap or a key stops it.
+Every toss is recorded. *Watch the replay* on the score card (or P) plays it back in slow motion with the camera following Lennie, from just before he's let go to where he lands, however long he was held first; a big toss (1,500 or more, or a new best) replays by itself. A tap or a key stops it.
 
 Lennie reacts: a grin and a "wheee!" when he's flung, "ow!" and "oof" when he hits something hard, and after a good toss he lies there with crossed-out eyes, his tongue out and stars circling his head until he's picked up again. All sounds are synthesized; there are no audio files.
 

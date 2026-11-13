@@ -757,6 +757,7 @@ function beginFlight() {
     toss.startInShop = shop.isInside(c);
     toss.startOnShopRoof = shop.isOnRoof(c);
   }
+  replay.launched();
   toss.state = 'flying';
   toss.time = 0;
   toss.settle = 0;
@@ -1175,10 +1176,14 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 0.8;
 controls.maxDistance = 32;
+// No further round than level: below that the camera would dip under the
+// floor or ground and get squashed up against Lennie, looking up.
+controls.maxPolarAngle = Math.PI / 2;
 controls.update();
 
 let camAnim = null;
 let follow = false;
+let chase = false; // following Lennie for the rest of this toss, because he was leaving the picture
 let replayCenter = null; // while a replay plays, the camera follows Lennie's replayed position
 let cutaway = true;
 controls.addEventListener('start', () => { camAnim = null; settleFocus = null; });
@@ -1226,6 +1231,14 @@ function updateCamera(dt) {
     _arm.subVectors(camera.position, controls.target);
     if (_arm.lengthSq() > 1e-8) camera.position.copy(controls.target).addScaledVector(_arm.normalize(), camWanted);
   }
+  // During a toss the camera starts chasing Lennie once he's about to fly out
+  // of the picture (on a narrow phone screen that's almost at once), and keeps
+  // at it until he lands.
+  if (toss.state !== 'flying') chase = false;
+  else if (!chase) {
+    const v = lennie.center(_center).project(camera);
+    chase = v.z > 1 || Math.abs(v.x) > 0.7 || Math.abs(v.y) > 0.7;
+  }
   if (camAnim) {
     camAnim.t += dt;
     const k = Math.min(1, camAnim.t / camAnim.dur);
@@ -1233,8 +1246,10 @@ function updateCamera(dt) {
     controls.target.lerpVectors(camAnim.fromT, camAnim.toT, e);
     camera.position.lerpVectors(camAnim.fromC, camAnim.toC, e);
     if (k >= 1) camAnim = null;
-  } else if (replayCenter || (follow && !grab)) {
-    const d = (replayCenter ? _center.copy(replayCenter) : lennie.center(_center)).sub(controls.target).multiplyScalar(1 - Math.exp(-dt * 4));
+  } else if (replayCenter || ((follow || chase) && !grab)) {
+    // a chase keeps up more tightly, so a fast fall doesn't leave him behind
+    const rate = chase && !follow && !replayCenter ? 10 : 4;
+    const d = (replayCenter ? _center.copy(replayCenter) : lennie.center(_center)).sub(controls.target).multiplyScalar(1 - Math.exp(-dt * rate));
     controls.target.add(d);
     camera.position.add(d);
   }
@@ -1591,6 +1606,7 @@ function setSetup(open) {
   if (open) {
     setHelp(false);
     setDropMenu(false);
+    hideResult();
     renderSetup();
     ui.setupNames.querySelector('input')?.focus({ preventScroll: true });
   }

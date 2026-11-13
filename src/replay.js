@@ -1,8 +1,10 @@
-// Instant replay: records Lennie's pose every frame of a toss, then plays it
-// back in slow motion by moving his visible parts (the physics stays paused).
+// Instant replay: records Lennie's pose during a toss, then plays it back in
+// slow motion by moving his visible parts (the physics stays paused).
 import * as THREE from 'three';
 
-const MAX_FRAMES = 60 * 16; // a little longer than the longest toss
+const SAMPLE_DT = 1 / 60; // one pose per 1/60 s of game time, whatever the screen's refresh rate
+const MAX_FRAMES = 60 * 16; // a little longer than the longest toss; older frames drop off the front
+const LEAD_IN = 0.4; // the replay starts this long (game time) before Lennie is let go
 const EXPRESSIONS = ['normal', 'ouch', 'whee', 'dizzy'];
 
 export class Replay {
@@ -20,13 +22,23 @@ export class Replay {
     this.frames = [];
     this.recording = true;
     this.time = 0;
+    this.nextAt = 0;
+    this.launchAt = null;
+  }
+
+  /** Marks the moment Lennie is first let go, so the replay skips the holding before it. */
+  launched() {
+    if (this.recording && this.launchAt === null) this.launchAt = this.time;
   }
 
   /** Called once per rendered frame while recording; dt is game time. */
   capture(dt) {
     if (!this.recording) return;
     this.time += dt;
-    if (this.frames.length >= MAX_FRAMES) return;
+    if (this.time < this.nextAt) return;
+    this.nextAt = this.time + SAMPLE_DT * 0.999;
+    // Keep the latest frames, so a long hold before the throw can't push out the landing.
+    if (this.frames.length >= MAX_FRAMES) this.frames.shift();
     const pose = new Float32Array(this.parts.length * 7);
     this.parts.forEach((part, k) => {
       const p = part.body.position;
@@ -40,7 +52,10 @@ export class Replay {
   stop(keep = true) {
     if (!this.recording) return;
     this.recording = false;
-    if (keep && this.frames.length > 20) this.clip = { frames: this.frames, face: this.ragdoll.expression };
+    if (!keep) return;
+    const from = this.launchAt === null ? -Infinity : this.launchAt - LEAD_IN;
+    const frames = this.frames.filter((f) => f.t >= from);
+    if (frames.length > 20) this.clip = { frames, face: this.ragdoll.expression };
   }
 
   get canPlay() {
@@ -49,7 +64,7 @@ export class Replay {
 
   play(speed = 0.4) {
     if (!this.clip) return false;
-    this.playing = { t: 0, i: 0, speed };
+    this.playing = { t: this.clip.frames[0].t, i: 0, speed };
     return true;
   }
 
