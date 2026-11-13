@@ -254,6 +254,87 @@ export class Sfx {
     });
   }
 
+  /**
+   * Lennie's cartoon voice: a buzzy tone through two vowel filters that glide
+   * from one vowel to the next. kind: 'ow' | 'oof' | 'whee' | 'ohh' | 'yay'.
+   */
+  voice(kind) {
+    if (!this.ready) return;
+    const V = { a: [800, 1250], o: [500, 900], u: [330, 800], i: [290, 2300], e: [480, 1900] };
+    const LINES = {
+      ow: { vowels: ['a', 'u'], f0: [300, 210], dur: 0.38 },
+      oof: { vowels: ['u', 'u'], f0: [230, 170], dur: 0.2, breath: true },
+      whee: { vowels: ['u', 'i'], f0: [330, 620], dur: 0.6 },
+      ohh: { vowels: ['o', 'u'], f0: [260, 140], dur: 0.9, wobble: 7 },
+      yay: { vowels: ['e', 'a'], f0: [380, 520], dur: 0.4 },
+    };
+    const line = LINES[kind];
+    if (!line) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const pitch = 0.9 + Math.random() * 0.25;
+    const { dur } = line;
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(line.f0[0] * pitch, t);
+    osc.frequency.exponentialRampToValueAtTime(line.f0[1] * pitch, t + dur);
+    const vib = ctx.createOscillator();
+    const vibGain = ctx.createGain();
+    vib.frequency.value = line.wobble ?? 6;
+    vibGain.gain.value = line.f0[0] * pitch * (line.wobble ? 0.06 : 0.025);
+    vib.connect(vibGain).connect(osc.frequency);
+
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(0.5, t + 0.03);
+    out.gain.setValueAtTime(0.5, t + dur * 0.7);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    out.connect(this.master);
+
+    const [from, to] = line.vowels.map((v) => V[v]);
+    for (let f = 0; f < 2; f++) {
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.Q.value = f === 0 ? 6 : 9;
+      bp.frequency.setValueAtTime(from[f], t);
+      bp.frequency.exponentialRampToValueAtTime(to[f], t + dur * 0.8);
+      const g = ctx.createGain();
+      g.gain.value = f === 0 ? 0.9 : 0.45;
+      osc.connect(bp).connect(g).connect(out);
+    }
+    osc.start(t); vib.start(t);
+    osc.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
+
+    if (line.breath) {
+      const src = this.#noiseSource(t, 0.12);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 900;
+      const ng = ctx.createGain();
+      this.#env(ng, t, 0.25, 0.005, 0.1);
+      src.connect(lp).connect(ng).connect(this.master);
+    }
+  }
+
+  /** Bright little chime for a finished challenge. */
+  chime() {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.02;
+    [783.99, 1046.5, 1318.5, 1567.98].forEach((f, i) => {
+      const t = t0 + i * 0.07;
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      const g = ctx.createGain();
+      this.#env(g, t, 0.18, 0.005, 0.6);
+      osc.connect(g).connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.7);
+    });
+  }
+
   fizzle() {
     if (!this.ready) return;
     const ctx = this.ctx;

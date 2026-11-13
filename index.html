@@ -33,6 +33,17 @@
     </div>
   </div>
 
+  <!-- The current challenge (free play) or the players' scores (taking turns), under the score -->
+  <div id="challenge" class="glass side-pill" hidden>
+    <span class="ch-tag">Challenge <b id="ch-num">1</b>/<span id="ch-count">20</span></span>
+    <span id="ch-text" class="ch-text"></span>
+    <button id="ch-skip" class="ch-skip" aria-label="Skip this challenge" title="Skip this challenge">Skip</button>
+  </div>
+  <div id="board" class="glass side-pill" hidden>
+    <div class="board-head"><span id="board-round">Toss 1 of 5</span><button id="board-end" class="ch-skip">End game</button></div>
+    <ol id="board-list" class="board-list"></ol>
+  </div>
+
   <!-- All controls: one icon toolbar, top right -->
   <nav id="toolbar" class="glass" aria-label="Game controls">
     <div class="tb-group">
@@ -41,6 +52,9 @@
       </button>
       <button id="btn-aim" class="icon-btn" aria-pressed="false" data-tip="Aim mode: click where Lennie should go (T)" aria-label="Aim mode">
         <svg viewBox="0 0 24 24"><path d="M3.5 18.5C6 9 12 5 20.5 5.5" class="dash"/><circle cx="17.5" cy="15.5" r="4"/><circle cx="17.5" cy="15.5" r="1.2" class="fill"/></svg>
+      </button>
+      <button id="btn-players" class="icon-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="match-setup" data-tip="Take turns: 2–4 players" aria-label="Take turns with more players">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19.5c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5"/><circle cx="16.8" cy="9" r="2.5"/><path d="M16.5 14c2.4 0 4 1.6 4.5 4.3"/></svg>
       </button>
       <button id="btn-reset" class="icon-btn" data-tip="Reset: fix windows and doors, Lennie downstairs (R)" aria-label="Reset">
         <svg viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4v4h4"/></svg>
@@ -98,12 +112,57 @@
     <div id="r-total" class="r-total">0</div>
     <ul id="r-lines" class="r-lines"></ul>
     <div id="r-foot" class="r-foot"></div>
+    <button id="r-replay" class="replay-btn" hidden>▶ Watch the replay <kbd class="mouse-only">P</kbd></button>
   </aside>
+
+  <div id="grab-hint" class="grab-hint" aria-hidden="true" hidden><span id="grab-hint-text">Grab me!</span></div>
+
+  <div id="aim-pad" class="glass" hidden>
+    <span class="aim-pad-label">Arc</span>
+    <button id="aim-higher" class="aim-btn" aria-label="Higher arc">▲</button>
+    <button id="aim-lower" class="aim-btn" aria-label="Lower arc">▼</button>
+  </div>
+
+  <div id="replay-badge" class="glass" hidden><i></i>Replay · tap to stop</div>
+
+  <div id="turn-card" class="glass" role="dialog" aria-labelledby="turn-title" hidden>
+    <div id="turn-kicker" class="turn-kicker">Next up</div>
+    <h2 id="turn-title">Player 1's turn!</h2>
+    <p id="turn-sub" class="turn-sub"></p>
+    <ol id="turn-ranking" class="board-list ranking" hidden></ol>
+    <div class="turn-actions">
+      <button id="turn-go" class="help-close">Go!</button>
+      <button id="turn-alt" class="ghost-btn" hidden>Free play</button>
+    </div>
+  </div>
+
+  <div id="match-setup" class="glass" role="dialog" aria-labelledby="setup-title" hidden>
+    <h2 id="setup-title">Take turns</h2>
+    <p class="help-lede">Everyone gets 5 tosses, one after the other. Before each turn the house is fixed and Lennie goes back downstairs. Highest total wins!</p>
+    <div class="setup-count" role="radiogroup" aria-label="How many players">
+      <button data-players="2" role="radio">2 players</button>
+      <button data-players="3" role="radio">3 players</button>
+      <button data-players="4" role="radio">4 players</button>
+    </div>
+    <div id="setup-names" class="setup-names"></div>
+    <div class="turn-actions">
+      <button id="setup-start" class="help-close">Start!</button>
+      <button id="setup-cancel" class="ghost-btn">Cancel</button>
+    </div>
+  </div>
 
   <div id="help" class="glass" role="dialog" aria-labelledby="help-title" hidden>
     <h2 id="help-title">How to play</h2>
-    <p class="help-lede">Grab Lennie by a limb and fling him through the house. When he comes to rest you score: the more contorted, the more points. Bounces, mid-air catches and smashed windows and doors multiply it.</p>
-    <dl class="help-keys">
+    <p class="help-lede">Grab Lennie by an arm or a leg and fling him through the house, out of the window or across the street into the supermarket. When he comes to rest you score: the more twisted up he is, the more points. Smashed windows, bounces and catching him in mid-air multiply it, and landing somewhere funny (the bath, the loo, the freezer...) earns a bonus.</p>
+    <dl class="help-keys touch-only">
+      <dt>Drag Lennie</dt><dd>grab him, swipe and let go to fling him</dd>
+      <dt>Drag empty space</dt><dd>turn the camera</dd>
+      <dt>Two fingers</dt><dd>pinch to zoom, slide to move the camera</dd>
+      <dt>Aim button</dt><dd>tap a spot to see his flight path, tap it again to throw; ▲ ▼ for a higher or lower arc</dd>
+      <dt>Arrow button</dt><dd>drop Lennie on a floor or the roof</dd>
+      <dt>People button</dt><dd>take turns with 2–4 players</dd>
+    </dl>
+    <dl class="help-keys mouse-only">
       <dt>Drag a limb</dt><dd>grab, flick and let go</dd>
       <dt>Scroll while holding</dt><dd>push him away or pull him closer</dd>
       <dt><kbd>T</kbd> aim mode</dt><dd>point anywhere to see his flight path, click to toss him there, scroll for a higher or lower arc</dd>
@@ -112,8 +171,10 @@
       <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>Q</kbd><kbd>E</kbd></dt><dd>fly the camera</dd>
       <dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>drop Lennie on floor 1–3 or the roof</dd>
       <dt><kbd>R</kbd></dt><dd>reset (fix windows and doors, Lennie downstairs)</dd>
+      <dt><kbd>P</kbd></dt><dd>watch the last toss again in slow motion</dd>
       <dt><kbd>F</kbd> <kbd>G</kbd> <kbd>C</kbd> <kbd>Z</kbd> <kbd>M</kbd></dt><dd>focus · follow · cutaway · slow-mo · sound</dd>
     </dl>
+    <p class="help-lede help-extra">Stuck for ideas? Try the <b>challenge</b> under the score. Playing together? The <b>people button</b> starts a game of turns.</p>
     <button id="help-close" class="help-close">Let's toss!</button>
   </div>
 

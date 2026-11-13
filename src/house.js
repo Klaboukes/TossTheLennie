@@ -818,6 +818,25 @@ export function buildHouse(scene, world, physMats) {
     return `in the ${room.name.toLowerCase()} (floor ${k + 1})`;
   }
 
+  // Landing spots worth a bonus: where Lennie's hips or chest come to rest.
+  // Boxes are [min, max] in world space, just above each piece of furniture.
+  const S = (id, label, value, say, min, max) => ({ id, label, value, say, min, max });
+  const spots = [
+    S('bath', 'In the bath!', 500, 'SPLASH!', [2.65, 2 * H, 2.75], [4.5, 2 * H + 1.0, 3.75]),
+    S('loo', 'On the loo!', 500, 'OOPS!', [5.05, 2 * H + 0.3, -1.8], [5.9, 2 * H + 1.1, -0.95]),
+    S('desk', 'Asleep on the desk', 200, 'ZZZ', [-5.9, 2 * H + 0.7, -1.65], [-5.05, 2 * H + 1.4, 0.25]),
+    S('armchair', 'Comfy in the armchair', 150, 'AHH!', [-1.25, 2 * H + 0.3, 2.15], [0.9, 2 * H + 1.2, 3.45]),
+    S('wardrobe', 'On top of the wardrobe!', 500, 'HELP!', [0.25, H + 1.95, 2.55], [0.95, H + 2.7, 4.45]),
+    S('bed', 'Tucked into bed', 250, 'NIGHT!', [-5.85, H + 0.3, 0.55], [-3.65, H + 1.1, 2.45]),
+    S('bed', 'Tucked into bed', 250, 'NIGHT!', [3.95, H + 0.25, -2.3], [5.9, H + 1.05, -1.15]),
+    S('beanbag', 'Beanbag flop!', 250, 'FLUMP!', [3.0, H + 0.4, 2.4], [4.2, H + 1.2, 3.6]),
+    S('toybox', 'On the toy box!', 250, 'TOYS!', [1.95, H + 0.45, 4.15], [3.05, H + 1.2, 4.9]),
+    S('fridge', 'On top of the fridge!', 450, 'CHILLY!', [5.0, 1.9, 3.5], [5.9, 2.7, 4.7]),
+    S('table', 'On the dinner table!', 200, 'DINNER!', [2.35, 0.75, 1.45], [3.95, 1.45, 3.25]),
+    S('counter', 'On the kitchen counter', 200, 'CHEF!', [5.15, 0.88, -2.3], [5.9, 1.55, 3.5]),
+    S('couch', 'Couch potato', 150, 'AHH!', [-5.9, 0.3, 0.25], [-4.85, 1.2, 3.15]),
+  ];
+
   function spawnPoint(level) {
     if (level >= 3) return { x: -1.5, z: 0.2, height: HOUSE.ridgeY + 0.3 };
     return { x: -2.4, z: 1.6, height: level * H + 0.05 };
@@ -937,6 +956,7 @@ export function buildHouse(scene, world, physMats) {
     levelOf,
     locate,
     spawnPoint,
+    spots,
     updateView,
     isFaded,
     breakPiece,

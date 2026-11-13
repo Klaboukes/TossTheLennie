@@ -392,7 +392,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     boxAt([c - 0.34, 0.85, z0 + 0.8], [c + 0.34, 0.88, z1 - 0.05], belt);
     boxAt([c + 0.45, 0.85, z0 + 0.15], [c + 0.75, 1.15, z0 + 0.45], darkFrame, { cast: true }); // the till
     boxAt([c + 0.4, 0, z0], [c + 1.0, 0.85, z0 + 0.6], green, { cast: true });
-    solid([c - 0.4, 0, z0], [c + 1.0, 0.88, z1], 'wall');
+    solid([c - 0.4, 0, z0], [c + 1.0, 0.88, z1], 'furniture');
     // a numbered lamp on a pole
     boxAt([c + 0.36, 0.85, z1 - 0.12], [c + 0.42, 2.2, z1 - 0.06], darkFrame);
     boxAt([c + 0.2, 2.2, z1 - 0.18], [c + 0.6, 2.6, z1], faces(green, green, green, green, std({ map: labelTexture(String(i + 1), '#3fae3a', '#ffffff', 96, 96) }), std({ map: labelTexture(String(i + 1), '#3fae3a', '#ffffff', 96, 96) })));
@@ -418,7 +418,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     const z0 = IN.z0 + 2.0;
     const z1 = z0 + 1.6;
     boxAt([x0, 0, z0], [x1, 0.72, z1], crate, { cast: true });
-    solid([x0, 0, z0], [x1, 0.8, z1], 'wall');
+    solid([x0, 0, z0], [x1, 0.8, z1], 'furniture');
     const parts = 3;
     const w = (x1 - x0) / parts;
     for (let p = 0; p < parts; p++) {
@@ -460,7 +460,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     for (const y of shelfYs.slice(1)) boxAt([cx - half, y - 0.03, z0], [cx + half, y, z1], shelfMat);
     boxAt([cx - half, h - 0.05, z0], [cx + half, h, z1], shelfMat);
     for (const z of [z0, z1]) boxAt([cx - half, 0, z - 0.05], [cx + half, h, z + 0.05], endCap, { cast: true });
-    solid([cx - half, 0, z0 - 0.05], [cx + half, h, z1 + 0.05], 'wall');
+    solid([cx - half, 0, z0 - 0.05], [cx + half, h, z1 + 0.05], 'furniture');
     // the goods: rows of boxes, jars and bags in bright packaging, on both sides
     for (const side of [-1, 1]) {
       for (const y of shelfYs) {
@@ -498,7 +498,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     const z0 = IN.z1 - 1.3;
     boxAt([x, 0, z0], [x + 3, 0.86, IN.z1 - 0.1], freezerBody, { cast: true });
     boxAt([x + 0.08, 0.86, z0 + 0.08], [x + 2.92, 0.9, IN.z1 - 0.18], freezerTop);
-    solid([x, 0, z0], [x + 3, 0.9, IN.z1 - 0.1], 'wall');
+    solid([x, 0, z0], [x + 3, 0.9, IN.z1 - 0.1], 'furniture');
     for (let tx = x + 0.25; tx < x + 2.8; tx += 0.3) for (const tz of [z0 + 0.35, z0 + 0.75]) tubs.push([tx, tz, iceCream[Math.floor(rnd() * iceCream.length)]]);
   }
   const tubMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.11, 0.1, 0.12, 10), std({ color: 0xffffff, roughness: 0.5 }), tubs.length);
@@ -513,7 +513,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   for (let z = IN.z0 + 5.5; z + 1.6 < IN.z1 - 1.6; z += 1.7) {
     boxAt([IN.x1 - 0.85, 0, z], [IN.x1, 2.15, z + 1.6], faces(freezerBody, fridgeMat, freezerBody, freezerBody, freezerBody, freezerBody), { cast: true });
   }
-  solid([IN.x1 - 0.85, 0, IN.z0 + 5.5], [IN.x1, 2.15, IN.z1 - 1.6], 'wall');
+  solid([IN.x1 - 0.85, 0, IN.z0 + 5.5], [IN.x1, 2.15, IN.z1 - 1.6], 'furniture');
 
   // ---------------------------------------------------------------- a row of shopping trolleys by the door
   const trolleyMat = std({ color: 0xb8bec4, metalness: 0.5, roughness: 0.35, transparent: true, opacity: 0.75 });
@@ -525,7 +525,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     boxAt([x - 0.02, 0.98, z - 0.06], [x + 0.57, 1.04, z], handle);
     for (const [dx, dz] of [[0.05, 0.05], [0.5, 0.05], [0.05, 0.85], [0.5, 0.85]]) boxAt([x + dx - 0.03, 0, z + dz - 0.03], [x + dx + 0.03, 0.45, z + dz + 0.03], darkFrame);
   }
-  solid([0.2, 0, IN.z0 + 0.15], [1.75, 1.05, IN.z0 + 1.2], 'wall');
+  solid([0.2, 0, IN.z0 + 0.15], [1.75, 1.05, IN.z0 + 1.2], 'furniture');
 
   // ---------------------------------------------------------------- queries and the view
   const isInside = (p) => p.y > -1 && p.y < IN.y1 && p.x > IN.x0 && p.x < IN.x1 && p.z > IN.z0 && p.z < IN.z1;
@@ -568,5 +568,18 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     return !!entry && entry.opacity < 0.5;
   }
 
-  return { isInside, isOnRoof, updateView, isFaded };
+  // Landing spots worth a bonus (see house.js): just above each fixture.
+  let freezerEnd = IN.x0 + 1.2;
+  while (freezerEnd + 3.3 + 3 < IN.x1 - 1.4) freezerEnd += 3.3;
+  const S = (id, label, value, say, min, max) => ({ id, label, value, say, min, max });
+  const spots = [
+    S('freezer', 'In the freezer!', 600, 'BRRR!', [IN.x0 + 1.2, 0.8, IN.z1 - 1.35], [freezerEnd + 3, 1.8, IN.z1]),
+    S('fridges', 'On top of the drinks fridges!', 500, 'WHOA!', [IN.x1 - 0.9, 2.1, IN.z0 + 5.4], [IN.x1, 3.0, IN.z1 - 1.5]),
+    S('trolley', 'In the trolleys!', 400, 'WHEEE!', [0.15, 0.95, IN.z0 + 0.1], [1.8, 1.8, IN.z0 + 1.25]),
+    S('fruit', 'In the fruit and veg!', 400, 'SQUISH!', [0.55, 0.7, IN.z0 + 1.95], [12.15, 1.5, IN.z0 + 3.65]),
+    ...[-17, -13.5, -10].map((c) => S('checkout', 'Scanned at the checkout!', 500, 'BEEP!', [c - 0.45, 0.85, IN.z0 + 1.15], [c + 1.05, 1.6, IN.z0 + 3.85])),
+    ...[-18, -13, -8, -3, 2, 7].map((cx) => S('shelves', 'On top of the shelves!', 500, 'HELP!', [cx - 0.6, 1.9, 36.1], [cx + 0.6, 2.8, 42.5])),
+  ];
+
+  return { isInside, isOnRoof, updateView, isFaded, spots };
 }

@@ -43,29 +43,32 @@ export function detectTricks(ragdoll) {
   const handL = P.lowerArmL.body.pointToWorldFrame(HAND_OFFSET);
   const handR = P.lowerArmR.body.pointToWorldFrame(HAND_OFFSET);
 
-  if (head.y < pelvis.position.y - 0.2) tricks.push({ label: 'Upside down!', value: 200 });
+  if (head.y < pelvis.position.y - 0.2) tricks.push({ id: 'upside', label: 'Upside down!', value: 200 });
 
   const legL = P.upperLegL.body.quaternion.vmult(DOWN);
   const legR = P.upperLegR.body.quaternion.vmult(DOWN);
-  if (Math.acos(Math.max(-1, Math.min(1, legL.dot(legR)))) > 1.7) tricks.push({ label: 'The splits!', value: 150 });
+  if (Math.acos(Math.max(-1, Math.min(1, legL.dot(legR)))) > 1.7) tricks.push({ id: 'splits', label: 'The splits!', value: 150 });
 
+  // A foot or hand counts as crossed over only when it's well past the middle,
+  // so a slightly pigeon-toed landing doesn't score.
   const fl = pelvis.pointToLocalFrame(footL);
   const fr = pelvis.pointToLocalFrame(footR);
-  const crossL = fl.x < -0.02;
-  const crossR = fr.x > 0.02;
-  if (crossL && crossR) tricks.push({ label: 'Pretzel legs!', value: 160 });
-  else if (crossL || crossR) tricks.push({ label: 'Crossed legs', value: 70 });
+  const crossL = fl.x < -0.1;
+  const crossR = fr.x > 0.1;
+  if (crossL && crossR) tricks.push({ id: 'pretzel', label: 'Pretzel legs!', value: 200 });
+  else if (crossL || crossR) tricks.push({ id: 'crossed', label: 'Crossed legs', value: 40, small: true });
 
   const hl = chest.pointToLocalFrame(handL);
   const hr = chest.pointToLocalFrame(handR);
-  const tangledL = hl.x < -0.04 || hl.z < -0.17;
-  const tangledR = hr.x > 0.04 || hr.z < -0.17;
-  if (tangledL && tangledR) tricks.push({ label: 'Straitjacket!', value: 180 });
-  else if (tangledL || tangledR) tricks.push({ label: 'Tangled arm', value: 70 });
+  const tangledL = hl.x < -0.12 || hl.z < -0.22;
+  const tangledR = hr.x > 0.12 || hr.z < -0.22;
+  if (tangledL && tangledR) tricks.push({ id: 'straitjacket', label: 'Straitjacket!', value: 200 });
+  else if (tangledL || tangledR) tricks.push({ id: 'tangled', label: 'Tangled arm', value: 40, small: true });
 
-  if (Math.min(footL.distanceTo(head), footR.distanceTo(head)) < 0.42) tricks.push({ label: 'Foot in face!', value: 200 });
+  if (Math.min(footL.distanceTo(head), footR.distanceTo(head)) < 0.42) tricks.push({ id: 'footface', label: 'Foot in face!', value: 200 });
 
-  if (tricks.length >= 3) tricks.push({ label: 'Human knot!', value: 250 });
+  // Three of the big ones at once; the small crossed leg and tangled arm don't count.
+  if (tricks.filter((t) => !t.small).length >= 3) tricks.push({ id: 'knot', label: 'Human knot!', value: 400 });
   return tricks;
 }
 

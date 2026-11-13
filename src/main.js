@@ -8,6 +8,8 @@ import { Ragdoll } from './ragdoll.js';
 import { measureContortion, evaluateToss, chainMultiplier } from './scoring.js';
 import { Sfx } from './audio.js';
 import { StuckGuard } from './guard.js';
+import { Replay } from './replay.js';
+import { Challenges, CHALLENGE_BONUS } from './challenges.js';
 
 const FIXED_DT = 1 / 120;
 const GRAB_FORCE = 3000;
@@ -38,6 +40,13 @@ const AIM_GUIDE_TIME = 0.12;
 const AIM_LOFT = { start: 0.9, min: 0.1, max: 8, step: 0.3 }; // arc top, metres above the higher end
 const AIM_CLICK_PX = 6; // a press that moves further than this orbits the camera instead of throwing
 const SOFT = new Set(['cushion', 'leaves', 'trampoline']);
+// Scenery the camera mustn't end up inside. Walls, floors and roofs fade out of
+// the way instead, so they aren't on this list.
+const CAM_BLOCKERS = new Set(['furniture', 'cushion', 'leaves', 'tree', 'trampoline']);
+const AIM_TAP_PX = 44; // on a touch screen, a second tap this close to the first one throws
+const BIG_TOSS = 1500; // from this score the replay plays by itself
+const TOSSES_PER_PLAYER = 5;
+const PLAYER_COLORS = ['#ff6b4a', '#3f5fd6', '#22a06b', '#b04ad6'];
 
 const $ = (id) => document.getElementById(id);
 const clamp = THREE.MathUtils.clamp;
@@ -56,7 +65,9 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xe3f2ff);
 
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.05, 400);
-camera.position.set(2.5, 2.2, 14.5);
+// Close enough to Lennie (on the living room floor) that you see him straight
+// away, from just outside the front window.
+camera.position.set(-0.9, 1.9, 5.9);
 
 // ---------------------------------------------------------------- physics
 const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -GRAVITY, 0) });
@@ -136,7 +147,43 @@ const ui = {
   help: $('help'),
   helpClose: $('help-close'),
   dropMenu: $('drop-menu'),
+  replayBtn: $('r-replay'),
+  replayBadge: $('replay-badge'),
+  aimPad: $('aim-pad'),
+  hint: $('grab-hint'),
+  hintText: $('grab-hint-text'),
+  challenge: $('challenge'),
+  chNum: $('ch-num'),
+  chCount: $('ch-count'),
+  chText: $('ch-text'),
+  chSkip: $('ch-skip'),
+  board: $('board'),
+  boardRound: $('board-round'),
+  boardList: $('board-list'),
+  boardEnd: $('board-end'),
+  turnCard: $('turn-card'),
+  turnKicker: $('turn-kicker'),
+  turnTitle: $('turn-title'),
+  turnSub: $('turn-sub'),
+  turnRanking: $('turn-ranking'),
+  turnGo: $('turn-go'),
+  turnAlt: $('turn-alt'),
+  setup: $('match-setup'),
+  setupNames: $('setup-names'),
+  setupStart: $('setup-start'),
+  setupCancel: $('setup-cancel'),
 };
+
+// Touch screens get touch help and tap-to-aim; whichever was used last wins
+// (some laptops have both).
+document.body.classList.toggle('touch', matchMedia('(pointer: coarse)').matches);
+addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch' || e.pointerType === 'mouse') document.body.classList.toggle('touch', e.pointerType === 'touch');
+}, { capture: true });
+
+const replay = new Replay(lennie);
+const challenges = new Challenges();
+const hint = { on: true }; // the "Grab me!" bubble over Lennie, until he's first grabbed (and at each turn)
 
 const BEST_KEY = 'toss-the-lennie:house-best';
 const OLD_BEST_KEY = 'bounce-the-lennie:house-best'; // from before the rename
@@ -200,6 +247,7 @@ function showResult(result, where) {
   });
   const deg = Math.round((result.worst.theta * 180) / Math.PI);
   ui.rFoot.textContent = `Landed ${where}. Most bent: ${result.worst.label.toLowerCase()} (${deg}°).`;
+  ui.replayBtn.hidden = !replay.canPlay;
   countUp = { t: 0, dur: 0.9, to: result.total };
   ui.rTotal.textContent = '0';
   ui.result.classList.add('show');
@@ -244,45 +292,79 @@ function resetChain() {
 
 const _center = new THREE.Vector3();
 
+const spots = [...house.spots, ...shop.spots];
+const inBox = (p, s) => p.x > s.min[0] && p.x < s.max[0] && p.y > s.min[1] && p.y < s.max[1] && p.z > s.min[2] && p.z < s.max[2];
+/** The named spot (bath, bed, freezer...) Lennie's hips or chest ended up in, if any. */
+function landingSpot() {
+  const hips = lennie.parts.pelvis.body.position;
+  const chest = lennie.parts.chest.body.position;
+  return spots.find((s) => inBox(hips, s) || inBox(chest, s)) ?? null;
+}
+
+const lennieBodies = new Set(lennie.bodies);
+/** The kinds of scenery Lennie is touching right now (from the last physics step). */
+function touching() {
+  const kinds = new Set();
+  for (const c of world.contacts) {
+    const other = lennieBodies.has(c.bi) ? c.bj : lennieBodies.has(c.bj) ? c.bi : null;
+    if (other?.surface) kinds.add(other.surface.kind);
+  }
+  return kinds;
+}
+
+/** The feats of a toss, each with an id that challenges can look for. */
 function houseBonuses(center) {
   const bonuses = [];
+  const add = (id, label, value, say) => bonuses.push({ id, label, value, say });
   const endInside = house.isInside(center);
   const onRoof = house.isOnRoof(center);
   const endLevel = house.levelOf(center);
   const hanging = !endInside && !onRoof && center.y > 1.5 && house.nearHouse(center);
-  if (toss.startInside && hanging) bonuses.push({ label: 'Hanging out the window!', value: 250 });
-  else if (toss.startInside && !endInside && !onRoof) bonuses.push({ label: 'Defenestrated!', value: 300 });
+  if (toss.startInside && hanging) add('hanging', 'Hanging out the window!', 400);
+  else if (toss.startInside && !endInside && !onRoof) add('defenestrated', 'Defenestrated!', 400);
   const fell = (toss.startLevel ?? 0) - endLevel;
-  if (fell >= 1) bonuses.push({ label: `Fell ${fell} floor${fell === 1 ? '' : 's'}`, value: 150 * fell });
-  if (onRoof && toss.startLevel < 3) bonuses.push({ label: 'Stranded on the roof!', value: 350 });
-  if (shop.isInside(center) && !toss.startInShop) bonuses.push({ label: 'Went shopping!', value: 300 });
-  if (shop.isOnRoof(center) && !toss.startOnShopRoof) bonuses.push({ label: 'On the supermarket roof!', value: 350 });
+  if (fell >= 1) add('fell', `Fell ${fell} floor${fell === 1 ? '' : 's'}`, 80 * fell);
+  if (onRoof && toss.startLevel < 3) add('roof', 'Stranded on the roof!', 400);
+  if (shop.isInside(center) && !toss.startInShop) add('shopping', 'Went shopping!', 500);
+  if (shop.isOnRoof(center) && !toss.startOnShopRoof) add('shoproof', 'On the supermarket roof!', 600);
   const steps = toss.stairs.size;
-  if (steps >= 10) bonuses.push({ label: `Full flight! (${steps} steps)`, value: 400 });
-  else if (steps >= 3) bonuses.push({ label: `Stair tumble (${steps} steps)`, value: 200 });
+  if (steps >= 10) add('fullflight', `Full flight! (${steps} steps)`, 400);
+  else if (steps >= 3) add('stairs', `Stair tumble (${steps} steps)`, 200);
   if (toss.trampoline) {
     const n = Math.min(toss.trampoline, 5);
-    bonuses.push({ label: n > 1 ? `Trampoline ×${n}` : 'Trampoline!', value: 80 * n });
+    add('trampoline', n > 1 ? `Trampoline ×${n}` : 'Trampoline!', 80 * n);
   }
+  // Where he came to rest: a piece of furniture, a tree, a bush...
+  const spot = landingSpot();
+  const touched = touching();
+  if (spot) add(spot.id, spot.label, spot.value, spot.say);
+  else if (touched.has('leaves') && center.y > 2.2) add('tree', 'Stuck in a tree!', 500, 'HELP!');
+  else if (touched.has('leaves')) add('bush', 'In the bushes', 150, 'RUSTLE!');
+  else if (touched.has('trampoline')) add('trampnap', 'Napping on the trampoline', 200, 'ZZZ');
   return bonuses;
 }
 
 function finishToss() {
   if (toss.maxSpeed < MIN_TOSS_SPEED && !toss.smashed && !toss.doors) {
     toss.state = 'idle';
+    replay.stop(false);
     resetChain();
     toast('Too gentle! Give Lennie a proper fling.');
     sfx.fizzle();
     return;
   }
+  replay.stop(true);
   const center = lennie.center(_center);
-  const result = evaluateToss(lennie, {
-    bounces: toss.bounces,
-    juggles: toss.juggles,
-    smashed: toss.smashed,
-    doors: toss.doors,
-    bonuses: houseBonuses(center),
-  });
+  const chain = { bounces: toss.bounces, juggles: toss.juggles, smashed: toss.smashed, doors: toss.doors, trampoline: toss.trampoline };
+  const result = evaluateToss(lennie, { ...chain, bonuses: houseBonuses(center) });
+
+  // The challenge (free play only): a bonus on top when it's done.
+  const done = match ? null : challenges.check({ total: result.total, ids: new Set(result.tricks.map((t) => t.id)), chain });
+  if (done) {
+    result.lines.push({ label: 'Challenge done!', value: CHALLENGE_BONUS, trick: true });
+    result.total += CHALLENGE_BONUS;
+  }
+
   stats.total += result.total;
   stats.last = result.total;
   stats.tosses += 1;
@@ -299,13 +381,35 @@ function finishToss() {
   }
   showResult(result, locate(center));
   sfx.score(result.total > 1600 ? 3 : result.total > 900 ? 2 : result.total > 400 ? 1 : 0);
-  lennie.setExpression(result.total > 900 || toss.bounces >= 5 ? 'dizzy' : 'ouch', result.total > 900 ? 0 : 2.5);
+  sfx.voice(result.total >= 900 ? 'ohh' : 'oof');
+  // A good toss leaves him seeing stars until he's picked up again.
+  if (result.total >= 400 || toss.bounces >= 5) lennie.setExpression('dizzy');
+  else lennie.setExpression('ouch', 4);
   const head = lennie.parts.head.body.position;
   popAt(new THREE.Vector3(head.x, head.y + 0.4, head.z), `+${fmt(result.total)}`, 'big');
+  const said = result.tricks.find((t) => t.say);
+  if (said) setTimeout(() => popAt(new THREE.Vector3(head.x, head.y + 0.9, head.z), said.say, 'good'), 450);
   focusLennie(1.0);
   toss.state = 'scored';
   resetChain();
+
+  if (done) challengeDone(done);
+  if (match) {
+    recordTurn(result.total);
+    turnPending = true;
+    clearTimeout(turnTimer);
+    turnTimer = setTimeout(showTurnCard, 2400);
+  } else if (result.total >= BIG_TOSS || newBest) {
+    // Big ones get an instant replay, once the score has counted up.
+    clearTimeout(autoReplayTimer);
+    autoReplayTimer = setTimeout(() => {
+      if (toss.state === 'scored' && !grab) playReplay();
+    }, 1700);
+  }
 }
+let autoReplayTimer = 0;
+let turnTimer = 0;
+let turnPending = false; // a match turn has ended and the next player hasn't pressed Go yet
 
 function updateToss(simDt) {
   if (toss.state !== 'flying') return;
@@ -389,8 +493,19 @@ lennie.onCollide = (partName, e) => {
       popAt(point, EXCLAIM[Math.floor(Math.random() * EXCLAIM.length)]);
     }
   }
-  if (v > 7 && !soft) lennie.setExpression('ouch', 0.7);
+  if (v > 7 && !soft) {
+    lennie.setExpression('ouch', 0.7);
+    if (flying && now - lastVoiceAt > 700) {
+      lastVoiceAt = now;
+      sfx.voice(v > 11 ? 'ow' : Math.random() < 0.5 ? 'ow' : 'oof');
+    }
+  } else if (flying && surf.kind === 'trampoline' && v > BOUNCE_IMPACT && now - lastVoiceAt > 700) {
+    lastVoiceAt = now;
+    sfx.voice('whee');
+    lennie.setExpression('whee', 0.8);
+  }
 };
+let lastVoiceAt = 0;
 
 // Lennie's velocities before each physics step, so that smashing through a
 // window or door doesn't also bounce him off it.
@@ -524,7 +639,7 @@ function isAirborne() {
   return lennie.coreSpeed() > 2.5;
 }
 
-function startGrab(pick, pointerId) {
+function startGrab(pick, pointerId, pointerType = 'mouse') {
   const part = lennie.parts[pick.name];
   const p = pick.hit.point;
   const local = part.body.pointToLocalFrame(new CANNON.Vec3(p.x, p.y, p.z));
@@ -539,6 +654,7 @@ function startGrab(pick, pointerId) {
     local,
     constraint,
     pointerId,
+    pointerType,
     plane: new THREE.Plane().setFromNormalAndCoplanarPoint(normal, p),
     target: p.clone(),
     samples: [{ t: performance.now(), p: p.clone() }],
@@ -549,8 +665,11 @@ function startGrab(pick, pointerId) {
     popAt(p, `JUGGLE ×${toss.juggles}`, 'good');
   } else {
     resetChain();
+    replay.start();
   }
   toss.state = 'held';
+  hint.on = false;
+  clearTimeout(autoReplayTimer);
   hideResult();
   if (lennie.expression !== 'normal') lennie.setExpression('normal');
   sfx.squeak();
@@ -615,8 +734,15 @@ function endGrab() {
   }
   const speed = v.length();
   if (speed > 5) sfx.whoosh(Math.min(1, speed / 20));
+  if (speed > 9) {
+    sfx.voice('whee');
+    lennie.setExpression('whee', 1.2);
+  }
   if (canvas.hasPointerCapture?.(grab.pointerId)) canvas.releasePointerCapture(grab.pointerId);
+  // A finger doesn't hover: once it lets go it's no longer over Lennie.
+  const lifted = grab.pointerType !== 'mouse';
   grab = null;
+  if (lifted) setHover(null);
   beginFlight();
   grabLine.visible = grabDot.visible = false;
   canvas.style.cursor = idleCursor();
@@ -653,22 +779,28 @@ function setHover(name) {
 // Registered before OrbitControls so a grab can disable orbiting in time.
 canvas.addEventListener('pointerdown', (e) => {
   sfx.unlock();
+  if (replay.playing) {
+    stopReplay();
+    return;
+  }
   if (e.button !== 0 || grab) return;
   setPointer(e);
-  const pick = pickPart();
+  // Between turns, Lennie waits for the next player to press Go.
+  const pick = ui.turnCard.hidden && ui.setup.hidden && !turnPending ? pickPart() : null;
   if (!pick) {
-    if (aim.on) aim.press = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    if (aim.on) aim.press = { x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType === 'touch' };
     return;
   }
   controls.enabled = false;
   canvas.setPointerCapture(e.pointerId);
   setHover(pick.name);
-  startGrab(pick, e.pointerId);
+  startGrab(pick, e.pointerId, e.pointerType);
 });
 
 canvas.addEventListener('pointermove', (e) => {
   setPointer(e);
-  aim.hover = true;
+  // A finger moving over the screen is orbiting the camera, not pointing.
+  aim.hover = e.pointerType !== 'touch';
   if (grab) {
     if (e.pointerId === grab.pointerId) moveGrab();
     return;
@@ -681,12 +813,32 @@ const release = (e) => {
   const press = aim.press;
   aim.press = null;
   // A click (not a drag, which orbits the camera) in aim mode throws Lennie there.
+  // On a touch screen there's no pointing before the tap, so the first tap
+  // shows the flight path and a second tap on the same spot throws.
   if (press && e.type === 'pointerup' && e.pointerId === press.id
-    && Math.hypot(e.clientX - press.x, e.clientY - press.y) < AIM_CLICK_PX) {
+    && Math.hypot(e.clientX - press.x, e.clientY - press.y) < (press.touch ? AIM_TAP_PX / 3 : AIM_CLICK_PX)) {
     setPointer(e);
-    aimThrow();
+    if (!press.touch) aimThrow();
+    else if (aim.pin && nearPin(e)) aimThrow();
+    else pinAim(e);
   }
 };
+
+/** Whether a tap is on the pinned target, where it is on screen now (the camera may have turned). */
+function nearPin(e) {
+  const v = aim.pin.point.clone().project(camera);
+  const rect = canvas.getBoundingClientRect();
+  const x = rect.left + (v.x * 0.5 + 0.5) * rect.width;
+  const y = rect.top + (-v.y * 0.5 + 0.5) * rect.height;
+  return v.z < 1 && Math.hypot(e.clientX - x, e.clientY - y) < AIM_TAP_PX;
+}
+
+/** Touch aiming: fixes the target under the finger until it's thrown or moved. */
+function pinAim(e) {
+  const target = aimTarget();
+  aim.pin = target ? { point: target.point.clone(), normal: target.normal, body: target.body } : null;
+  if (target) sfx.squeak();
+}
 canvas.addEventListener('pointerup', release);
 canvas.addEventListener('pointercancel', release);
 canvas.addEventListener('pointerleave', (e) => {
@@ -729,6 +881,7 @@ const aim = {
   press: null,
   loft: AIM_LOFT.start,
   shot: null, // { v, blocked, tooFar } for the current pointer target
+  pin: null, // touch screens: the tapped target, { point, normal, body, x, y }
   guide: null, // the launch still being steered, { v, t0, spin }
 };
 
@@ -869,8 +1022,8 @@ function placeRing(ring, point, normal) {
 }
 
 function updateAim() {
-  if (!aim.on || !aim.hover || grab || hoverPart || isAirborne()) return hideAim();
-  const target = aimTarget();
+  if (!aim.on || (!aim.hover && !aim.pin) || grab || hoverPart || isAirborne()) return hideAim();
+  const target = aim.pin ?? aimTarget();
   if (!target) return hideAim();
   const from = centerOfMass(_aimFrom);
   // Lennie hits the side facing him, which may not be the side facing the camera.
@@ -919,15 +1072,20 @@ function updateAim() {
 }
 
 function aimThrow() {
-  if (grab) return;
+  if (grab || turnPending || !ui.setup.hidden) return;
   if (isAirborne()) {
     toast('Wait for Lennie to land, then aim again', 1400);
     return;
   }
-  aim.hover = true;
+  const touch = document.body.classList.contains('touch');
+  if (!touch) aim.hover = true;
   updateAim();
   const shot = aim.shot;
+  aim.pin = null;
   if (!shot) return;
+  replay.start();
+  hint.on = false;
+  clearTimeout(autoReplayTimer);
 
   resetChain();
   hideResult();
@@ -944,6 +1102,8 @@ function aimThrow() {
   aim.guide = { v: shot.v.clone(), t0: world.time, spin };
   sfx.squeak();
   sfx.whoosh(Math.min(1, shot.v.length() / 20));
+  sfx.voice('whee');
+  lennie.setExpression('whee', 1.2);
   beginFlight();
   hideAim();
   camAnim = null;
@@ -999,13 +1159,18 @@ function toggleAim() {
   aim.on = !aim.on;
   btn.aim.setAttribute('aria-pressed', String(aim.on));
   if (!aim.on) hideAim();
+  aim.pin = null;
+  ui.aimPad.hidden = !aim.on;
   canvas.style.cursor = grab ? 'grabbing' : idleCursor();
-  toast(aim.on ? 'Aim mode: point where Lennie should go and click. Scroll for a higher or lower arc.' : 'Aim mode off', aim.on ? 3200 : 1200);
+  const how = document.body.classList.contains('touch')
+    ? 'tap where Lennie should go, then tap there again to throw'
+    : 'point where Lennie should go and click. Scroll for a higher or lower arc';
+  toast(aim.on ? `Aim mode: ${how}` : 'Aim mode off', aim.on ? 3200 : 1200);
 }
 
 // ---------------------------------------------------------------- camera
 const controls = new OrbitControls(camera, canvas);
-controls.target.set(-2.2, 0.8, 1.6);
+controls.target.set(-2.4, 0.5, 1.6);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 0.8;
@@ -1014,8 +1179,9 @@ controls.update();
 
 let camAnim = null;
 let follow = false;
+let replayCenter = null; // while a replay plays, the camera follows Lennie's replayed position
 let cutaway = true;
-controls.addEventListener('start', () => { camAnim = null; });
+controls.addEventListener('start', () => { camAnim = null; settleFocus = null; });
 
 function focusLennie(dur = 0.7) {
   const to = lennie.center();
@@ -1067,8 +1233,8 @@ function updateCamera(dt) {
     controls.target.lerpVectors(camAnim.fromT, camAnim.toT, e);
     camera.position.lerpVectors(camAnim.fromC, camAnim.toC, e);
     if (k >= 1) camAnim = null;
-  } else if (follow && !grab) {
-    const d = lennie.center(_center).sub(controls.target).multiplyScalar(1 - Math.exp(-dt * 4));
+  } else if (replayCenter || (follow && !grab)) {
+    const d = (replayCenter ? _center.copy(replayCenter) : lennie.center(_center)).sub(controls.target).multiplyScalar(1 - Math.exp(-dt * 4));
     controls.target.add(d);
     camera.position.add(d);
   }
@@ -1100,7 +1266,26 @@ function updateCamera(dt) {
   camWanted = _arm.length();
   if (camWanted < 1e-4) return;
   _arm.divideScalar(camWanted);
-  camera.position.copy(controls.target).addScaledVector(_arm, Math.min(camWanted, armLimit(controls.target, _arm)));
+  // Furniture, bushes and trees between Lennie and the camera pull it in front
+  // of them at once; when they're out of the way it eases back out.
+  const block = obstacleLimit(controls.target, _arm, camWanted);
+  camBlock = block < camBlock ? block : camBlock + (block - camBlock) * (1 - Math.exp(-dt * 3));
+  camera.position.copy(controls.target).addScaledVector(_arm, Math.min(camWanted, armLimit(controls.target, _arm), camBlock));
+}
+
+let camBlock = 1e3;
+const _camFrom = new CANNON.Vec3();
+const _camTo = new CANNON.Vec3();
+const CAM_RAY = { collisionFilterMask: 1, skipBackfaces: true };
+/** How far the camera can be from `o` along `dir` before it is inside furniture, a bush or a tree. */
+function obstacleLimit(o, dir, dist) {
+  _camFrom.set(o.x, o.y, o.z);
+  _camTo.set(o.x + dir.x * (dist + 0.4), o.y + dir.y * (dist + 0.4), o.z + dir.z * (dist + 0.4));
+  let nearest = 1e3;
+  world.raycastAll(_camFrom, _camTo, CAM_RAY, (r) => {
+    if (CAM_BLOCKERS.has(r.body.surface?.kind)) nearest = Math.min(nearest, r.distance);
+  });
+  return nearest === 1e3 ? 1e3 : Math.max(0.5, nearest - 0.35);
 }
 
 // ---------------------------------------------------------------- buttons & keys
@@ -1115,11 +1300,14 @@ const btn = {
   drop: $('btn-drop'),
   help: $('btn-help'),
   aim: $('btn-aim'),
+  players: $('btn-players'),
 };
 
 const LEVEL_NAMES = ['floor 1', 'floor 2', 'floor 3', 'the roof'];
 function dropLennie(level) {
   if (grab) endGrab();
+  stopReplay();
+  replay.stop(false);
   const p = house.spawnPoint(level);
   lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
   guard.forget();
@@ -1130,13 +1318,28 @@ function dropLennie(level) {
   resetChain();
   hideResult();
   focusLennie(0.8);
+  settleFocus = { t: 0 };
 }
 
-function resetAll() {
+// After a drop Lennie flops over and slides a bit: once he lies still, the
+// camera re-centres on him (on a narrow phone screen he'd otherwise be off the edge).
+let settleFocus = { t: 0 };
+function updateSettleFocus(dt) {
+  if (!settleFocus) return;
+  settleFocus.t += dt;
+  if (grab || toss.state !== 'idle' || settleFocus.t > 6) {
+    settleFocus = null;
+  } else if (settleFocus.t > 0.8 && !camAnim && lennie.maxSpeed() < 0.4) {
+    settleFocus = null;
+    focusLennie(0.6);
+  }
+}
+
+function resetAll(say = true) {
   house.repairAll();
   clearShards();
   dropLennie(0);
-  toast('Windows and doors fixed, Lennie back downstairs', 1500);
+  if (say) toast('Windows and doors fixed, Lennie back downstairs', 1500);
 }
 
 function toggleFollow() {
@@ -1163,7 +1366,7 @@ function toggleSound() {
   btn.sound.setAttribute('aria-pressed', String(!sfx.muted));
 }
 
-btn.reset.addEventListener('click', resetAll);
+btn.reset.addEventListener('click', () => resetAll());
 btn.focus.addEventListener('click', () => focusLennie());
 btn.follow.addEventListener('click', toggleFollow);
 btn.cutaway.addEventListener('click', toggleCutaway);
@@ -1223,9 +1426,13 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Escape') {
     setDropMenu(false);
     if (!ui.help.hidden) setHelp(false);
+    if (!ui.setup.hidden) setSetup(false);
+    stopReplay();
     return;
   }
+  if (replay.playing && e.code !== 'KeyM' && e.code !== 'KeyP') stopReplay();
   switch (e.code) {
+    case 'KeyP': if (replay.playing) stopReplay(); else playReplay(); break;
     case 'KeyR': resetAll(); break;
     case 'KeyF': focusLennie(); break;
     case 'KeyG': toggleFollow(); break;
@@ -1251,6 +1458,296 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
+
+// ---------------------------------------------------------------- instant replay
+function playReplay() {
+  if (grab || replay.playing || !replay.play(0.4)) return;
+  clearTimeout(autoReplayTimer);
+  camAnim = null;
+  aim.guide = null;
+  hideAim();
+  hideResult();
+  ui.replayBadge.hidden = false;
+}
+
+/** Ends a replay early (or when it finishes) and brings the score card back. */
+function stopReplay() {
+  if (!replay.playing) return;
+  replay.cancel();
+  endReplay();
+}
+
+function endReplay() {
+  replayCenter = null;
+  ui.replayBadge.hidden = true;
+  if (match && turnPending) {
+    showTurnCard();
+  } else if (toss.state === 'scored') {
+    ui.result.classList.add('show');
+    clearTimeout(resultTimer);
+    resultTimer = setTimeout(hideResult, 6000);
+  }
+  focusLennie(0.8);
+}
+
+ui.replayBtn.addEventListener('click', () => {
+  ui.replayBtn.blur();
+  playReplay();
+});
+
+// ---------------------------------------------------------------- "Grab me!" hint
+const _hintPos = new THREE.Vector3();
+function updateHint() {
+  const show = hint.on && toss.state === 'idle' && !grab && !replay.playing
+    && ui.help.hidden && ui.turnCard.hidden && ui.setup.hidden;
+  if (show) {
+    const head = lennie.parts.head.body.position;
+    const v = _hintPos.set(head.x, head.y + 0.35, head.z).project(camera);
+    if (v.z < 1 && Math.abs(v.x) < 1 && Math.abs(v.y) < 1) {
+      ui.hint.style.left = `${(v.x * 0.5 + 0.5) * innerWidth}px`;
+      ui.hint.style.top = `${(-v.y * 0.5 + 0.5) * innerHeight}px`;
+      if (ui.hint.hidden) ui.hint.hidden = false;
+      return;
+    }
+  }
+  if (!ui.hint.hidden) ui.hint.hidden = true;
+}
+
+// ---------------------------------------------------------------- challenges
+function renderChallenge() {
+  ui.challenge.hidden = !!match;
+  const c = challenges.current;
+  ui.chCount.textContent = challenges.count;
+  if (c) {
+    ui.chNum.textContent = challenges.number;
+    ui.chText.textContent = c.text;
+    ui.chSkip.textContent = 'Skip';
+    ui.chSkip.title = ui.chSkip.ariaLabel = 'Skip this challenge';
+  } else {
+    ui.chNum.textContent = challenges.count;
+    ui.chText.textContent = 'All challenges done. Lennie legend!';
+    ui.chSkip.textContent = 'Again';
+    ui.chSkip.title = ui.chSkip.ariaLabel = 'Start the challenges over';
+  }
+}
+
+function challengeDone(c) {
+  sfx.chime();
+  sfx.voice('yay');
+  toast(`Challenge done: ${c.text}! +${CHALLENGE_BONUS}`, 2600);
+  ui.chText.textContent = `✔ ${c.text}`;
+  ui.challenge.classList.remove('done');
+  void ui.challenge.offsetWidth;
+  ui.challenge.classList.add('done');
+  setTimeout(renderChallenge, 1600);
+}
+
+ui.chSkip.addEventListener('click', () => {
+  ui.chSkip.blur();
+  if (challenges.current) challenges.skip();
+  else challenges.restart();
+  renderChallenge();
+});
+
+// ---------------------------------------------------------------- taking turns
+// 2–4 players take turns, TOSSES_PER_PLAYER each; before each turn the house is
+// fixed and Lennie goes back downstairs, so everyone starts the same way.
+const NAMES_KEY = 'toss-the-lennie:players';
+let match = null; // { players: [{ name, color, scores: [] }], turn }
+let setupCount = 2;
+let savedNames = [];
+try { savedNames = JSON.parse(localStorage.getItem(NAMES_KEY) ?? '[]'); } catch { /* ignore */ }
+
+const playerName = (i) => savedNames[i]?.trim() || `Player ${i + 1}`;
+const matchOver = () => match.players.every((p) => p.scores.length >= TOSSES_PER_PLAYER);
+const playerTotal = (p) => p.scores.reduce((a, b) => a + b, 0);
+
+function renderSetup() {
+  ui.setup.querySelectorAll('[data-players]').forEach((b) => b.setAttribute('aria-checked', String(Number(b.dataset.players) === setupCount)));
+  const values = [...ui.setupNames.querySelectorAll('input')].map((i) => i.value);
+  ui.setupNames.innerHTML = '';
+  for (let i = 0; i < setupCount; i++) {
+    const label = document.createElement('label');
+    label.style.setProperty('--player', PLAYER_COLORS[i]);
+    const dot = document.createElement('i');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 14;
+    input.placeholder = `Player ${i + 1}`;
+    input.value = values[i] ?? savedNames[i] ?? '';
+    input.setAttribute('aria-label', `Name of player ${i + 1}`);
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation(); // typing a name mustn't drive the game
+      if (e.key === 'Enter') ui.setupStart.click();
+    });
+    label.append(dot, input);
+    ui.setupNames.appendChild(label);
+  }
+}
+
+function setSetup(open) {
+  ui.setup.hidden = !open;
+  btn.players.setAttribute('aria-expanded', String(open));
+  if (open) {
+    setHelp(false);
+    setDropMenu(false);
+    renderSetup();
+    ui.setupNames.querySelector('input')?.focus({ preventScroll: true });
+  }
+}
+
+function startMatch() {
+  const names = [...ui.setupNames.querySelectorAll('input')].map((i, n) => i.value.trim() || `Player ${n + 1}`);
+  savedNames = names;
+  try { localStorage.setItem(NAMES_KEY, JSON.stringify(names)); } catch { /* ignore */ }
+  setSetup(false);
+  newMatch(names);
+}
+
+function newMatch(names) {
+  stopReplay();
+  turnPending = true;
+  clearTimeout(turnTimer);
+  match = { players: names.map((name, i) => ({ name, color: PLAYER_COLORS[i], scores: [] })), turn: 0 };
+  renderBoard();
+  renderChallenge();
+  showTurnCard();
+}
+
+function endMatch() {
+  match = null;
+  turnPending = false;
+  ui.hintText.textContent = 'Grab me!';
+  clearTimeout(turnTimer);
+  ui.board.hidden = true;
+  ui.turnCard.hidden = true;
+  renderChallenge();
+}
+
+function recordTurn(total) {
+  const p = match.players[match.turn];
+  p.scores.push(total);
+  match.turn = (match.turn + 1) % match.players.length;
+  renderBoard();
+}
+
+function renderBoard() {
+  ui.board.hidden = !match;
+  if (!match) return;
+  const cur = match.players[match.turn];
+  ui.boardRound.textContent = matchOver() ? 'Game over' : `Toss ${cur.scores.length + 1} of ${TOSSES_PER_PLAYER}`;
+  ui.boardList.innerHTML = '';
+  match.players.forEach((p, i) => {
+    const li = document.createElement('li');
+    li.style.setProperty('--player', p.color);
+    if (i === match.turn && !matchOver()) li.className = 'now';
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = p.name;
+    const dots = document.createElement('span');
+    dots.className = 'dots';
+    dots.textContent = '●'.repeat(p.scores.length) + '○'.repeat(TOSSES_PER_PLAYER - p.scores.length);
+    const pts = document.createElement('span');
+    pts.className = 'pts';
+    pts.textContent = fmt(playerTotal(p));
+    li.append(name, dots, pts);
+    ui.boardList.appendChild(li);
+  });
+}
+
+/** Between turns: whose turn it is next, or at the end who won. */
+function showTurnCard() {
+  if (!match || replay.playing) return; // after a replay, endReplay shows it
+  ui.turnRanking.hidden = true;
+  ui.turnAlt.hidden = true;
+  if (matchOver()) {
+    const ranked = [...match.players].sort((a, b) => playerTotal(b) - playerTotal(a));
+    const top = playerTotal(ranked[0]);
+    const winners = ranked.filter((p) => playerTotal(p) === top);
+    ui.turnCard.style.setProperty('--player', winners[0].color);
+    ui.turnKicker.textContent = 'Game over';
+    ui.turnTitle.textContent = winners.length > 1 ? "It's a tie!" : `${winners[0].name} wins!`;
+    ui.turnSub.textContent = winners.length > 1 ? `${winners.map((p) => p.name).join(' and ')} both scored ${fmt(top)}.` : `With ${fmt(top)} points from ${TOSSES_PER_PLAYER} tosses.`;
+    ui.turnRanking.innerHTML = '';
+    ranked.forEach((p) => {
+      const li = document.createElement('li');
+      li.style.setProperty('--player', p.color);
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = p.name;
+      const pts = document.createElement('span');
+      pts.className = 'pts';
+      pts.textContent = fmt(playerTotal(p));
+      li.append(name, pts);
+      ui.turnRanking.appendChild(li);
+    });
+    ui.turnRanking.hidden = false;
+    ui.turnGo.textContent = 'Play again';
+    ui.turnAlt.textContent = 'Back to free play';
+    ui.turnAlt.hidden = false;
+    ui.turnAlt.dataset.action = 'free';
+    sfx.score(3);
+    sfx.voice('yay');
+  } else {
+    const p = match.players[match.turn];
+    const first = match.players.every((q) => q.scores.length === 0);
+    ui.turnCard.style.setProperty('--player', p.color);
+    ui.turnKicker.textContent = first ? 'Game on!' : `Toss ${p.scores.length + 1} of ${TOSSES_PER_PLAYER}`;
+    ui.turnTitle.textContent = `${p.name}'s turn!`;
+    const device = document.body.classList.contains('touch') ? 'tablet' : 'mouse';
+    ui.turnSub.textContent = first ? `${p.name} goes first. Ready?` : `Pass the ${device} to ${p.name}.`;
+    ui.turnGo.textContent = 'Go!';
+    if (replay.canPlay && !first) {
+      ui.turnAlt.textContent = 'Watch the last toss again';
+      ui.turnAlt.hidden = false;
+      ui.turnAlt.dataset.action = 'replay';
+    }
+  }
+  ui.turnCard.hidden = false;
+  ui.turnGo.focus({ preventScroll: true });
+}
+
+function beginTurn() {
+  ui.turnCard.hidden = true;
+  turnPending = false;
+  if (!match) return;
+  if (matchOver()) {
+    newMatch(match.players.map((p) => p.name));
+    return;
+  }
+  resetAll(false);
+  hint.on = true;
+  const p = match.players[match.turn];
+  ui.hintText.textContent = `${p.name}, grab me!`;
+  toast(`${p.name}'s turn!`, 1400);
+}
+
+btn.players.addEventListener('click', () => setSetup(ui.setup.hidden));
+ui.setup.querySelectorAll('[data-players]').forEach((b) => b.addEventListener('click', () => {
+  setupCount = Number(b.dataset.players);
+  renderSetup();
+}));
+ui.setupStart.addEventListener('click', startMatch);
+ui.setupCancel.addEventListener('click', () => setSetup(false));
+ui.turnGo.addEventListener('click', beginTurn);
+ui.turnAlt.addEventListener('click', () => {
+  if (ui.turnAlt.dataset.action === 'free') {
+    endMatch();
+    toast('Free play', 1200);
+  } else {
+    ui.turnCard.hidden = true;
+    playReplay();
+  }
+});
+ui.boardEnd.addEventListener('click', () => {
+  ui.boardEnd.blur();
+  endMatch();
+  toast('Game ended: free play', 1400);
+});
+
+ui.aimPad.querySelector('#aim-higher').addEventListener('click', () => { aim.loft = clamp(aim.loft + AIM_LOFT.step * 2, AIM_LOFT.min, AIM_LOFT.max); });
+ui.aimPad.querySelector('#aim-lower').addEventListener('click', () => { aim.loft = clamp(aim.loft - AIM_LOFT.step * 2, AIM_LOFT.min, AIM_LOFT.max); });
+renderChallenge();
 
 // ---------------------------------------------------------------- HUD per frame
 let meter = 0;
@@ -1290,7 +1787,9 @@ function updateHud(dt, now) {
     status = toss.state === 'scored' ? `Scored! Landed ${where}.` : `${place} · grab a limb and fling!`;
     if (aim.on && !hoverPart) {
       const warn = aim.shot?.tooFar ? ' · <b>too far</b>' : aim.shot?.blocked ? ' · <b>something is in the way</b>' : '';
-      status = `<b>Aim</b>: click where Lennie should go · scroll for a higher or lower arc${warn}`;
+      status = document.body.classList.contains('touch')
+        ? (aim.pin ? `<b>Aim</b>: tap the ring again to throw · tap elsewhere to aim again${warn}` : '<b>Aim</b>: tap where Lennie should go')
+        : `<b>Aim</b>: click where Lennie should go · scroll for a higher or lower arc${warn}`;
     }
   }
   if (ui.status.innerHTML !== status) ui.status.innerHTML = status;
@@ -1378,6 +1877,8 @@ function putBackNearEdge() {
 /** After teleporting Lennie: the same tidy-up as dropping him in. */
 function placedBack(message) {
   if (grab) endGrab();
+  stopReplay();
+  replay.stop(false);
   guard.forget();
   aim.guide = null;
   nudge();
@@ -1405,21 +1906,29 @@ function frame(now) {
 }
 
 function tick(dt, now) {
-  acc += dt;
-  let steps = 0;
-  while (acc >= FIXED_DT && steps < 12) {
-    stepPhysics(FIXED_DT * timeScale);
-    acc -= FIXED_DT;
-    steps++;
+  if (replay.playing) {
+    // The physics waits while the replay moves Lennie's visible parts.
+    replayCenter = replay.update(dt);
+    if (!replayCenter) endReplay();
+  } else {
+    acc += dt;
+    let steps = 0;
+    while (acc >= FIXED_DT && steps < 12) {
+      stepPhysics(FIXED_DT * timeScale);
+      acc -= FIXED_DT;
+      steps++;
+    }
+    if (steps === 12) acc = 0;
+    lennie.sync();
+    updateToss(dt * timeScale);
+    replay.capture(dt * timeScale);
   }
-  if (steps === 12) acc = 0;
-
-  lennie.sync();
   lennie.update(dt);
-  updateToss(dt * timeScale);
   updateGrabVisual();
+  updateSettleFocus(dt);
   updateCamera(dt);
   updateAim();
+  updateHint();
   house.updateView(camera, controls.target, dt, cutaway);
   shop.updateView(camera, controls.target, dt);
   updateShards(dt * timeScale);

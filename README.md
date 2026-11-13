@@ -57,37 +57,58 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 | Push/pull while holding | Scroll wheel |
 | Aim mode on/off | T (or the arc button) |
 | Aimed toss (in aim mode) | Point where Lennie should go, click |
-| Higher/lower arc (in aim mode) | Scroll wheel |
+| Higher/lower arc (in aim mode) | Scroll wheel, or the ▲ ▼ buttons |
 | Orbit camera | Drag empty space |
 | Pan / zoom | Right-drag / scroll |
 | Fly the camera | WASD, Q/E down/up |
 | Drop Lennie on floor 1 / 2 / 3 / the roof | 1 / 2 / 3 / 4 |
 | Fix the windows and doors and put Lennie back downstairs | R |
+| Watch the last toss again in slow motion | P (or the button on the score card) |
+| Take turns with 2–4 players | The people button |
 | Focus camera on Lennie | F |
 | Camera follows Lennie | G |
 | Cutaway (hide upper floors when looking down) | C |
 | Slow motion | Z |
 | Sound on/off | M |
 | How to play | H |
-| Close the help or the drop menu | Esc |
+| Close the help, a menu or a replay | Esc |
+
+**On a tablet or phone:** drag Lennie to fling him, drag empty space to turn the camera, and pinch or slide two fingers to zoom and move. In aim mode, tap a spot to see the flight path and tap it again to throw. The help screen shows the touch controls on a touch screen and the mouse and keyboard ones on a computer.
 
 In aim mode a dotted arc runs from Lennie to whatever you point at: a window, a doorway, a corner, the trampoline. It stops at the first thing in the way and the ring turns white when it won't reach, so you can see where he'll really hit. A click throws him along it with a little somersault. Dragging still orbits the camera, and grabbing a limb still works as usual.
 
-Walls, floors and the roof between the camera and the point it's looking at fade out automatically, so you can see Lennie anywhere in the house.
+Walls, floors and the roof between the camera and the point it's looking at fade out automatically, so you can see Lennie anywhere in the house. Furniture, bushes and trees don't fade, so the camera stops in front of them instead of ending up inside one.
+
+The game opens close up on Lennie with a "Grab me!" bubble over him, which stays until he's first picked up.
 
 ## Scoring
 
 - **Contortion**: every joint (neck, spine, shoulders, elbows, hips, knees) is measured against its relaxed pose. A bit of bend counts as relaxed and is free; past that, points grow with the square of the bend.
-- **Pose tricks**: Upside down, The splits, Crossed/Pretzel legs, Tangled arm/Straitjacket, Foot in face, and Human knot (any three of those at once).
-- **House feats**: Defenestrated! (thrown out of the house), Hanging out the window!, Fell N floors, Stair tumble/Full flight, Stranded on the roof!, Went shopping! (landed in the supermarket), On the supermarket roof!, Trampoline bounces.
+- **Pose tricks**: Upside down, The splits, Pretzel legs, Straitjacket, Foot in face, and Human knot (any three of those at once). One crossed leg or one tangled arm is a small extra that doesn't count towards the knot.
+- **House feats**: Defenestrated! (thrown out of the house), Hanging out the window!, Fell N floors (a modest bonus, so rolling him off the roof isn't the easy way to a big score), Stair tumble/Full flight, Stranded on the roof!, Went shopping! (landed in the supermarket), On the supermarket roof!, Trampoline bounces.
+- **Landing spots**: where he comes to rest can earn a bonus, with Lennie saying something about it: in the bath, on the loo, on the desk, in the armchair, on top of the wardrobe, in either bed, on the beanbag or the toy box, on top of the fridge, on the dinner table or kitchen counter, on the couch; in the supermarket in the freezer, on top of the drinks fridges or the shelves, in the trolleys, in the fruit and veg, or scanned at a checkout; outside stuck in a tree, in the bushes, or napping on the trampoline.
 - **Multiplier**: +0.1 per hard bounce, +0.25 per mid-air juggle (re-grabbing him while he's airborne), +0.3 per smashed window, +0.4 per smashed door, up to ×4.
 - A toss that's too gentle doesn't score.
 - The best score is remembered in the browser, so it survives a reload on the same computer.
 
+## Challenges
+
+Under the score there's always one challenge to go for, from easy ("Smash a window") to hard ("Put Lennie in the freezer", "Score 2,500 points in one toss"): 20 in all. Doing one adds 300 points to that toss and brings up the next. *Skip* moves on and comes back to it later. Progress is remembered in the browser. Challenges pause during a game of turns.
+
+## Taking turns
+
+The people button starts a game for 2–4 players, with their names (remembered for next time). Everyone gets 5 tosses, one after the other. Before each turn the house is fixed and Lennie goes back downstairs, so everyone starts the same way, and a card says whose turn it is, so the tablet can be passed on. A board under the score shows everyone's total. After the last toss the winner is announced, with *Play again* or *Back to free play*.
+
+## Replay and reactions
+
+Every toss is recorded. *Watch the replay* on the score card (or P) plays it back in slow motion with the camera following Lennie; a big toss (1,500 or more, or a new best) replays by itself. A tap or a key stops it.
+
+Lennie reacts: a grin and a "wheee!" when he's flung, "ow!" and "oof" when he hits something hard, and after a good toss he lies there with crossed-out eyes, his tongue out and stars circling his head until he's picked up again. All sounds are synthesized; there are no audio files.
+
 ## Files
 
-- `index.html`, `style.css`: the page, toolbar, score panel and help; the import map that loads three.js and cannon-es
-- `src/main.js`: scene, input, camera, toss state machine, breaking glass and doors, putting Lennie back when he leaves the play area, HUD
+- `index.html`, `style.css`: the page, toolbar, score panel, challenge, players board, turn card and help; the import map that loads three.js and cannon-es
+- `src/main.js`: scene, input (mouse and touch), camera, toss state machine, breaking glass and doors, landing spots, putting Lennie back when he leaves the play area, HUD, challenges, taking turns and the replay controls
 - `src/house.js`: the house (walls with windows and breakable doors, floors, stairs, the row's roof, furniture), plus cutaway and wall fading
 - `src/street.js`: the neighbour houses, and the details every house in the row shares (porch, chimney, dormer, skylight, vents, downpipe)
 - `src/yard.js`: sky, lighting, lawn, back-garden fence, the play area's edges, garden trees, bushes, the hedge and the trampoline
@@ -96,8 +117,10 @@ Walls, floors and the roof between the camera and the point it's looking at fade
 - `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, breeze blocks, wallpaper, wood, floor tiles, grass)
 - `src/ragdoll.js`: Lennie's bodies, joints and look
 - `src/scoring.js`: contortion measurement, trick detection and the multiplier
+- `src/challenges.js`: the list of challenges and the progress kept in the browser
+- `src/replay.js`: records each toss and plays it back in slow motion
 - `src/guard.js`: safety net that puts Lennie back in one piece if a limb ever ends up inside a wall or floor
-- `src/audio.js`: synthesized sound effects
+- `src/audio.js`: synthesized sound effects and Lennie's voice
 - `tests/check.mjs`: quick code check (modules parse, imports resolve, files linked from `index.html` exist), run nightly by `.github/workflows/ci.yml`
 
 ## License

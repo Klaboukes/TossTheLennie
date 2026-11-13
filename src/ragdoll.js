@@ -250,8 +250,34 @@ export class Ragdoll {
     ouch.position.set(0, -0.075, 0.13);
     ouch.visible = false;
     g.add(ouch);
+    // a wide open grin for when he's flying
+    const grin = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24, Math.PI, Math.PI), material(0x3a1018));
+    grin.position.set(0, -0.045, 0.13);
+    grin.visible = false;
+    g.add(grin);
+    // and his tongue sticking out when he's dizzy
+    const tongue = mesh(new THREE.SphereGeometry(0.026, 14, 10), material(0xe86f86, { roughness: 0.4 }), [0.012, -0.1, 0.135]);
+    tongue.scale.set(1, 1.3, 0.5);
+    tongue.visible = false;
+    g.add(tongue);
     this.face.smile = smile;
     this.face.ouch = ouch;
+    this.face.grin = grin;
+    this.face.tongue = tongue;
+
+    // Cartoon stars circling his head when he's dizzy. They live in the scene
+    // rather than on the head, so they stay above him whichever way up he is.
+    this.stars = new THREE.Group();
+    const starMat = new THREE.MeshBasicMaterial({ color: 0xffd23f });
+    for (let i = 0; i < 4; i++) {
+      const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.065, 0), starMat);
+      const a = (i / 4) * Math.PI * 2;
+      star.position.set(Math.cos(a) * 0.26, Math.sin(a * 2) * 0.04, Math.sin(a) * 0.26);
+      star.scale.set(1, 1, 0.45);
+      this.stars.add(star);
+    }
+    this.stars.visible = false;
+    this.scene.add(this.stars);
   }
 
   /** Stand Lennie back up in the rest pose. */
@@ -278,13 +304,19 @@ export class Ragdoll {
   }
 
   update(dt) {
+    if (this.stars.visible) {
+      const h = this.parts.head.group.position;
+      this.stars.position.set(h.x, h.y + 0.26, h.z);
+      this.stars.rotation.y += dt * 4;
+      for (const s of this.stars.children) s.rotation.y += dt * 6;
+    }
     if (this.expressionTimer > 0) {
       this.expressionTimer -= dt;
       if (this.expressionTimer <= 0) this.setExpression('normal');
     }
   }
 
-  /** 'normal' | 'ouch' | 'dizzy'. A duration of 0 keeps it until changed. */
+  /** 'normal' | 'ouch' | 'whee' | 'dizzy'. A duration of 0 keeps it until changed. */
   setExpression(kind, duration = 0) {
     // A brief 'ouch' never overrides a lasting dizzy face.
     if (kind === 'ouch' && this.expression === 'dizzy' && this.expressionTimer <= 0) return;
@@ -294,7 +326,10 @@ export class Ragdoll {
     this.face.pupils.forEach((p) => (p.visible = !dizzy));
     this.face.xEyes.forEach((x) => (x.visible = dizzy));
     this.face.smile.visible = kind === 'normal';
-    this.face.ouch.visible = kind !== 'normal';
+    this.face.grin.visible = kind === 'whee';
+    this.face.ouch.visible = kind === 'ouch' || dizzy;
+    this.face.tongue.visible = dizzy;
+    this.stars.visible = dizzy;
   }
 
   highlight(name, on) {
