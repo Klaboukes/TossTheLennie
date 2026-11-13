@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { floorGeometry, meterBoxUVs } from './textures.js';
+import { createStock, ASSORTMENT } from './products.js';
 
 // The supermarket across the road, after the real one: a long orange box
 // under a zigzag of grey gables, with a brick-and-glass entrance and a big
 // green four-dot logo. Lennie can be flung in through the open sliding doors:
 // inside are checkouts, fruit and veg crates with red offer signs, aisles of
-// shelves, freezers and fridges. The west end is a closed storeroom.
+// shelves stocked with products (products.js) that tumble off when Lennie hits
+// them, and glass-door freezers and fridges. The shop window and every
+// freezer and fridge door is breakable glass. The west end is a closed storeroom.
 // Walls, the roof and the entrance fade like the house's walls when they block
 // the view of the camera target.
 export const SHOP = {
@@ -206,7 +209,33 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     b.position.set((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2);
     b.surface = { kind };
     world.addBody(b);
+    return b;
   };
+  // Breakable glass, like the house's windows (main.js smashes them): the
+  // meshes of one pane, the box its physics body fills, and the way it faces.
+  const windows = [];
+  function pane(meshes, min, max, normal, onBreak = null) {
+    const group = new THREE.Group();
+    for (const m of meshes) group.add(m);
+    scene.add(group);
+    const size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+    const b = new CANNON.Body({ mass: 0, material: physMats.glass, shape: new CANNON.Box(new CANNON.Vec3(size[0] / 2, size[1] / 2, size[2] / 2)) });
+    b.position.set((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2);
+    const piece = {
+      kind: 'window', owner: null, group, broken: false, story: 0,
+      center: new THREE.Vector3(b.position.x, b.position.y, b.position.z),
+      normal: normal.clone(),
+      width: normal.z ? size[0] : size[2],
+      height: size[1],
+      body: b,
+      onBreak,
+    };
+    b.surface = { kind: 'glass', piece };
+    world.addBody(b);
+    windows.push(piece);
+    return piece;
+  }
+
   // (box faces: +x, −x, +y, −y, +z, −z; the shop's street side is −z)
   const faces = (px, nx, py, ny, pz, nz) => [px, nx, py, ny, pz, nz];
 
@@ -288,17 +317,34 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   boxAt([E.x0 + 0.6, E.top - 0.45, E.z0], [E.x1 - 0.6, E.top, SHOP.z0], brick, { ...fadeFront, uv: true });
   boxAt([E.x0 - 0.2, E.top, E.z0 - 0.2], [E.x1 + 0.2, E.top + 0.15, SHOP.z0 + 0.1], white, fadeFront);
   const gz = [E.z0 + 0.2, E.z0 + 0.26];
-  for (const [a, b, y0, y1] of [[E.x0 + 0.6, d0, 0, E.top - 0.45], [d1, E.x1 - 0.6, 0, E.top - 0.45], [d0, d1, SHOP.doorTop, E.top - 0.45]]) {
-    boxAt([a, y0, gz[0]], [b, y1, gz[1]], shopGlass, { fade: 'front' });
-  }
-  for (const [a, b, y0, y1] of [[E.x0 + 0.6, E.x1 - 0.6, SHOP.doorTop, SHOP.doorTop + 0.1], [d0 - 0.12, d0, 0, SHOP.doorTop], [d1, d1 + 0.12, 0, SHOP.doorTop], [-7.6, -7.5, 0, SHOP.doorTop], [-0.8, -0.7, 0, SHOP.doorTop]]) {
+  const gTop = E.top - 0.45;
+  const top = SHOP.doorTop + 0.1;
+  // the frames between the panes (solid, so they stay standing when the glass goes)
+  for (const [a, b, y0, y1] of [
+    [E.x0 + 0.6, E.x1 - 0.6, SHOP.doorTop, top],
+    [d0 - 0.12, d0, 0, SHOP.doorTop], [d1, d1 + 0.12, 0, SHOP.doorTop], [-7.6, -7.5, 0, SHOP.doorTop], [-0.8, -0.7, 0, SHOP.doorTop],
+    [d0 - 0.06, d0 + 0.06, top, gTop], [d1 - 0.06, d1 + 0.06, top, gTop],
+  ]) {
     boxAt([a, y0, gz[0] - 0.02], [b, y1, gz[1] + 0.02], darkFrame, { fade: 'front' });
+    solid([a, y0, gz[0] - 0.1], [b, y1, gz[1] + 0.1], 'wall');
   }
-  // the sliding doors stand open, slid behind the fixed glass
-  for (const [a, b] of [[d0 - 1.4, d0 - 0.05], [d1 + 0.05, d1 + 1.4]]) boxAt([a, 0.02, gz[1] + 0.04], [b, SHOP.doorTop - 0.05, gz[1] + 0.08], shopGlass, { fade: 'front' });
-  solid([E.x0, 0, E.z0], [d0, E.top, SHOP.z0], 'wall');
-  solid([d1, 0, E.z0], [E.x1, E.top, SHOP.z0], 'wall');
-  solid([d0, SHOP.doorTop, E.z0], [d1, E.top, SHOP.z0], 'wall');
+  // the panes, each one breakable; the sliding doors stand open, slid behind the fixed glass
+  const slider = (a, b) => boxAt([a, 0.02, gz[1] + 0.04], [b, SHOP.doorTop - 0.05, gz[1] + 0.08], shopGlass, { fade: 'front' });
+  const street = new THREE.Vector3(0, 0, -1);
+  for (const [a, b, y0, y1, extra] of [
+    [E.x0 + 0.6, -7.6, 0, SHOP.doorTop],
+    [-7.5, d0 - 0.12, 0, SHOP.doorTop, () => slider(d0 - 1.4, d0 - 0.05)],
+    [d1 + 0.12, -0.8, 0, SHOP.doorTop, () => slider(d1 + 0.05, d1 + 1.4)],
+    [-0.7, E.x1 - 0.6, 0, SHOP.doorTop],
+    [E.x0 + 0.6, d0 - 0.06, top, gTop], [d0 + 0.06, d1 - 0.06, top, gTop], [d1 + 0.06, E.x1 - 0.6, top, gTop],
+  ]) {
+    const glass = boxAt([a, y0, gz[0]], [b, y1, gz[1]], shopGlass, { fade: 'front' });
+    pane([glass, ...(extra ? [extra()] : [])], [a, y0, gz[0] - 0.12], [b, y1, gz[1] + 0.12], street);
+  }
+  // the brick around the glass
+  solid([E.x0, 0, E.z0], [E.x0 + 0.6, E.top, SHOP.z0], 'wall');
+  solid([E.x1 - 0.6, 0, E.z0], [E.x1, E.top, SHOP.z0], 'wall');
+  solid([E.x0 + 0.6, gTop, E.z0], [E.x1 - 0.6, E.top, SHOP.z0], 'wall');
   // the big logo on the glass above the doors
   const logoTex = logoTexture();
   const logo = add(new THREE.Mesh(new THREE.PlaneGeometry(8.6, 2.15), std({ map: logoTex, emissive: 0xffffff, emissiveMap: logoTex, emissiveIntensity: 0.35, transparent: true, alphaTest: 0.05 })), { fade: 'front' });
@@ -446,74 +492,144 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   scene.add(fruit);
 
   // ---------------------------------------------------------------- aisles of shelves
+  // Each aisle is stocked with products that belong there (products.js); a
+  // hard knock against a shelf sends the ones near the impact tumbling out.
+  const stock = createStock(scene, { bounds: IN });
   const shelfMat = std({ color: 0xd9dcdf, roughness: 0.5, metalness: 0.2 });
   const endCap = green;
   const AISLE = { z0: 36.2, z1: 42.4, h: 1.95, half: 0.55 };
   const shelfYs = [0.12, 0.55, 0.98, 1.41];
-  const items = [];
-  const packColors = [0xe8473b, 0xf6d04d, 0x3b7dd8, 0xffffff, 0x3fae3a, 0xf59a23, 0x8e44ad, 0xe86fa0, 0x6b4a32, 0x1b1b1b, 0x5fc4e0];
   const aisleNames = ['BROOD', 'ZUIVEL', 'KAAS', 'SNOEP', 'DRINKEN', 'PASTA & SOEP'];
-  [-18, -13, -8, -3, 2, 7].forEach((cx, a) => {
+  const aisleXs = [-18, -13, -8, -3, 2, 7];
+  const _out = new THREE.Vector3();
+  aisleXs.forEach((cx, a) => {
     const { z0, z1, h, half } = AISLE;
     boxAt([cx - half, 0, z0], [cx + half, 0.12, z1], shelfMat);
     boxAt([cx - 0.04, 0.12, z0], [cx + 0.04, h, z1], shelfMat, { cast: true });
     for (const y of shelfYs.slice(1)) boxAt([cx - half, y - 0.03, z0], [cx + half, y, z1], shelfMat);
     boxAt([cx - half, h - 0.05, z0], [cx + half, h, z1], shelfMat);
     for (const z of [z0, z1]) boxAt([cx - half, 0, z - 0.05], [cx + half, h, z + 0.05], endCap, { cast: true });
-    solid([cx - half, 0, z0 - 0.05], [cx + half, h, z1 + 0.05], 'furniture');
-    // the goods: rows of boxes, jars and bags in bright packaging, on both sides
+    // the goods, on both sides, facing out into the aisles
+    const sides = {};
     for (const side of [-1, 1]) {
-      for (const y of shelfYs) {
-        const col = packColors[Math.floor(rnd() * packColors.length)];
-        let z = z0 + 0.1;
-        while (z < z1 - 0.3) {
-          const w = 0.14 + rnd() * 0.16;
-          const ht = 0.16 + rnd() * 0.2;
-          // runs of the same product, like on real shelves
-          const c = rnd() < 0.2 ? packColors[Math.floor(rnd() * packColors.length)] : col;
-          items.push([cx + side * 0.3, y + ht / 2, z + w / 2, 0.36, ht, w, c]);
-          z += w + 0.02;
-        }
-      }
+      const section = stock.section();
+      sides[side] = section;
+      shelfYs.forEach((y, i) => {
+        const above = (shelfYs[i + 1] ?? h) - 0.03;
+        stock.fillRow(ASSORTMENT[aisleNames[a]][i], {
+          along: 'z', a: z0 + 0.08, b: z1 - 0.08, y, yaw: (side * Math.PI) / 2, maxH: Math.min(0.42, above - y), section,
+          depthAt: (row, depth) => cx + side * (half - 0.02 - depth / 2 - row * (depth + 0.01)), room: half - 0.08,
+        });
+      });
     }
+    const shelf = solid([cx - half, 0, z0 - 0.05], [cx + half, h, z1 + 0.05], 'furniture');
+    shelf.surface.mess = `Clean-up in aisle ${a + 1}!`;
+    shelf.surface.onHit = (point, strength, push) => {
+      if (point.y > h - 0.08) {
+        // on top: the top shelves on both sides
+        let n = 0;
+        for (const side of [-1, 1]) n += stock.knock(sides[side], point, _out.set(side, 0, 0), strength, push, { chance: 0.6 });
+        return n;
+      }
+      if (point.z < z0 + 0.02 || point.z > z1 - 0.02) {
+        // an end of the aisle: the products at that end slide off lengthwise
+        _out.set(0, 0, point.z < z0 + 0.02 ? -1 : 1);
+        return stock.knock(sides[-1], point, _out, strength, push, { chance: 0.7 }) + stock.knock(sides[1], point, _out, strength, push, { chance: 0.7 });
+      }
+      const side = point.x < cx ? -1 : 1;
+      return stock.knock(sides[side], point, _out.set(side, 0, 0), strength, push);
+    };
     // a hanging sign over the front end of the aisle
     const label = std({ map: labelTexture(aisleNames[a]) });
     boxAt([cx - 0.9, 2.75, z0 - 0.45], [cx + 0.9, 3.2, z0 - 0.4], faces(green, green, green, green, label, label));
     for (const dx of [-0.7, 0.7]) boxAt([cx + dx - 0.01, 3.2, z0 - 0.43], [cx + dx + 0.01, IN.y1, z0 - 0.42], darkFrame);
   });
-  const goods = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), std({ color: 0xffffff, roughness: 0.6 }), items.length);
-  items.forEach(([x, y, z, sx, sy, sz, color], i) => {
-    goods.setMatrixAt(i, _m.compose(_p.set(x, y, z), _q.identity(), _s.set(sx, sy, sz)));
-    goods.setColorAt(i, _c.setHex(color).offsetHSL(0, 0, (rnd() - 0.5) * 0.08));
-  });
-  goods.castShadow = true;
-  scene.add(goods);
 
-  // ---------------------------------------------------------------- freezers along the back, fridges along the side
-  const freezerBody = std({ color: 0xf4f6f8, roughness: 0.4 });
-  const freezerTop = std({ color: 0xbfe3f2, roughness: 0.1, emissive: 0x16323d });
-  const iceCream = [0xf7e3b5, 0xf2a2b8, 0x8a5a3c, 0xffffff, 0x9ad0e8];
-  const tubs = [];
-  for (let x = IN.x0 + 1.2; x + 3 < IN.x1 - 1.4; x += 3.3) {
-    const z0 = IN.z1 - 1.3;
-    boxAt([x, 0, z0], [x + 3, 0.86, IN.z1 - 0.1], freezerBody, { cast: true });
-    boxAt([x + 0.08, 0.86, z0 + 0.08], [x + 2.92, 0.9, IN.z1 - 0.18], freezerTop);
-    solid([x, 0, z0], [x + 3, 0.9, IN.z1 - 0.1], 'furniture');
-    for (let tx = x + 0.25; tx < x + 2.8; tx += 0.3) for (const tz of [z0 + 0.35, z0 + 0.75]) tubs.push([tx, tz, iceCream[Math.floor(rnd() * iceCream.length)]]);
+  // ---------------------------------------------------------------- glass-door freezers along the back, drinks fridges along the side
+  // Stand-up cabinets with a glass door every 80 cm or so. Every door is
+  // breakable glass: smash one and the products behind it spill out, and
+  // Lennie can end up inside, between the shelves.
+  const cabinetWhite = std({ color: 0xf4f6f8, roughness: 0.4 });
+  const cabinetGlass = new THREE.MeshStandardMaterial({ color: 0xcfeaf5, transparent: true, opacity: 0.22, roughness: 0.05, depthWrite: false });
+  const handleMat = std({ color: 0xb8bec4, metalness: 0.6, roughness: 0.3 });
+  const coldLight = std({ color: 0xe8f6fc, emissive: 0xbfe3f2, emissiveIntensity: 0.55, roughness: 0.6 });
+  const lightStrip = std({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1 });
+  const wireShelf = std({ color: 0xc9ced3, metalness: 0.4, roughness: 0.4 });
+  const CAB = { depth: 0.85, height: 2.15, base: 0.12, canopy: 0.22, door: 0.8, shelves: [0.12, 0.78, 1.42] };
+  /**
+   * A row of cabinets against the wall at `wall` (z for axis 'x', x for axis
+   * 'z'), from u0 to u1 along it, the glass facing into the shop. Returns the
+   * box inside the cabinets and, for each door, the doorway Lennie can end up
+   * in once its glass is smashed (half in counts: he's taller than they're deep).
+   */
+  function cabinets({ axis, wall, u0, u1, assortment, sign, signColor, mess }) {
+    const { depth, height, base, canopy } = CAB;
+    // (u along the row, y up, w from the glass back to the wall) → world
+    const P = (u, y, w) => (axis === 'x' ? [u, y, wall - depth + w] : [wall - depth + w, y, u]);
+    const box = (ua, ya, wa, ub, yb, wb) => {
+      const p = P(ua, ya, wa);
+      const q = P(ub, yb, wb);
+      return [[Math.min(p[0], q[0]), ya, Math.min(p[2], q[2])], [Math.max(p[0], q[0]), yb, Math.max(p[2], q[2])]];
+    };
+    const out = axis === 'x' ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(-1, 0, 0);
+    const yaw = axis === 'x' ? Math.PI : -Math.PI / 2;
+    const top = height - canopy;
+    const part = (ua, ya, wa, ub, yb, wb, mat, { phys = false, cast = false } = {}) => {
+      const [lo, hi] = box(ua, ya, wa, ub, yb, wb);
+      const m = boxAt(lo, hi, mat, { cast });
+      if (phys) solid(lo, hi, 'furniture').surface.mess = mess;
+      return m;
+    };
+    // the cabinet: plinth, a canopy with a lit sign, the ends, a cold white back and the shelves inside
+    part(u0, 0, 0, u1, base, depth, darkFrame, { phys: true });
+    part(u0, top, 0, u1, height, depth, cabinetWhite, { phys: true, cast: true });
+    const signTex = labelTexture(`${sign}   •   ${sign}   •   ${sign}`, signColor, '#ffffff', 1024, 64);
+    signTex.wrapS = THREE.RepeatWrapping;
+    signTex.repeat.set(Math.max(1, Math.round((u1 - u0) / 6)), 1);
+    boxAt(...box(u0, top + 0.03, -0.01, u1, height - 0.03, 0), std({ map: signTex, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.2 }));
+    for (const u of [u0, u1 - 0.06]) part(u, 0, 0, u + 0.06, height, depth, cabinetWhite, { phys: true, cast: true });
+    part(u0, base, depth - 0.04, u1, top, depth, coldLight);
+    part(u0 + 0.06, top - 0.03, 0.12, u1 - 0.06, top, 0.18, lightStrip);
+    const inside = stock.section();
+    for (const [i, y] of CAB.shelves.entries()) {
+      if (i > 0) {
+        const [lo, hi] = box(u0 + 0.06, y - 0.025, 0.12, u1 - 0.06, y, depth - 0.04);
+        boxAt(lo, hi, wireShelf);
+        const s = solid(lo, hi, 'furniture');
+        s.surface.mess = mess;
+        s.surface.onHit = (point, strength, push) => stock.knock(inside, point, out, strength, push);
+      }
+      const above = (CAB.shelves[i + 1] ?? top) - 0.03;
+      stock.fillRow(assortment[i], {
+        along: axis, a: u0 + 0.1, b: u1 - 0.1, y, yaw, maxH: Math.min(0.42, above - y), section: inside,
+        depthAt: (row, d) => P(0, 0, 0.15 + d / 2 + row * (d + 0.01))[axis === 'x' ? 2 : 0], room: depth - 0.22,
+      });
+    }
+    // the doors: a glass pane in a thin frame with a handle, each one breakable
+    const doorways = [];
+    const n = Math.max(1, Math.round((u1 - u0 - 0.12) / CAB.door));
+    const dw = (u1 - u0 - 0.12) / n;
+    for (let i = 0; i < n; i++) {
+      const a = u0 + 0.06 + i * dw;
+      const b = a + dw;
+      const meshes = [part(a + 0.02, base + 0.05, 0, b - 0.02, top - 0.05, 0.02, cabinetGlass)];
+      for (const [ya, yb] of [[base, base + 0.05], [top - 0.05, top]]) meshes.push(part(a + 0.012, ya, -0.01, b - 0.012, yb, 0.03, cabinetWhite));
+      const hu = i % 2 ? a + 0.06 : b - 0.085;
+      meshes.push(part(hu, 0.75, -0.06, hu + 0.025, 1.55, -0.01, handleMat));
+      const [lo, hi] = box(a, base, -0.08, b, top, 0.1);
+      const piece = pane(meshes, lo, hi, out);
+      piece.onBreak = () => stock.knock(inside, piece.center.clone().addScaledVector(out, -0.3), out, 7, null, { radius: 0.75, chance: 0.6 });
+      const [dlo, dhi] = box(a, -1, -0.45, b, top, depth - 0.04);
+      doorways.push({ min: dlo, max: dhi, when: () => piece.broken });
+      // the frame between this door and the one before
+      part(a - 0.012, base, -0.012, a + 0.012, top, 0.03, cabinetWhite);
+    }
+    part(u1 - 0.072, base, -0.012, u1 - 0.048, top, 0.03, cabinetWhite);
+    return { inside: box(u0 + 0.06, base, 0.04, u1 - 0.06, top, depth - 0.04), doorways };
   }
-  const tubMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.11, 0.1, 0.12, 10), std({ color: 0xffffff, roughness: 0.5 }), tubs.length);
-  tubs.forEach(([x, z, color], i) => {
-    tubMesh.setMatrixAt(i, _m.makeTranslation(x, 0.8, z));
-    tubMesh.setColorAt(i, _c.setHex(color));
-  });
-  scene.add(tubMesh);
-  boxAt([IN.x0 + 1.2, 2.35, IN.z1 - 0.06], [IN.x0 + 5.2, 2.7, IN.z1 - 0.03], faces(white, white, white, white, white, std({ map: labelTexture('DIEPVRIES', '#3b7dd8') })));
-
-  const fridgeMat = std({ map: fridgeTexture(), emissive: 0x3a4a50, roughness: 0.15 });
-  for (let z = IN.z0 + 5.5; z + 1.6 < IN.z1 - 1.6; z += 1.7) {
-    boxAt([IN.x1 - 0.85, 0, z], [IN.x1, 2.15, z + 1.6], faces(freezerBody, fridgeMat, freezerBody, freezerBody, freezerBody, freezerBody), { cast: true });
-  }
-  solid([IN.x1 - 0.85, 0, IN.z0 + 5.5], [IN.x1, 2.15, IN.z1 - 1.6], 'furniture');
+  const freezers = cabinets({ axis: 'x', wall: IN.z1, u0: IN.x0 + 1.2, u1: IN.x1 - 1.3, assortment: ASSORTMENT.DIEPVRIES, sign: 'DIEPVRIES', signColor: '#3b7dd8', mess: 'Clean-up at the freezers!' });
+  const fridges = cabinets({ axis: 'z', wall: IN.x1, u0: IN.z0 + 5.5, u1: IN.z1 - 0.95, assortment: ASSORTMENT.FRISDRANK, sign: 'FRISDRANK', signColor: '#3fae3a', mess: 'Clean-up at the fridges!' });
+  stock.build();
 
   // ---------------------------------------------------------------- a row of shopping trolleys by the door
   const trolleyMat = std({ color: 0xb8bec4, metalness: 0.5, roughness: 0.35, transparent: true, opacity: 0.75 });
@@ -569,17 +685,40 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   }
 
   // Landing spots worth a bonus (see house.js): just above each fixture.
-  let freezerEnd = IN.x0 + 1.2;
-  while (freezerEnd + 3.3 + 3 < IN.x1 - 1.4) freezerEnd += 3.3;
-  const S = (id, label, value, say, min, max) => ({ id, label, value, say, min, max });
+  const S = (id, label, value, say, min, max, when = null) => ({ id, label, value, say, min, max, when });
+  const [freezerInside, fridgeInside] = [freezers.inside, fridges.inside];
   const spots = [
-    S('freezer', 'In the freezer!', 600, 'BRRR!', [IN.x0 + 1.2, 0.8, IN.z1 - 1.35], [freezerEnd + 3, 1.8, IN.z1]),
-    S('fridges', 'On top of the drinks fridges!', 500, 'WHOA!', [IN.x1 - 0.9, 2.1, IN.z0 + 5.4], [IN.x1, 3.0, IN.z1 - 1.5]),
+    ...freezers.doorways.map((d) => S('freezer', 'In the freezer!', 600, 'BRRR!', d.min, d.max, d.when)),
+    ...fridges.doorways.map((d) => S('drinksfridge', 'In the drinks fridge!', 550, 'BRRR!', d.min, d.max, d.when)),
+    S('fridges', 'On top of the drinks fridges!', 500, 'WHOA!', [fridgeInside[0][0] - 0.1, CAB.height - 0.05, fridgeInside[0][2]], [IN.x1, 3.0, fridgeInside[1][2]]),
+    S('freezertop', 'On top of the freezers!', 500, 'WHOA!', [freezerInside[0][0], CAB.height - 0.05, freezerInside[0][2] - 0.1], [freezerInside[1][0], 3.0, IN.z1]),
     S('trolley', 'In the trolleys!', 400, 'WHEEE!', [0.15, 0.95, IN.z0 + 0.1], [1.8, 1.8, IN.z0 + 1.25]),
     S('fruit', 'In the fruit and veg!', 400, 'SQUISH!', [0.55, 0.7, IN.z0 + 1.95], [12.15, 1.5, IN.z0 + 3.65]),
     ...[-17, -13.5, -10].map((c) => S('checkout', 'Scanned at the checkout!', 500, 'BEEP!', [c - 0.45, 0.85, IN.z0 + 1.15], [c + 1.05, 1.6, IN.z0 + 3.85])),
     ...[-18, -13, -8, -3, 2, 7].map((cx) => S('shelves', 'On top of the shelves!', 500, 'HELP!', [cx - 0.6, 1.9, 36.1], [cx + 0.6, 2.8, 42.5])),
   ];
 
-  return { isInside, isOnRoof, updateView, isFaded, spots };
+  /** Smashes a pane of glass (the shop window or a fridge door) out of its frame. */
+  function breakPiece(piece) {
+    if (piece.broken) return;
+    piece.broken = true;
+    piece.group.visible = false;
+    world.removeBody(piece.body);
+    piece.onBreak?.();
+  }
+
+  /** New glass everywhere and the shelves stocked again. */
+  function repairAll() {
+    for (const piece of windows) {
+      if (!piece.broken) continue;
+      piece.broken = false;
+      piece.group.visible = true;
+      world.addBody(piece.body);
+    }
+    stock.restock();
+  }
+
+  const api = { isInside, isOnRoof, updateView, isFaded, spots, windows, breakPiece, repairAll, update: (dt) => stock.update(dt) };
+  for (const piece of windows) piece.owner = api;
+  return api;
 }

@@ -23,6 +23,7 @@ export const CHALLENGES = [
   { id: 'twowindows', text: 'Smash two windows in one toss', test: (r) => r.chain.smashed >= 2 },
   { id: 'shopping', text: 'Take Lennie shopping', test: (r) => r.ids.has('shopping') },
   { id: 'checkout', text: 'Scan Lennie at the checkout', test: (r) => r.ids.has('checkout') },
+  { id: 'mess', text: 'Knock products off the supermarket shelves', test: (r) => r.ids.has('mess') },
   { id: 'freezer', text: 'Put Lennie in the freezer', test: (r) => r.ids.has('freezer') },
   { id: 'tree', text: 'Get Lennie stuck in a tree', test: (r) => r.ids.has('tree') },
   { id: 'knot', text: 'Tie Lennie in a human knot', test: (r) => r.ids.has('knot') },

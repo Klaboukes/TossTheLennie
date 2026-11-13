@@ -31,6 +31,8 @@ const GLASS_BREAK_SPEED = 4.5;
 // hit only cracks it, and the next such knock (a moment later) finishes it.
 const DOOR_BREAK_SPEED = 7;
 const DOOR_CRACK_SPEED = GLASS_BREAK_SPEED;
+// Hitting a supermarket shelf at least this hard knocks products off it.
+const SHELF_KNOCK_SPEED = 3.5;
 const SLOWMO_SCALE = 0.25;
 const CAMERA_SPEED = 6;
 const GRAVITY = 9.82;
@@ -278,6 +280,7 @@ const toss = {
   smashed: 0,
   doors: 0,
   trampoline: 0,
+  products: 0, // knocked off the supermarket's shelves
   stairs: new Set(),
   startLevel: null,
   startInside: false,
@@ -289,6 +292,7 @@ function resetChain() {
   toss.smashed = 0;
   toss.doors = 0;
   toss.trampoline = 0;
+  toss.products = 0;
   toss.stairs = new Set();
   toss.startLevel = null;
   toss.startInside = false;
@@ -297,7 +301,8 @@ function resetChain() {
 const _center = new THREE.Vector3();
 
 const spots = [...house.spots, ...shop.spots];
-const inBox = (p, s) => p.x > s.min[0] && p.x < s.max[0] && p.y > s.min[1] && p.y < s.max[1] && p.z > s.min[2] && p.z < s.max[2];
+// (a spot with a `when` only counts while that holds, like a freezer whose glass door is smashed)
+const inBox = (p, s) => p.x > s.min[0] && p.x < s.max[0] && p.y > s.min[1] && p.y < s.max[1] && p.z > s.min[2] && p.z < s.max[2] && (!s.when || s.when());
 /** The named spot (bath, bed, freezer...) Lennie's hips or chest ended up in, if any. */
 function landingSpot() {
   const hips = lennie.parts.pelvis.body.position;
@@ -331,6 +336,7 @@ function houseBonuses(center) {
   if (onRoof && toss.startLevel < 3) add('roof', 'Stranded on the roof!', 400);
   if (shop.isInside(center) && !toss.startInShop) add('shopping', 'Went shopping!', 500);
   if (shop.isOnRoof(center) && !toss.startOnShopRoof) add('shoproof', 'On the supermarket roof!', 600);
+  if (toss.products >= 5) add('mess', `Knocked ${toss.products} products off the shelves`, Math.min(400, 10 * toss.products));
   const steps = toss.stairs.size;
   if (steps >= 10) add('fullflight', `Full flight! (${steps} steps)`, 400);
   else if (steps >= 3) add('stairs', `Stair tumble (${steps} steps)`, 200);
@@ -473,6 +479,8 @@ lennie.onCollide = (partName, e) => {
       popAt(door.center, 'CRACK!');
     }
   }
+  // A shelf or fridge in the supermarket: the products near the impact tumble off.
+  if (surf.onHit && v > SHELF_KNOCK_SPEED) knockProducts(surf, e, v);
   if (v < 1.2) return;
 
   const strength = Math.min(1, v / 14);
@@ -511,6 +519,24 @@ lennie.onCollide = (partName, e) => {
 };
 let lastVoiceAt = 0;
 
+let lastMessAt = 0;
+let lastClatterAt = 0;
+function knockProducts(surf, e, v) {
+  const point = contactPoint(e);
+  const n = surf.onHit(point, v, e.target.velocity);
+  if (!n) return;
+  if (toss.state === 'flying' || toss.state === 'held') toss.products += n;
+  const now = performance.now();
+  if (now - lastClatterAt > 150) {
+    lastClatterAt = now;
+    sfx.clatter(n);
+  }
+  if (n >= 4 && now - lastMessAt > 1500) {
+    lastMessAt = now;
+    popAt(point.setY(point.y + 0.4), surf.mess ?? 'CLATTER!', 'good');
+  }
+}
+
 // Lennie's velocities before each physics step, so that smashing through a
 // window or door doesn't also bounce him off it.
 const preStep = lennie.bodies.map(() => new CANNON.Vec3());
@@ -529,7 +555,7 @@ const splinterMat = (color) => {
 };
 
 function smash(piece) {
-  house.breakPiece(piece);
+  (piece.owner ?? house).breakPiece(piece);
   const door = piece.kind === 'door';
   if (door) sfx.splinter();
   else sfx.crash();
@@ -1356,9 +1382,10 @@ function updateSettleFocus(dt) {
 
 function resetAll(say = true) {
   house.repairAll();
+  shop.repairAll();
   clearShards();
   dropLennie(0);
-  if (say) toast('Windows and doors fixed, Lennie back downstairs', 1500);
+  if (say) toast('Windows and doors fixed, shelves stocked, Lennie back downstairs', 1700);
 }
 
 function toggleFollow() {
@@ -1952,6 +1979,7 @@ function tick(dt, now) {
   house.updateView(camera, controls.target, dt, cutaway);
   shop.updateView(camera, controls.target, dt);
   updateShards(dt * timeScale);
+  if (!replay.playing) shop.update(dt * timeScale);
   updateHud(dt, now);
   renderer.render(scene, camera);
 }

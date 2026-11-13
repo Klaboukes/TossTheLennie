@@ -35,7 +35,12 @@ Lennie's house is a brick rowhouse in a 1970s Dutch terrace, with two floors and
 
 ## The supermarket
 
-Across the road, after the real one: an orange building under a zigzag of grey gables, with posters, parked bikes and a brick-and-glass entrance under a big green PLUS-style logo (hand-drawn, not the official artwork). A green carpet runs from the road to the open sliding doors, so Lennie can be flung straight inside: checkouts, fruit and veg crates with red ACTIE offer cards, six aisles of shelves (bread, dairy, cheese, sweets, drinks, pasta and soup), freezers and drinks fridges. Its back wall is the far end of the play area, and he can land on its roof too. The roof and walls fade when you look inside.
+Across the road, after the real one: an orange building under a zigzag of grey gables, with posters, parked bikes and a brick-and-glass entrance under a big green PLUS-style logo (hand-drawn, not the official artwork). A green carpet runs from the road to the open sliding doors, so Lennie can be flung straight inside: checkouts, fruit and veg crates with red ACTIE offer cards, six aisles of shelves, glass-door freezers along the back wall and drinks fridges along the side. Its back wall is the far end of the play area, and he can land on its roof too. The roof and walls fade when you look inside.
+
+- **The shelves** are stocked with products that belong in each aisle, in cartoon packaging with plain Dutch names (no real brands): bread, krentenbollen, hagelslag, pindakaas and jam; milk, karnemelk, chocomelk, yoghurt, vla, butter and eggs; Gouda wheels, cheese packs and Edam balls; chips, drop, sweets, chocolate and stroopwafels; cola, sinas, water, juice and cans; spaghetti, macaroni, rice, soup cans and pasta sauce. The freezers hold ice cream, pizza, fries, peas and fish sticks, and the fridges drinks.
+- **Crash into a shelf** and the products near the impact tumble out onto the floor: the harder the hit, the bigger the mess.
+- **The shop window** by the entrance and **every freezer and fridge door** is glass that shatters like the house's windows. Smash a freezer or fridge door and the products behind it spill out; land Lennie in that doorway and he's in the freezer.
+- R puts the glass back and restocks the shelves.
 
 ## The neighbourhood (decoration)
 
@@ -62,7 +67,7 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 | Pan / zoom | Right-drag / scroll |
 | Fly the camera | WASD, Q/E down/up |
 | Drop Lennie on floor 1 / 2 / 3 / the roof | 1 / 2 / 3 / 4 |
-| Fix the windows and doors and put Lennie back downstairs | R |
+| Fix the windows and doors, restock the shop and put Lennie back downstairs | R |
 | Watch the last toss again in slow motion | P (or the button on the score card) |
 | Take turns with 2–4 players | The people button |
 | Focus camera on Lennie | F |
@@ -87,15 +92,15 @@ The game opens close up on Lennie with a "Grab me!" bubble over him, which stays
 
 - **Contortion**: every joint (neck, spine, shoulders, elbows, hips, knees) is measured against its relaxed pose. A bit of bend counts as relaxed and is free; past that, points grow with the square of the bend.
 - **Pose tricks**: Upside down, The splits, Pretzel legs, Straitjacket, Foot in face, and Human knot (any three of those at once). One crossed leg or one tangled arm is a small extra that doesn't count towards the knot.
-- **House feats**: Defenestrated! (thrown out of the house), Hanging out the window!, Fell N floors (a modest bonus, so rolling him off the roof isn't the easy way to a big score), Stair tumble/Full flight, Stranded on the roof!, Went shopping! (landed in the supermarket), On the supermarket roof!, Trampoline bounces.
-- **Landing spots**: where he comes to rest can earn a bonus, with Lennie saying something about it: in the bath, on the loo, on the desk, in the armchair, on top of the wardrobe, in either bed, on the beanbag or the toy box, on top of the fridge, on the dinner table or kitchen counter, on the couch; in the supermarket in the freezer, on top of the drinks fridges or the shelves, in the trolleys, in the fruit and veg, or scanned at a checkout; outside stuck in a tree, in the bushes, or napping on the trampoline.
-- **Multiplier**: +0.1 per hard bounce, +0.25 per mid-air juggle (re-grabbing him while he's airborne), +0.3 per smashed window, +0.4 per smashed door, up to ×4.
+- **House feats**: Defenestrated! (thrown out of the house), Hanging out the window!, Fell N floors (a modest bonus, so rolling him off the roof isn't the easy way to a big score), Stair tumble/Full flight, Stranded on the roof!, Went shopping! (landed in the supermarket), On the supermarket roof!, Knocked products off the shelves (5 or more, 10 points each, up to 400), Trampoline bounces.
+- **Landing spots**: where he comes to rest can earn a bonus, with Lennie saying something about it: in the bath, on the loo, on the desk, in the armchair, on top of the wardrobe, in either bed, on the beanbag or the toy box, on top of the fridge, on the dinner table or kitchen counter, on the couch; in the supermarket in a freezer or a drinks fridge (through a smashed door, half in counts), on top of the freezers, the drinks fridges or the shelves, in the trolleys, in the fruit and veg, or scanned at a checkout; outside stuck in a tree, in the bushes, or napping on the trampoline.
+- **Multiplier**: +0.1 per hard bounce, +0.25 per mid-air juggle (re-grabbing him while he's airborne), +0.3 per smashed window (the shop window and the freezer and fridge doors count too), +0.4 per smashed door, up to ×4.
 - A toss that's too gentle doesn't score.
 - The best score is remembered in the browser, so it survives a reload on the same computer.
 
 ## Challenges
 
-Under the score there's always one challenge to go for, from easy ("Smash a window") to hard ("Put Lennie in the freezer", "Score 2,500 points in one toss"): 20 in all. Doing one adds 300 points to that toss and brings up the next. *Skip* moves on and comes back to it later. Progress is remembered in the browser. Challenges pause during a game of turns.
+Under the score there's always one challenge to go for, from easy ("Smash a window") to hard ("Put Lennie in the freezer", "Score 2,500 points in one toss"): 21 in all. Doing one adds 300 points to that toss and brings up the next. *Skip* moves on and comes back to it later. Progress is remembered in the browser. Challenges pause during a game of turns.
 
 ## Taking turns
 
@@ -115,7 +120,8 @@ Lennie reacts: a grin and a "wheee!" when he's flung, "ow!" and "oof" when he hi
 - `src/street.js`: the neighbour houses, and the details every house in the row shares (porch, chimney, dormer, skylight, vents, downpipe)
 - `src/yard.js`: sky, lighting, lawn, back-garden fence, the play area's edges, garden trees, bushes, the hedge and the trampoline
 - `src/streetscape.js`: the street in front: cycle path, verge trees and lamps, road and the townhouses
-- `src/supermarket.js`: the supermarket across the road, inside and out, with its own fading walls and roof
+- `src/supermarket.js`: the supermarket across the road, inside and out (the breakable shop window, aisles, freezers and fridges), with its own fading walls and roof
+- `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking
 - `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, breeze blocks, wallpaper, wood, floor tiles, grass)
 - `src/ragdoll.js`: Lennie's bodies, joints and look
 - `src/scoring.js`: contortion measurement, trick detection and the multiplier

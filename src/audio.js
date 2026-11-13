@@ -188,6 +188,25 @@ export class Sfx {
     osc.stop(t + 0.25);
   }
 
+  /** Groceries raining down on the floor: a patter of little knocks, more for more products. */
+  clatter(count) {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime;
+    const n = Math.min(14, 2 + Math.round(count * 0.6));
+    for (let i = 0; i < n; i++) {
+      const t = t0 + 0.15 + Math.random() * 0.7;
+      const src = this.#noiseSource(t, 0.05);
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 700 + Math.random() * 2200;
+      bp.Q.value = 3;
+      const g = ctx.createGain();
+      this.#env(g, t, 0.06 + Math.random() * 0.1, 0.002, 0.05);
+      src.connect(bp).connect(g).connect(this.master);
+    }
+  }
+
   /** Soft flop of limbs hitting each other. */
   flop(strength) {
     if (!this.ready) return;
