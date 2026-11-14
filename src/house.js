@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { textures, meterBoxUVs, floorGeometry } from './textures.js';
 import { makeDetails, buildNeighbours, LAYOUT } from './street.js';
+import { buildClutter } from './clutter.js';
 
 // A Dutch terraced house: two brick storeys and an attic under a steep roof,
 // with a dormer. Footprint x ∈ [-6, 6], z ∈ [-5, 5]; the front door faces +z.
@@ -520,6 +521,8 @@ export function buildHouse(scene, world, physMats) {
   details.downpipe(OUT.x0 + LAYOUT.pipe, 2.55, (k) => ({ story: k, line: `south-${k}` }));
   buildNeighbours(kit, details);
   buildFurniture();
+  // the mess: dishes, toys, clothes, household stuff and the board game closet (clutter.js)
+  const clutter = buildClutter({ ...kit, H });
 
   // ------------------------------------------------------------ attic
   // The top floor is the attic: no front or back wall (the roof slopes down to
@@ -835,6 +838,7 @@ export function buildHouse(scene, world, physMats) {
     S('table', 'On the dinner table!', 200, 'DINNER!', [2.35, 0.75, 1.45], [3.95, 1.45, 3.25]),
     S('counter', 'On the kitchen counter', 200, 'CHEF!', [5.15, 0.88, -2.3], [5.9, 1.55, 3.5]),
     S('couch', 'Couch potato', 150, 'AHH!', [-5.9, 0.3, 0.25], [-4.85, 1.2, 3.15]),
+    ...clutter.spots,
   ];
 
   function spawnPoint(level) {
@@ -932,7 +936,9 @@ export function buildHouse(scene, world, physMats) {
     else door.group.rotation.x = 0.03 * dir;
   }
 
+  /** Fixes the windows and doors, and puts all the mess back where it was. */
   function repairAll() {
+    clutter.restock();
     for (const piece of [...windows, ...doors]) {
       if (piece.kind === 'door') {
         piece.cracked = false;
@@ -962,6 +968,8 @@ export function buildHouse(scene, world, physMats) {
     breakPiece,
     crackDoor,
     repairAll,
+    scatter: clutter.scatter,
+    update: clutter.update,
     get cutLevel() { return level; },
   };
 }
