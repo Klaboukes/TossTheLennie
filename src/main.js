@@ -455,7 +455,7 @@ function finishToss() {
   const cheer = beatBest ? 'best' : result.total >= BIG_TOSS ? 'big' : null;
   showResult(result, locate(center), cheer);
   sfx.score(result.total > 1600 ? 3 : result.total > 900 ? 2 : result.total > 400 ? 1 : 0);
-  sfx.voice(result.total >= 900 ? 'ohh' : 'oof');
+  sfx.voice(result.total >= 900 ? 'land' : 'grunt');
   // A good toss leaves him seeing stars until he's picked up again.
   if (result.total >= 400 || toss.bounces >= 5) lennie.setExpression('dizzy');
   else lennie.setExpression('ouch', 4);
@@ -521,7 +521,7 @@ lennie.onCollide = (partName, e) => {
     if (!surf.piece.broken && v > GLASS_BREAK_SPEED) pendingBreaks.add(surf.piece);
     else if (v > 1.5 && now - lastSoundAt > 60) {
       lastSoundAt = now;
-      sfx.thud(Math.min(1, v / 16));
+      sfx.impact('glass', Math.min(1, v / 16));
     }
     return;
   }
@@ -548,8 +548,7 @@ lennie.onCollide = (partName, e) => {
   const soft = SOFT.has(surf.kind);
   if (now - lastSoundAt > 45) {
     lastSoundAt = now;
-    if (soft) sfx.boing(strength);
-    else sfx.thud(strength);
+    sfx.impact(surf.sound ?? surf.kind, strength);
   }
 
   const flying = toss.state === 'flying';
@@ -570,11 +569,11 @@ lennie.onCollide = (partName, e) => {
     lennie.setExpression('ouch', 0.7);
     if (flying && now - lastVoiceAt > 700) {
       lastVoiceAt = now;
-      sfx.voice(v > 11 ? 'ow' : Math.random() < 0.5 ? 'ow' : 'oof');
+      sfx.voice('hit');
     }
   } else if (flying && surf.kind === 'trampoline' && v > BOUNCE_IMPACT && now - lastVoiceAt > 700) {
     lastVoiceAt = now;
-    sfx.voice('whee');
+    sfx.voice('fly');
     lennie.setExpression('whee', 0.8);
   }
 };
@@ -763,7 +762,7 @@ function startGrab(pick, pointerId, pointerType = 'mouse') {
   hint.on = false;
   hideResult();
   if (lennie.expression !== 'normal') lennie.setExpression('normal');
-  sfx.squeak();
+  sfx.grab();
   canvas.style.cursor = 'grabbing';
   grabLine.visible = grabDot.visible = true;
   hideAim();
@@ -833,7 +832,7 @@ function endGrab() {
   const speed = v.length();
   if (speed > 5) sfx.whoosh(Math.min(1, speed / 20));
   if (speed > 9) {
-    sfx.voice('whee');
+    sfx.voice('fly');
     lennie.setExpression('whee', 1.2);
   }
   if (canvas.hasPointerCapture?.(grab.pointerId)) canvas.releasePointerCapture(grab.pointerId);
@@ -884,7 +883,7 @@ function startSling(pick, e) {
   hint.on = false;
   hideResult();
   if (lennie.expression !== 'normal') lennie.setExpression('normal');
-  sfx.squeak();
+  sfx.grab();
   canvas.style.cursor = 'grabbing';
   grabLine.visible = grabDot.visible = true;
   hideAim();
@@ -1407,7 +1406,7 @@ function launch(v) {
   const speed = v.length();
   sfx.whoosh(Math.min(1, speed / 20));
   if (speed > 7) {
-    sfx.voice('whee');
+    sfx.voice('fly');
     lennie.setExpression('whee', 1.2);
   }
   beginFlight();
@@ -1960,7 +1959,7 @@ function renderChallenge() {
 
 function challengeDone(c) {
   sfx.chime();
-  sfx.voice('yay');
+  sfx.voice('cheer');
   toast(`Challenge done: ${c.text}! +${CHALLENGE_BONUS}`, 2600);
   ui.chText.textContent = `✔ ${c.text}`;
   ui.challenge.classList.remove('done');
@@ -2115,7 +2114,7 @@ function showTurnCard() {
     ui.turnAlt.hidden = false;
     ui.turnAlt.dataset.action = 'free';
     sfx.score(3);
-    sfx.voice('yay');
+    sfx.voice('cheer');
   } else {
     const p = match.players[match.turn];
     const first = match.players.every((q) => q.scores.length === 0);

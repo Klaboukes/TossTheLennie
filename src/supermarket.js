@@ -208,7 +208,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const solid = (min, max, kind, material = physMats.hard) => {
     const b = new CANNON.Body({ mass: 0, material, shape: new CANNON.Box(new CANNON.Vec3((max[0] - min[0]) / 2, (max[1] - min[1]) / 2, (max[2] - min[2]) / 2)) });
     b.position.set((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2);
-    b.surface = { kind };
+    // The shop's shelves, fridges and counters are metal: they clang.
+    b.surface = kind === 'furniture' ? { kind, sound: 'metal' } : { kind };
     world.addBody(b);
     return b;
   };

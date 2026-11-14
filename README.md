@@ -122,7 +122,7 @@ Every toss is recorded. *Watch the replay* on the score card (or P) plays it bac
 
 A big toss (1,500 or more) gets a burst of confetti where Lennie lands and a blue *Big toss!* sticker on the score card. A new best gets more confetti with gold in it, a gold *New best!* sticker and a little chime. Both make *Watch the replay* glow a few times.
 
-Lennie reacts: a grin and a "wheee!" when he's flung, "ow!" and "oof" when he hits something hard, and after a good toss he lies there with crossed-out eyes, his tongue out and stars circling his head until he's picked up again. All sounds are synthesized; there are no audio files.
+Lennie reacts: a grin and a "wheee!" or "wa-hoo!" when he's flung, "ow!", "oof", "eek!" or "ouch" when he hits something hard, a groan when he lands, and after a good toss he lies there with crossed-out eyes, his tongue out and stars circling his head until he's picked up again. All sounds are synthesized; there are no audio files. To keep them from getting old, each surface sounds like what it's made of (wooden furniture knocks, the shop's shelves clang, hedges rustle, cushions puff), every sound has a few variations that never come twice in a row, and a sound that keeps repeating gets quieter.
 
 ## Files
 
