@@ -811,7 +811,7 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
     const b = (min, max, m) => box(min, max, m, { story: k, cast: true });
     b([X0, 0, Z0], [X0 + T, TOP, Z1], oak);
     b([X1 - T, 0, Z0], [X1, TOP, Z1], oak);
-    b([X0, 0, Z0], [X1, TOP, Z0 + 0.02], inside);
+    b([X0 + T, 0, Z0], [X1 - T, TOP, Z0 + 0.02], inside); // between the sides, or its edges flicker through them
     b([(X0 + X1) / 2 - T / 2, 0.08, Z0], [(X0 + X1) / 2 + T / 2, TOP - T, Z1 - 0.01], oak);
     b([X0, 0, Z1 - 0.04], [X1, 0.08, Z1], oak); // plinth
     const shelves = [0.08, 0.47, 0.86, 1.25, 1.64];
@@ -946,7 +946,8 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
     // the laundry basket in the bedroom
     const wicker = std({ color: 0xc9a77a, roughness: 0.9, side: THREE.DoubleSide });
     add(1, mesh(Cyl(0.26, 0.22, 0.42, 18, true), wicker, -0.45, H + 0.21, -1.9));
-    add(1, mesh(new THREE.CircleGeometry(0.22, 18).rotateX(-Math.PI / 2), wicker, -0.45, H + 0.01, -1.9), false);
+    // its bottom lies just above the floorboards (at 0.012), not level with them
+    add(1, mesh(new THREE.CircleGeometry(0.22, 18).rotateX(-Math.PI / 2), wicker, -0.45, H + 0.016, -1.9), false);
     // a sleeve and a trouser leg caught in the wardrobe door
     add(1, mesh(Box(0.01, 0.55, 0.1), std({ color: 0xc0392b, roughness: 1 }), 0.295, H + 1.15, 3.55));
     add(1, mesh(Box(0.01, 0.7, 0.13), std({ color: 0x3a5a8c, roughness: 1 }), 0.295, H + 0.55, 3.85));

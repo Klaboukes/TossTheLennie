@@ -586,9 +586,10 @@ export function buildHouse(scene, world, physMats) {
     cheek([[DORMER.back, y0], [zf, y0], [zf, underside(zf)], [DORMER.back, DORMER.top]], { pos: bath, neg: bath });
     cheek([[DORMER.back, DORMER.top], [zf, DORMER.top], [zf, underside(zf)]], { pos: M.cladding, neg: bath });
 
-    // the dormer's front wall, with a breakable window
+    // the dormer's front wall, with a breakable window; it fits between the
+    // sides like the middle wall's (running into the right side, its corner flickered)
     wall({
-      run: 'x', at: DORMER.front, from: MID_X + INT / 2, to: DORMER.x1 + DORMER.wallT / 2, y0, y1: DORMER.top,
+      run: 'x', at: DORMER.front, from: MID_X + INT / 2, to: DORMER.x1 - DORMER.wallT / 2, y0, y1: DORMER.top,
       thick: DORMER.wallT, physThick: 0.5, physOffset: 0.15, outward: 1, story: k, line: `dormer-${k}`,
       openings: [{ a: 1.5, b: 4.2, bottom: underside(zf) + 0.45, top: DORMER.top - 0.25, glass: true, bars: { v: [0.5], h: [] }, slack: SLACK }],
       mats: { pos: M.cladding, neg: bath, ends: M.cladding },
@@ -643,6 +644,9 @@ export function buildHouse(scene, world, physMats) {
     }
 
     const fy = HOUSE.ridgeY - PITCH * runOut; // underside at the eave edge
+    // At the two ends of the row, the fascia boards and the ridge stick out 2 cm
+    // past the roof, so their ends don't flicker against the roof's ends.
+    const past = (x) => (x === -ends ? x - 0.02 : x === ends ? x + 0.02 : x);
     for (const side of [1, -1]) {
       const line = LINES[side];
       for (const [x0, x1] of [[-ends, OUT.x0], [OUT.x1, ends]]) slope(side, x0, x1, 0, runOut, { story: 0 });
@@ -655,10 +659,10 @@ export function buildHouse(scene, world, physMats) {
       } else slope(side, OUT.x0, OUT.x1, 0, runOut, own);
       // white fascia boards along the eave
       const z = side * (runOut + 0.05);
-      for (const [x0, x1, story] of sections) box([x0, fy - 0.15, z - 0.07], [x1, fy + 0.3, z + 0.07], M.trim, { story, cast: true, line: story === 3 ? line : null });
+      for (const [x0, x1, story] of sections) box([past(x0), fy - 0.15, z - 0.07], [past(x1), fy + 0.3, z + 0.07], M.trim, { story, cast: true, line: story === 3 ? line : null });
     }
     const ry = HOUSE.ridgeY + thick * hyp;
-    for (const [x0, x1, story] of sections) box([x0, ry - 0.15, -0.2], [x1, ry + 0.1, 0.2], ridgeMat, { story, cast: true, line: story === 3 ? LINES[1] : null });
+    for (const [x0, x1, story] of sections) box([past(x0), ry - 0.15, -0.2], [past(x1), ry + 0.1, 0.2], ridgeMat, { story, cast: true, line: story === 3 ? LINES[1] : null });
 
     // The dormer's flat roof (its sides and front are attic walls, see buildAttic).
     const dMin = [DORMER.x0 - 0.15, DORMER.top, DORMER.back - 0.15];
@@ -744,8 +748,9 @@ export function buildHouse(scene, world, physMats) {
     piece(0, [
       [[-5.85, 0, 0.3], [-4.95, 0.45, 3.1], 0x3f8f8a, { soft: true }],
       [[-5.85, 0.45, 0.3], [-5.55, 0.88, 3.1], 0x3f8f8a, { soft: true }],
-      [[-5.85, 0.45, 0.3], [-4.95, 0.66, 0.52], 0x367d78, { soft: true }],
-      [[-5.85, 0.45, 2.88], [-4.95, 0.66, 3.1], 0x367d78, { soft: true }],
+      // the arms start in front of the back cushion, so their ends don't flicker against its ends
+      [[-5.55, 0.45, 0.3], [-4.95, 0.66, 0.52], 0x367d78, { soft: true }],
+      [[-5.55, 0.45, 2.88], [-4.95, 0.66, 3.1], 0x367d78, { soft: true }],
       [[-5.5, 0.45, 0.6], [-5.0, 0.52, 1.65], 0x4fa7a0, { soft: true, phys: false }],
       [[-5.5, 0.45, 1.75], [-5.0, 0.52, 2.8], 0x4fa7a0, { soft: true, phys: false }],
       ...table(-4.1, 1.0, -3.0, 2.4, 0.45, WOOD),

@@ -41,7 +41,9 @@ export function buildStreet(scene, world, physMats, { std, tex }) {
     b.surface = { kind };
     world.addBody(b);
   };
-  const white = std({ color: 0xf6f6f2, roughness: 0.6 });
+  // The road markings are pulled in front of the road in the depth test (like
+  // the rugs in the house): only 2 mm above it, they flickered from afar.
+  const white = std({ color: 0xf6f6f2, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
 
   // ------------------------------------------------------------ cycle path, kerbs, road and markings
   flat(-REACH, STREET.cycle[0], REACH, STREET.cycle[1], std({ color: 0xbf6152, roughness: 0.95 }), 0.007);

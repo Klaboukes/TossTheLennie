@@ -273,24 +273,28 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   // ---------------------------------------------------------------- the storeroom (closed, solid)
   boxAt([SHOP.x0, 0, SHOP.z0], [SHOP.hall, SHOP.h, SHOP.z1], faces(orange, orange, roofGrey, orange, orange, orange), { cast: true });
   solid([SHOP.x0, 0, SHOP.z0], [SHOP.hall, SHOP.h, SHOP.z1], 'wall');
-  boxAt([SHOP.x0 - 0.05, SHOP.h - 0.15, SHOP.z0 - 0.06], [SHOP.hall, SHOP.h, SHOP.z0 + 0.02], white);
+  // (the white rims along the top stick out 2 cm above the roof, so their tops never flicker against it)
+  boxAt([SHOP.x0 - 0.05, SHOP.h - 0.15, SHOP.z0 - 0.06], [SHOP.hall, SHOP.h + 0.02, SHOP.z0 + 0.02], white);
 
   // ---------------------------------------------------------------- walls of the shop floor
+  // The walls stop under the roof slab (at the ceiling), which forms the top
+  // band of the facade by itself: drawn up to the roof's top too, their tops
+  // and outsides lay exactly on the roof's and flickered against it.
   const [d0, d1] = SHOP.door;
   // the wall is open behind the glass entrance (E below), so you can see in
   const frontMats = faces(orange, orange, orange, orange, innerWall, orange);
   for (const [a, b] of [[SHOP.hall, -9.0], [-0.1, SHOP.x1]]) {
-    boxAt([a, 0, SHOP.z0], [b, SHOP.h, SHOP.z0 + SHOP.t], frontMats, { cast: true, fade: 'front' });
+    boxAt([a, 0, SHOP.z0], [b, IN.y1, SHOP.z0 + SHOP.t], frontMats, { cast: true, fade: 'front' });
     solid([a, 0, SHOP.z0], [b, SHOP.h, SHOP.z0 + SHOP.t], 'wall');
   }
-  boxAt([SHOP.hall, SHOP.h - 0.15, SHOP.z0 - 0.06], [SHOP.x1 + 0.05, SHOP.h, SHOP.z0 + 0.02], white, { fade: 'front' });
+  boxAt([SHOP.hall, SHOP.h - 0.15, SHOP.z0 - 0.06], [SHOP.x1 + 0.05, SHOP.h + 0.02, SHOP.z0 + 0.02], white, { fade: 'front' });
 
-  boxAt([IN.x1, 0, SHOP.z0], [SHOP.x1, SHOP.h, SHOP.z1], faces(orange, innerWall, orange, orange, orange, orange), { cast: true, fade: 'east' });
+  boxAt([IN.x1, 0, SHOP.z0], [SHOP.x1, IN.y1, SHOP.z1], faces(orange, innerWall, orange, orange, orange, orange), { cast: true, fade: 'east' });
   solid([IN.x1, 0, SHOP.z0], [SHOP.x1, SHOP.h, SHOP.z1], 'wall');
-  boxAt([SHOP.hall, 0, IN.z1], [IN.x1, SHOP.h, SHOP.z1], faces(orange, orange, orange, orange, orange, innerWall), { fade: 'back' });
+  boxAt([SHOP.hall, 0, IN.z1], [IN.x1, IN.y1, SHOP.z1], faces(orange, orange, orange, orange, orange, innerWall), { fade: 'back' });
   solid([SHOP.hall, 0, IN.z1], [IN.x1, SHOP.h, SHOP.z1], 'wall');
   // the storeroom's wall, with a staff door on the shop side
-  boxAt([SHOP.hall, 0, IN.z0], [IN.x0, SHOP.h, IN.z1], innerWall);
+  boxAt([SHOP.hall, 0, IN.z0], [IN.x0, IN.y1, IN.z1], innerWall);
   solid([SHOP.hall, 0, IN.z0], [IN.x0, SHOP.h, IN.z1], 'wall');
   // (in the back corner, past the cheese cooler)
   boxAt([IN.x0, 0, 43.1], [IN.x0 + 0.04, 2.2, 44.5], std({ color: 0x8d949a, roughness: 0.5 }));
@@ -515,7 +519,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
       }
       if (card) {
         const cx = (a0 + a1) / 2;
-        boxAt([cx - 0.02, top, z1 - 0.06], [cx + 0.02, 1.55, z1 - 0.02], darkFrame);
+        // (the post stands just behind the card's face, not level with it)
+        boxAt([cx - 0.02, top, z1 - 0.05], [cx + 0.02, 1.55, z1 - 0.02], darkFrame);
         const m = std({ map: offerTexture(card(p)) });
         boxAt([cx - 0.24, 1.45, z1 - 0.06], [cx + 0.24, 2.05, z1 - 0.03], m);
       }
@@ -534,10 +539,12 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const aisleXs = [-18, -13, -8, -3, 2, 7];
   aisleXs.forEach((cx, a) => {
     const { z0, z1, h, half } = AISLE;
-    boxAt([cx - half, 0, z0], [cx + half, 0.12, z1], shelfMat);
-    boxAt([cx - 0.04, 0.12, z0], [cx + 0.04, h, z1], shelfMat, { cast: true });
-    for (const y of shelfYs.slice(1)) boxAt([cx - half, y - 0.03, z0], [cx + half, y, z1], shelfMat);
-    boxAt([cx - half, h - 0.05, z0], [cx + half, h, z1], shelfMat);
+    // (the shelves run between the green end caps, not into them, or their sides and tops flicker through)
+    const [s0, s1] = [z0 + 0.05, z1 - 0.05];
+    boxAt([cx - half, 0, s0], [cx + half, 0.12, s1], shelfMat);
+    boxAt([cx - 0.04, 0.12, s0], [cx + 0.04, h, s1], shelfMat, { cast: true });
+    for (const y of shelfYs.slice(1)) boxAt([cx - half, y - 0.03, s0], [cx + half, y, s1], shelfMat);
+    boxAt([cx - half, h - 0.05, s0], [cx + half, h, s1], shelfMat);
     for (const z of [z0, z1]) boxAt([cx - half, 0, z - 0.05], [cx + half, h, z + 0.05], endCap, { cast: true });
     // the goods, on both sides, facing out into the aisles
     const sides = {};
@@ -611,14 +618,16 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
       return m;
     };
     // the cabinet: plinth, a canopy with a lit sign, the ends, a cold white back and the shelves inside
-    part(u0, 0, 0, u1, base, depth, darkFrame, { phys: true });
+    // (the plinth and the back fit between the ends, so no two faces lie on top of each other and flicker)
+    part(u0 + 0.06, 0, 0, u1 - 0.06, base, depth, darkFrame);
+    solid(...box(u0, 0, 0, u1, base, depth), 'furniture').surface.mess = mess;
     part(u0, top, 0, u1, height, depth, cabinetWhite, { phys: true, cast: true });
     const signTex = labelTexture(`${sign}   •   ${sign}   •   ${sign}`, signColor, '#ffffff', 1024, 64);
     signTex.wrapS = THREE.RepeatWrapping;
     signTex.repeat.set(Math.max(1, Math.round((u1 - u0) / 6)), 1);
     boxAt(...box(u0, top + 0.03, -0.01, u1, height - 0.03, 0), std({ map: signTex, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 0.2 }));
     for (const u of [u0, u1 - 0.06]) part(u, 0, 0, u + 0.06, height, depth, cabinetWhite, { phys: true, cast: true });
-    part(u0, base, depth - 0.04, u1, top, depth, coldLight);
+    part(u0 + 0.06, base, depth - 0.04, u1 - 0.06, top, depth, coldLight);
     part(u0 + 0.06, top - 0.03, 0.12, u1 - 0.06, top, 0.18, lightStrip);
     const inside = stock.section();
     for (const [i, y] of CAB.shelves.entries()) {
@@ -692,7 +701,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   function shelfUnit({ axis, back, dir, u0, u1, depth, h, ys, assortment, mats, mess }) {
     const F = frame(axis, back, dir);
     const part = (ua, ya, wa, ub, yb, wb, m, cast = false) => boxAt(...F.box(ua, ya, wa, ub, yb, wb), m, { cast });
-    part(u0, 0, 0, u1, h, 0.04, mats.back, true);
+    // (the back fits between the sides and under the top, so its edges don't flicker through theirs)
+    part(u0 + 0.04, 0, 0, u1 - 0.04, h - 0.04, 0.04, mats.back, true);
     for (const u of [u0, u1 - 0.04]) part(u, 0, 0, u + 0.04, h, depth, mats.frame, true);
     part(u0, 0, 0.04, u1, ys[0], depth, mats.frame);
     for (const y of ys.slice(1)) part(u0 + 0.04, y - 0.03, 0.04, u1 - 0.04, y, depth, mats.shelf);
@@ -730,7 +740,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   // the pastry case along the front wall: a counter with a glass case on top
   const caseF = frame('x', IN.z0, 1);
   const CASE = { u0: -21.1, u1: -18.6, depth: 0.82, top: 0.85, glass: 1.3 };
-  boxAt(...caseF.box(CASE.u0, 0, 0, CASE.u1, CASE.top, CASE.depth), caseF.withFront(wood, std({ map: labelTexture('Vers van de bakker', '#f4e3c3', brown, 1024, 160) })), { cast: true });
+  // (the wood stops under the cream top, so the two don't share a surface and flicker)
+  boxAt(...caseF.box(CASE.u0, 0, 0, CASE.u1, CASE.top - 0.01, CASE.depth), caseF.withFront(wood, std({ map: labelTexture('Vers van de bakker', '#f4e3c3', brown, 1024, 160) })), { cast: true });
   boxAt(...caseF.box(CASE.u0, CASE.top - 0.01, 0, CASE.u1, CASE.top, CASE.depth), std({ color: 0xf6f1e6, roughness: 0.5 }));
   const pastries = stock.section();
   stock.fillRow(ASSORTMENT.GEBAK[0], {
@@ -849,9 +860,11 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const cheeseF = frame('z', IN.x0, 1);
   const CH = { u0: 36.4, u1: 42.6, depth: 1.05, top: 1.85, roof: 2.0 };
   const cpart = (ua, ya, wa, ub, yb, wb, m, cast = false) => boxAt(...cheeseF.box(ua, ya, wa, ub, yb, wb), m, { cast });
-  cpart(CH.u0, 0, 0, CH.u1, 0.36, CH.depth, darkFrame);
-  cpart(CH.u0, 0.3, CH.depth - 0.05, CH.u1, 0.42, CH.depth, cabinetWhite);
-  cpart(CH.u0, 0, 0, CH.u1, CH.roof, 0.05, coldLight);
+  // (plinth, front strip and back fit between the white ends and under the
+  // canopy, so no two faces lie on top of each other and flicker)
+  cpart(CH.u0 + 0.06, 0, 0, CH.u1 - 0.06, 0.3, CH.depth, darkFrame);
+  cpart(CH.u0 + 0.06, 0.3, CH.depth - 0.05, CH.u1 - 0.06, 0.42, CH.depth, cabinetWhite);
+  cpart(CH.u0 + 0.06, 0, 0, CH.u1 - 0.06, CH.top, 0.05, coldLight);
   for (const u of [CH.u0, CH.u1 - 0.06]) cpart(u, 0, 0, u + 0.06, CH.roof, CH.depth, cabinetWhite, true);
   cpart(CH.u0, CH.top, 0, CH.u1, CH.roof, 0.8, cheeseF.withFront(cabinetWhite, std({ map: labelTexture('HOLLANDSE KAAS  •  HOLLANDSE KAAS  •  HOLLANDSE KAAS', '#3fae3a', '#ffffff', 2048, 96) })), true);
   cpart(CH.u0 + 0.06, CH.top - 0.03, 0.1, CH.u1 - 0.06, CH.top, 0.16, lightStrip);
@@ -999,12 +1012,15 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     const icy = std({ color: 0xdff2fa, emissive: 0x6a8a99, roughness: 0.5 });
     const band = std({ map: labelTexture('SNACKS  •  SNACKS  •  SNACKS', '#3b7dd8', '#ffffff', 1024, 96) });
     boxAt([FZ.x0, 0, FZ.z0], [FZ.x1, FZ.floor, FZ.z1], faces(cabinetWhite, cabinetWhite, icy, cabinetWhite, cabinetWhite, cabinetWhite), { cast: true });
-    boxAt([FZ.x0, 0.06, FZ.z0 - 0.01], [FZ.x1, 0.12, FZ.z1 + 0.01], darkFrame);
+    // The dark kick strip stands 1 cm proud of the white sides all round, and
+    // the end walls fit between the long ones: when they overlapped, their
+    // faces lay exactly on each other and the edges flickered.
+    boxAt([FZ.x0 - 0.01, 0.06, FZ.z0 - 0.01], [FZ.x1 + 0.01, 0.12, FZ.z1 + 0.01], darkFrame);
     const walls = [
       [[FZ.x0, FZ.floor, FZ.z0], [FZ.x0 + FZ.wall, FZ.rim, FZ.z1], faces(icy, band, cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite)],
       [[FZ.x1 - FZ.wall, FZ.floor, FZ.z0], [FZ.x1, FZ.rim, FZ.z1], faces(band, icy, cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite)],
-      [[FZ.x0, FZ.floor, FZ.z0], [FZ.x1, FZ.rim, FZ.z0 + FZ.wall], faces(cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite, icy, cabinetWhite)],
-      [[FZ.x0, FZ.floor, FZ.z1 - FZ.wall], [FZ.x1, FZ.rim, FZ.z1], faces(cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite, icy)],
+      [[FZ.x0 + FZ.wall, FZ.floor, FZ.z0], [FZ.x1 - FZ.wall, FZ.rim, FZ.z0 + FZ.wall], faces(cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite, icy, cabinetWhite)],
+      [[FZ.x0 + FZ.wall, FZ.floor, FZ.z1 - FZ.wall], [FZ.x1 - FZ.wall, FZ.rim, FZ.z1], faces(cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite, icy)],
     ];
     const snacks = stock.section();
     const snackHit = (point, strength, push) => {
@@ -1183,10 +1199,12 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
       g.fillStyle = red; g.font = '900 72px "Arial Black", "Trebuchet MS", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillText('SLAGERIJ', w / 2, h / 2 + 4);
     });
-    bpart(du0, 0, B.aisle, B.u1, B.bed, B.front, F.withFront(cabinetWhite, std({ map: counterFront })), true);
-    bpart(du0, 0, B.front - 0.06, B.u1, 0.1, B.front + 0.005, darkFrame);
+    // (the counter stops under the cold-light bed and the ledge, and the kick
+    // strip is a few mm in from its ends, so no two faces lie on each other and flicker)
+    bpart(du0, 0, B.aisle, B.u1, B.bed - 0.01, B.front, F.withFront(cabinetWhite, std({ map: counterFront })), true);
+    bpart(du0 + 0.005, 0, B.front - 0.06, B.u1 - 0.005, 0.1, B.front + 0.005, darkFrame);
     bpart(du0, B.bed - 0.01, B.ledge, B.u1, B.bed, B.front, coldLight);
-    bpart(du0, B.bed, B.aisle, B.u1, 1.25, B.ledge, cabinetWhite, true);
+    bpart(du0, B.bed - 0.01, B.aisle, B.u1, 1.25, B.ledge, cabinetWhite, true);
     // the scale on the ledge
     bpart(du0 + 0.4, 1.25, 1.08, du0 + 0.75, 1.3, 1.27, steel);
     bpart(du0 + 0.45, 1.3, 1.1, du0 + 0.7, 1.44, 1.13, darkFrame);
@@ -1223,7 +1241,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
         g.fillStyle = '#c9ced3'; g.fillRect((i + 1) * sw - 2, 0, 4, h);
       });
     });
-    bpart(du0, B.bed - 0.07, B.front - 0.01, B.u1, B.bed + 0.01, B.front + 0.015, F.withFront(steel, std({ map: prices })));
+    bpart(du0 + 0.005, B.bed - 0.07, B.front - 0.01, B.u1 - 0.005, B.bed + 0.01, B.front + 0.015, F.withFront(steel, std({ map: prices })));
 
     // the glass: flat on top, sloping down to the front, glass ends; breakable
     const span = B.u1 - du0;
@@ -1236,7 +1254,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     glassMeshes.push(slant);
     const endShape = new THREE.Shape([[B.ledge - 0.05, B.bed], [B.front - 0.02, B.bed], [B.front - 0.02, B.bed + 0.05], [1.62, B.top], [B.ledge - 0.05, B.top]].map(([w, y]) => new THREE.Vector2(w, y)));
     const endGeo = new THREE.ExtrudeGeometry(endShape, { depth: 0.012, bevelEnabled: false });
-    for (const u of [du0, B.u1 - 0.012]) {
+    // (2 mm outside the counter's ends, so the glass doesn't flicker against them)
+    for (const u of [du0 - 0.002, B.u1 - 0.010]) {
       const m = add(new THREE.Mesh(endGeo, cabinetGlass));
       m.rotation.y = Math.PI / 2; // the shape's x runs out from the wall (−z), its depth along u
       m.position.set(u, 0, IN.z1);

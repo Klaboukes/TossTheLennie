@@ -205,7 +205,7 @@ export function buildNeighbours(kit, details) {
       });
       if (k < HOUSE.brickStories - 1) {
         const yb = y0 + 2.27;
-        const yt = y0 + H + 0.55;
+        const yt = y0 + H + 0.5; // up to the sill above, not into it (their tops flickered)
         box([col[0], yb, OUT.z1 - 0.01], [col[1], yt, OUT.z1 + 0.03], panelMat, { story: 0, line: front });
         box([col[0] - 0.07, yb, OUT.z1 - 0.01], [col[0], yt, OUT.z1 + 0.05], frameMat, { story: 0, line: front });
         box([col[1], yb, OUT.z1 - 0.01], [col[1] + 0.07, yt, OUT.z1 + 0.05], frameMat, { story: 0, line: front });
