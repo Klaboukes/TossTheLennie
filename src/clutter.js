@@ -612,15 +612,15 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
    * Low heights (on the floor, or stacked on something on the floor) count
    * from the top of the floorboards and rugs, which lie FLOOR above the
    * storey's base: otherwise flat things like clothes sink into them and flicker.
-   * Thin things also get their own few-mm layer, so two shirts lying across
-   * each other never share one surface.
+   * Thin things are lifted a mm or a few, to a height no flat thing they
+   * overlap has, so two shirts lying across each other never share one
+   * surface (products.js does the same when they land after a toss).
    */
   const FLOOR = 0.012;
-  let thin = 0;
   function put(room, id, x, y, z, { yaw = rnd() * TAU, ...opts } = {}) {
     const sec = rooms[room];
     if (y < 0.35) y += FLOOR;
-    if (!opts.on && !opts.inside && Math.min(...half(id)) < 0.012) opts.layer = (thin++ % 6) * 0.001;
+    if (!opts.on && !opts.inside && Math.min(...half(id)) < 0.012) opts.layer = 'free';
     return stocks[sec.k].place(id, x, sec.k * H + y, z, yaw, sec, 0, opts);
   }
   /** A pile of the same thing (plates, books), each resting on the one below. */

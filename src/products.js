@@ -748,6 +748,7 @@ const lookOf = (p) => oneMaterial(buildLook(p));
 // ---------------------------------------------------------------- the stock: placing, knocking off, restocking
 const GRAVITY = 9.8;
 const _m = new THREE.Matrix4();
+const _rm = new THREE.Matrix4();
 const _one = new THREE.Vector3(1, 1, 1);
 const _v = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -768,6 +769,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalogue = PRODUCTS }) {
   const kinds = new Map(); // product id → { look, items, mesh }
   const items = [];
+  const lyingFlat = new Set(); // the flat ones lying still (see freeLayer)
   const flying = new Set();
   let seed = 7;
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
@@ -801,16 +803,23 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
    * games), so it falls when that one is knocked away from under it.
    */
   function place(id, x, y, z, yaw, section, row = 0, opts = {}) {
-    const { slope = 0, tilt = null, lift = null, inside = null, on = null, layer = 0 } = typeof opts === 'number' ? { slope: opts } : opts;
+    const { slope = 0, tilt = null, lift = null, inside = null, on = null, layer: asked = 0 } = typeof opts === 'number' ? { slope: opts } : opts;
     const k = kind(id);
     const tint = catalogue[id].base ? catalogue[id].color : null;
     if (tint !== null) k.tinted = true;
     const homeQ = new THREE.Quaternion().setFromAxisAngle(UP, yaw + (rnd() - 0.5) * 0.08);
     if (slope) homeQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), slope));
     if (tilt) homeQ.multiply(tilt);
+    let layer = asked === 'free' ? 0 : asked;
     const home = lift !== null
       ? new THREE.Vector3(x, y + lift + layer, z)
       : new THREE.Vector3(x, y + layer, z).addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(homeQ), k.half[1]);
+    const rest = inside ? null : flatRest(k, home, homeQ);
+    if (asked === 'free' && rest) {
+      layer = freeLayer(null, rest);
+      home.y += layer;
+      rest.top += layer;
+    }
     const item = {
       k, idx: k.items.length, section: inside ? inside.section : section, row,
       home,
@@ -818,13 +827,17 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
       pos: new THREE.Vector3(), quat: new THREE.Quaternion(),
       vel: new THREE.Vector3(), spin: new THREE.Vector3(),
       state: 'home', restQ: null, t: 0, ground: floorY, contents: null, above: null, tint,
-      // `layer`: a few mm it always rests above whatever it lies on, so thin
-      // things lying on top of each other (clothes) don't flicker
+      // `layer`: a few mm it rests above whatever it lies on, so thin things
+      // lying across each other (clothes) don't flicker. `layer: 'free'` picks
+      // one no flat thing it overlaps has (see freeLayer).
       layer,
+      // where its top is and what it covers while it lies still, if it's flat
+      rest, homeRest: rest,
     };
     if (on) (on.above ??= []).push(item);
     k.items.push(item);
     items.push(item);
+    if (rest) lyingFlat.add(item);
     if (inside) (inside.contents ??= []).push(item);
     else section.items.push(item);
     return item;
@@ -901,6 +914,9 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
       item.ground = floorOf(item);
       item.pos.copy(item.home);
       item.quat.copy(item.homeQ);
+      item.rest = item.homeRest;
+      if (item.rest) lyingFlat.add(item);
+      else lyingFlat.delete(item);
       _m.compose(item.pos, item.quat, _one);
       item.k.mesh.setMatrixAt(item.idx, _m);
     }
@@ -948,6 +964,8 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
     let n = item.state === 'home' ? 1 : 0;
     if (item.state === 'down') item.pos.y += 0.01; // kicked up off the floor
     item.state = 'flying';
+    item.rest = null;
+    lyingFlat.delete(item);
     item.t = 0;
     _axis.crossVectors(out, UP); // sideways along the shelf
     item.vel.copy(out).multiplyScalar((0.6 + rnd() * 1.6) * power)
@@ -984,6 +1002,59 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
     const e = _m.elements;
     const [hx, hy, hz] = item.k.half;
     return Math.abs(e[1]) * hx + Math.abs(e[5]) * hy + Math.abs(e[9]) * hz;
+  }
+
+  // ---- flat things lying across each other
+  // Two flat things (shirts, socks, papers) overlapping with their tops at
+  // exactly the same height flicker where they overlap. So each one, when it's
+  // put down and again when it lands, gets lifted by whole millimetres to a
+  // height that no flat thing it overlaps has.
+  const FLAT = 0.012; // lying with less than this above its middle
+  const STEP = 0.001;
+
+  /**
+   * For a product lying flat at pos, turned by q: the height of its top and
+   * its outline on the floor (its middle x, z and two half-axes ax, az and bx,
+   * bz). Null if it isn't lying flat.
+   */
+  function flatRest(k, pos, q) {
+    const e = _rm.makeRotationFromQuaternion(q).elements;
+    let up = 0;
+    for (let i = 1; i < 3; i++) if (Math.abs(e[i * 4 + 1]) > Math.abs(e[up * 4 + 1])) up = i;
+    const tall = Math.abs(e[1]) * k.half[0] + Math.abs(e[5]) * k.half[1] + Math.abs(e[9]) * k.half[2];
+    if (tall >= FLAT) return null;
+    const [i, j] = [0, 1, 2].filter((n) => n !== up);
+    return {
+      top: pos.y + tall, x: pos.x, z: pos.z,
+      ax: e[i * 4] * k.half[i], az: e[i * 4 + 2] * k.half[i],
+      bx: e[j * 4] * k.half[j], bz: e[j * 4 + 2] * k.half[j],
+    };
+  }
+
+  /** Whether two flat outlines overlap (two rectangles: no gap along any of their four sides). */
+  function overlaps(r, o) {
+    const dx = o.x - r.x;
+    const dz = o.z - r.z;
+    for (const [ux, uz] of [[r.ax, r.az], [r.bx, r.bz], [o.ax, o.az], [o.bx, o.bz]]) {
+      const len = Math.hypot(ux, uz) || 1;
+      const reach = (Math.abs(r.ax * ux + r.az * uz) + Math.abs(r.bx * ux + r.bz * uz) + Math.abs(o.ax * ux + o.az * uz) + Math.abs(o.bx * ux + o.bz * uz)) / len;
+      if (Math.abs(dx * ux + dz * uz) / len > reach) return false;
+    }
+    return true;
+  }
+
+  /** How far to lift a flat thing whose top would be at rest.top, so it's at a height of its own. */
+  function freeLayer(item, rest) {
+    const tops = [];
+    for (const n of lyingFlat) {
+      const o = n.rest;
+      if (o && n !== item && Math.abs(o.top - rest.top) < 0.03 && overlaps(rest, o)) tops.push(o.top);
+    }
+    for (let j = 0; j < 12; j++) {
+      const top = rest.top + j * STEP;
+      if (tops.every((t) => Math.abs(t - top) > STEP * 0.6)) return j * STEP;
+    }
+    return Math.max(...tops) + STEP - rest.top;
   }
 
   /** What a product would land on right below it: a table top it's above, or the floor. */
@@ -1070,7 +1141,15 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
         item.pos.y = ground + low + item.layer;
         if (item.t > 0.6 && item.vel.lengthSq() < 0.0004) {
           item.quat.copy(item.restQ);
-          item.pos.y = ground + lowest(item) + item.layer;
+          item.pos.y = ground + lowest(item);
+          // flat things find a height of their own among the ones they landed across
+          item.rest = flatRest(item.k, item.pos, item.quat);
+          if (item.rest) {
+            item.layer = freeLayer(item, item.rest);
+            item.rest.top += item.layer;
+            lyingFlat.add(item);
+          }
+          item.pos.y += item.layer;
           item.state = 'down';
           flying.delete(item);
         }
