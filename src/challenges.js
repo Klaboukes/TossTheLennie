@@ -25,6 +25,7 @@ export const CHALLENGES = [
   { id: 'shopping', text: 'Take Lennie shopping', test: (r) => r.ids.has('shopping') },
   { id: 'checkout', text: 'Scan Lennie at the checkout', test: (r) => r.ids.has('checkout') },
   { id: 'pindakaas', text: 'Drop Lennie in the pindakaas', test: (r) => r.ids.has('pindakaas') },
+  { id: 'butcher', text: 'Send Lennie behind the butcher counter', test: (r) => r.ids.has('butcher') },
   { id: 'mess', text: 'Knock products off the supermarket shelves', test: (r) => r.ids.has('mess') },
   { id: 'freezer', text: 'Put Lennie in the freezer', test: (r) => r.ids.has('freezer') },
   { id: 'pastry', text: 'Crash Lennie into the pastry case', test: (r) => r.ids.has('pastry') },

@@ -640,7 +640,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     part(u1 - 0.072, base, -0.012, u1 - 0.048, top, 0.03, cabinetWhite);
     return { inside: box(u0 + 0.06, base, 0.04, u1 - 0.06, top, depth - 0.04), doorways };
   }
-  const freezers = cabinets({ axis: 'x', wall: IN.z1, u0: IN.x0 + 1.2, u1: IN.x1 - 1.3, assortment: ASSORTMENT.DIEPVRIES, sign: 'DIEPVRIES', signColor: '#3b7dd8', mess: 'Clean-up at the freezers!' });
+  // (they stop short of the back corner, where the butcher's counter is)
+  const freezers = cabinets({ axis: 'x', wall: IN.z1, u0: IN.x0 + 1.2, u1: 7.6, assortment: ASSORTMENT.DIEPVRIES, sign: 'DIEPVRIES', signColor: '#3b7dd8', mess: 'Clean-up at the freezers!' });
   const fridges = cabinets({ axis: 'z', wall: IN.x1, u0: IN.z0 + 5.5, u1: IN.z1 - 0.95, assortment: ASSORTMENT.FRISDRANK, sign: 'FRISDRANK', signColor: '#3fae3a', mess: 'Clean-up at the fridges!' });
 
   // ---------------------------------------------------------------- one-sided displays
@@ -1093,6 +1094,164 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     solid([B.x0, 0, B.z0], [B.x1, B.h, B.z1], 'furniture');
   }
 
+  // ---------------------------------------------------------------- the butcher's counter in the back corner
+  // A glass counter of meat on trays, a narrow aisle behind it for the butcher,
+  // and a back counter under a tiled wall with rookworsten hanging on a rail.
+  // It takes the corner the freezers used to run into, so the floor stays open.
+  const butcher = (() => {
+    const F = frame('x', IN.z1, -1);
+    // u along the wall; w out from it: back counter, the butcher's aisle, then the glass counter
+    const B = { u0: 7.75, u1: 12.75, back: 0.45, aisle: 1.05, ledge: 1.3, front: 1.95, bed: 0.8, top: 1.32 };
+    const du0 = B.u0 + 0.75; // the glass counter leaves a gap at this end to get behind it
+    const bpart = (ua, ya, wa, ub, yb, wb, m, cast = false) => boxAt(...F.box(ua, ya, wa, ub, yb, wb), m, { cast });
+    const mess = 'Rookworst everywhere!';
+    const red = '#b3121f';
+
+    // the back counter, the tiled wall above it with a comic pig, and the rail of rookworsten
+    bpart(B.u0, 0, 0, B.u1, 0.88, B.back, cabinetWhite, true);
+    bpart(B.u0, 0.88, 0, B.u1, 0.92, B.back + 0.02, steel);
+    const tiles = canvasTexture(1024, 356, (g, w, h) => {
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+      g.fillStyle = red; g.fillRect(0, h - 30, w, 30); g.fillRect(0, 0, w, 30);
+      g.strokeStyle = '#d5dade'; g.lineWidth = 2;
+      for (let x = 0; x <= w; x += 30) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+      for (let y = 0; y <= h; y += 30) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+      // the pig
+      const px = 330;
+      const py = 175;
+      g.lineWidth = 6; g.strokeStyle = INK_SIGN; g.fillStyle = '#f5a9b8';
+      for (const s of [-1, 1]) { g.beginPath(); g.moveTo(px + s * 40, py - 60); g.lineTo(px + s * 75, py - 100); g.lineTo(px + s * 72, py - 45); g.closePath(); g.fill(); g.stroke(); }
+      g.beginPath(); g.arc(px, py, 78, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = '#ef8fa4'; g.beginPath(); g.ellipse(px, py + 22, 36, 26, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = INK_SIGN;
+      for (const s of [-1, 1]) {
+        g.beginPath(); g.ellipse(px + s * 13, py + 22, 6, 10, 0, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.arc(px + s * 30, py - 22, 9, 0, Math.PI * 2); g.fill();
+      }
+      g.font = '900 84px "Arial Black", "Trebuchet MS", sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'left';
+      g.lineWidth = 12; g.lineJoin = 'round'; g.strokeStyle = '#ffffff';
+      g.strokeText('SLAGERIJ', 440, 150); g.fillStyle = red; g.fillText('SLAGERIJ', 440, 150);
+      g.font = 'bold 40px "Trebuchet MS", sans-serif'; g.fillStyle = INK_SIGN; g.fillText('vers van de slager', 448, 222);
+    });
+    bpart(B.u0, 0.92, 0, B.u1, 2.65, 0.02, F.withFront(cabinetWhite, std({ map: tiles })));
+    bpart(B.u0 + 0.1, 2.38, 0.2, B.u1 - 0.1, 2.41, 0.23, steel);
+    for (const u of [B.u0 + 0.1, B.u1 - 0.13]) bpart(u, 2.38, 0, u + 0.03, 2.41, 0.23, steel);
+    const hanging = stock.section();
+    const upright = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+    const [, , hw] = F.P(0, 0, 0.215);
+    const hangDrop = halfSize(PRODUCTS.rookworst)[2];
+    for (let u = B.u0 + 0.3; u < B.u1 - 0.25; u += 0.21) stock.place('rookworst', u, 2.385 - hangDrop, hw, F.yaw, hanging, 0, { tilt: upright, lift: 0 });
+    // on the back counter: a chopping block with a cleaver, and rookworst and leverworst
+    bpart(B.u0 + 0.3, 0.92, 0.06, B.u0 + 0.9, 1.04, 0.4, wood, true);
+    bpart(B.u0 + 0.5, 1.04, 0.15, B.u0 + 0.72, 1.05, 0.27, steel);
+    bpart(B.u0 + 0.72, 1.04, 0.19, B.u0 + 0.86, 1.07, 0.23, darkFrame);
+    const backStock = stock.section();
+    stock.fillRow(['rookworst', 'leverworst', 'rookworst', 'saucijs'], {
+      along: 'x', a: B.u0 + 1.1, b: B.u1 - 0.1, y: 0.92, yaw: F.yaw, maxH: 0.3, section: backStock, rows: 2,
+      depthAt: (row, d) => F.P(0, 0, B.back - 0.03 - d / 2 - row * (d + 0.01))[2], room: B.back - 0.08,
+    });
+    const backBody = solid(...F.box(B.u0, 0, 0, B.u1, 0.92, B.back + 0.02), 'furniture');
+    backBody.surface.mess = mess;
+    backBody.surface.onHit = (point, strength, push) => (point.y > 0.86 ? stock.knock(backStock, point, F.out, strength, push) : 0);
+    // the rookworsten on the rail come down when he hits them (they're soft)
+    const rail = solid(...F.box(B.u0 + 0.1, 2.2, 0.12, B.u1 - 0.1, 2.42, 0.3), 'cushion', physMats.soft);
+    rail.surface.mess = mess;
+    rail.surface.onHit = (point, strength, push) => stock.knock(hanging, point, F.out, strength, push, { radius: Math.min(1.2, 0.4 + strength * 0.08) });
+
+    // the glass counter: meat on steel trays with parsley between them, and a price rail
+    const counterFront = canvasTexture(1024, 192, (g, w, h) => {
+      for (let x = 0; x < w; x += 64) { g.fillStyle = (x / 64) % 2 ? '#ffffff' : red; g.fillRect(x, 0, 64, h); }
+      g.fillStyle = '#ffffff'; g.fillRect(w * 0.27, h * 0.2, w * 0.46, h * 0.6);
+      g.strokeStyle = red; g.lineWidth = 8; g.strokeRect(w * 0.27, h * 0.2, w * 0.46, h * 0.6);
+      g.fillStyle = red; g.font = '900 72px "Arial Black", "Trebuchet MS", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('SLAGERIJ', w / 2, h / 2 + 4);
+    });
+    bpart(du0, 0, B.aisle, B.u1, B.bed, B.front, F.withFront(cabinetWhite, std({ map: counterFront })), true);
+    bpart(du0, 0, B.front - 0.06, B.u1, 0.1, B.front + 0.005, darkFrame);
+    bpart(du0, B.bed - 0.01, B.ledge, B.u1, B.bed, B.front, coldLight);
+    bpart(du0, B.bed, B.aisle, B.u1, 1.25, B.ledge, cabinetWhite, true);
+    // the scale on the ledge
+    bpart(du0 + 0.4, 1.25, 1.08, du0 + 0.75, 1.3, 1.27, steel);
+    bpart(du0 + 0.45, 1.3, 1.1, du0 + 0.7, 1.44, 1.13, darkFrame);
+    const trays = [
+      ['rookworst', 'ROOKWORST', '2,49'], ['gehaktbal', 'GEHAKTBALLEN', '3,99'], ['slavink', 'SLAVINKEN', '4,29'], ['biefstuk', 'BIEFSTUK', '6,99'],
+      ['kipfilet', 'KIPFILET', '5,49'], ['speklap', 'SPEKLAPPEN', '3,79'], ['karbonade', 'KARBONADE', '4,49'], ['runderlap', 'RUNDERLAPPEN', '5,99'],
+      ['filetAmericain', 'FILET AMERICAIN', '1,89'], ['saucijs', 'SAUCIJZEN', '3,49'],
+    ];
+    const meats = stock.section();
+    const tw = (B.u1 - 0.04 - du0) / trays.length;
+    const parsley = std({ color: 0x3e8f3a, roughness: 0.9 });
+    const [w0, w1] = [B.ledge + 0.04, B.front - 0.06];
+    trays.forEach(([id], i) => {
+      const a = du0 + 0.02 + i * tw;
+      bpart(a + 0.02, B.bed, w0, a + tw - 0.02, B.bed + 0.015, w1, steel);
+      if (i) bpart(a - 0.018, B.bed, w0, a + 0.018, B.bed + 0.035, w1, parsley);
+      const [hu, , hd] = halfSize(PRODUCTS[PRODUCTS[id].base ?? id]);
+      for (let u = a + 0.04 + hu; u < a + tw - 0.03 - hu; u += hu * 2.1) {
+        for (let w = w0 + 0.02 + hd; w < w1 - 0.02 - hd; w += hd * 2.15) {
+          const [x, , z] = F.P(u + (rnd() - 0.5) * 0.01, 0, w);
+          stock.place(id, x, B.bed + 0.015, z, F.yaw + (rnd() - 0.5) * 0.3, meats, w < (w0 + w1) / 2 ? 1 : 0);
+        }
+      }
+    });
+    const prices = canvasTexture(2048, 64, (g, w, h) => {
+      g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+      const sw = w / trays.length;
+      g.textBaseline = 'middle';
+      trays.forEach(([, name, price], i) => {
+        g.fillStyle = INK_SIGN; g.font = 'bold 22px "Trebuchet MS", sans-serif'; g.textAlign = 'left';
+        g.fillText(name, i * sw + 8, h / 2 + 2, sw - 80);
+        g.fillStyle = red; g.font = '900 28px "Arial Black", "Trebuchet MS", sans-serif'; g.textAlign = 'right';
+        g.fillText(price, (i + 1) * sw - 8, h / 2 + 2);
+        g.fillStyle = '#c9ced3'; g.fillRect((i + 1) * sw - 2, 0, 4, h);
+      });
+    });
+    bpart(du0, B.bed - 0.07, B.front - 0.01, B.u1, B.bed + 0.01, B.front + 0.015, F.withFront(steel, std({ map: prices })));
+
+    // the glass: flat on top, sloping down to the front, glass ends; breakable
+    const span = B.u1 - du0;
+    const midU = (du0 + B.u1) / 2;
+    const glassMeshes = [bpart(du0, B.top - 0.012, B.ledge - 0.05, B.u1, B.top, 1.62, cabinetGlass)];
+    const [dy, dw] = [B.top - (B.bed + 0.05), B.front - 0.02 - 1.62];
+    const slant = add(new THREE.Mesh(new THREE.BoxGeometry(span, 0.012, Math.hypot(dy, dw)), cabinetGlass));
+    slant.position.set(midU, (B.top + B.bed + 0.05) / 2, F.P(0, 0, (1.62 + B.front - 0.02) / 2)[2]);
+    slant.rotation.x = Math.atan2(-dy, dw);
+    glassMeshes.push(slant);
+    const endShape = new THREE.Shape([[B.ledge - 0.05, B.bed], [B.front - 0.02, B.bed], [B.front - 0.02, B.bed + 0.05], [1.62, B.top], [B.ledge - 0.05, B.top]].map(([w, y]) => new THREE.Vector2(w, y)));
+    const endGeo = new THREE.ExtrudeGeometry(endShape, { depth: 0.012, bevelEnabled: false });
+    for (const u of [du0, B.u1 - 0.012]) {
+      const m = add(new THREE.Mesh(endGeo, cabinetGlass));
+      m.rotation.y = Math.PI / 2; // the shape's x runs out from the wall (−z), its depth along u
+      m.position.set(u, 0, IN.z1);
+      glassMeshes.push(m);
+    }
+    glassMeshes.push(bpart(du0 + 0.05, B.top - 0.04, B.ledge - 0.04, B.u1 - 0.05, B.top - 0.015, B.ledge + 0.02, lightStrip));
+    const glass = pane(glassMeshes, ...F.box(du0, B.bed + 0.02, B.ledge - 0.05, B.u1, B.top + 0.02, B.front + 0.02), F.out);
+    glass.onBreak = () => stock.knock(meats, glass.center, F.out, 7, null, { radius: 1.6, chance: 0.6 });
+    const base = solid(...F.box(du0, 0, B.aisle, B.u1, B.bed + 0.02, B.front), 'furniture');
+    base.surface.mess = mess;
+    base.surface.onHit = (point, strength, push) => (glass.broken && point.y > B.bed - 0.05 ? stock.knock(meats, point, F.out, strength, push, { radius: Math.min(1, 0.3 + strength * 0.06) }) : 0);
+    const ledge = solid(...F.box(du0, B.bed, B.aisle, B.u1, 1.3, B.ledge - 0.05), 'furniture');
+    ledge.surface.mess = mess;
+
+    // the hanging sign, with the "now serving" number next to it
+    const sign = canvasTexture(1024, 192, (g, w, h) => {
+      g.fillStyle = red; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#ffffff'; g.font = '900 96px "Arial Black", "Trebuchet MS", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('SLAGERIJ', w * 0.38, h / 2 + 4);
+      g.fillStyle = '#141414'; g.fillRect(w * 0.76, 24, w * 0.21, h - 48);
+      g.fillStyle = '#ff4a3a'; g.font = '900 100px "Courier New", monospace'; g.fillText('42', w * 0.865, h / 2 + 6);
+      g.fillStyle = '#ffffff'; g.font = 'bold 22px "Trebuchet MS", sans-serif'; g.fillText('NU AAN DE BEURT', w * 0.865, 14);
+    });
+    const signMat = std({ map: sign });
+    const signRed = std({ color: 0xb3121f });
+    const [, , sz] = F.P(0, 0, B.front + 0.35);
+    boxAt([midU - 1.3, 2.7, sz - 0.03], [midU + 1.3, 3.19, sz + 0.03], faces(signRed, signRed, signRed, signRed, signMat, signMat));
+    for (const dx of [-1.1, 1.1]) boxAt([midU + dx - 0.01, 3.19, sz - 0.01], [midU + dx + 0.01, IN.y1, sz + 0.01], darkFrame);
+
+    return { F, B, du0, glass };
+  })();
+
   stock.build();
 
   // ---------------------------------------------------------------- a row of shopping trolleys by the door
@@ -1166,6 +1325,10 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     S('breadrack', 'On top of the bread rack!', 500, 'HELP!', ...breadRack.box(IN.z0 + 0.2, 2.4, 0, 35.4, 3.2, 0.65)),
     S('cheese', 'On top of the cheese!', 500, 'SAY CHEESE!', ...cheeseF.box(CH.u0, CH.roof - 0.05, 0, CH.u1, 3.0, CH.depth)),
     ...spotsExtra.map((a) => S(...a)),
+    // (the butcher's aisle, and the way into it at the end of the glass counter)
+    S('butcher', 'Behind the butcher counter!', 500, 'VOLGENDE!', ...butcher.F.box(butcher.B.u0, -1, butcher.B.back, butcher.B.u1, 1.25, butcher.B.aisle)),
+    S('butcher', 'Behind the butcher counter!', 500, 'VOLGENDE!', ...butcher.F.box(butcher.B.u0, -1, butcher.B.back, butcher.du0, 1.25, butcher.B.ledge)),
+    S('meat', 'In the meat counter!', 600, 'GEHAKT!', ...butcher.F.box(butcher.du0, butcher.B.bed - 0.1, butcher.B.ledge - 0.1, butcher.B.u1, 1.8, butcher.B.front + 0.1), () => butcher.glass.broken),
   ];
 
   function update(dt) {

@@ -120,6 +120,20 @@ export const PRODUCTS = {
   frikandellen: { shape: 'box', w: 0.26, h: 0.05, d: 0.15, stack: true, lay: true, face: { bg: '#7a3e2a', band: '#f6d04d', fg: '#7a3e2a', text: 'FRIKANDELLEN', art: ['frikandel'] } },
   bitterballen: { shape: 'box', w: 0.22, h: 0.06, d: 0.15, stack: true, lay: true, face: { bg: '#f6d04d', fg: '#7b3f00', text: 'BITTERBALLEN', art: ['bitterbal'] } },
   kaassouffle: { shape: 'box', w: 0.22, h: 0.05, d: 0.15, stack: true, lay: true, face: { bg: '#3b7dd8', band: '#f6d04d', fg: '#3b7dd8', text: 'KAASSOUFFLÉS', art: ['cheese'] } },
+  // the butcher's counter: loose meat on trays, rookworsten hanging on a rail.
+  // The steaks and chops are one model, coloured per kind.
+  rookworst: { w: 0.154, h: 0.034, d: 0.121, look: horseshoe },
+  gehaktbal: { shape: 'bun', r: 0.045, color: '#7a4428' },
+  slavink: { shape: 'stick', r: 0.03, len: 0.06, color: '#b0503c' },
+  saucijs: { shape: 'stick', r: 0.018, len: 0.13, color: '#e3a58e' },
+  leverworst: { shape: 'stick', r: 0.034, len: 0.12, color: '#8c7a6b' },
+  kipfilet: { shape: 'bun', r: 0.055, color: '#f2c7b2' },
+  lap: { w: 0.14, h: 0.028, d: 0.1, look: slab },
+  biefstuk: { base: 'lap', color: '#9c2a2c' },
+  karbonade: { base: 'lap', color: '#de9a8c' },
+  speklap: { base: 'lap', color: '#eab3a6' },
+  runderlap: { base: 'lap', color: '#7e2224' },
+  filetAmericain: { shape: 'tub', r: 0.05, h: 0.06, stack: true, lid: '#ffffff', face: { bg: '#c0392b', fg: '#ffffff', text: 'FILET AMERICAIN' } },
   // frozen
   pizza: { shape: 'box', w: 0.28, h: 0.28, d: 0.04, face: { bg: '#c0392b', band: '#f6d04d', fg: '#c0392b', text: 'PIZZA', art: ['pizza'] } },
   ijsVanille: { shape: 'tub', r: 0.1, h: 0.13, stack: true, lid: '#3b7dd8', face: { bg: '#f7e3b5', fg: '#3b7dd8', text: 'VANILLE-IJS', art: ['icecream', '#fff6d8'] } },
@@ -478,6 +492,29 @@ const wrapTex = (r, h, f, decorate) => {
 };
 
 const mat = (opts) => new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0, ...opts });
+
+/** A rookworst: a smoked sausage bent into a horseshoe, lying flat with its open end at the front. */
+function horseshoe() {
+  const geo = new THREE.TorusGeometry(0.06, 0.017, 6, 14, Math.PI * 1.3);
+  geo.rotateZ(-Math.PI * 0.15); // the gap at the bottom
+  geo.rotateX(-Math.PI / 2); // lying down, the gap towards +z (the front)
+  geo.computeBoundingBox();
+  const c = geo.boundingBox.getCenter(new THREE.Vector3());
+  geo.translate(-c.x, -c.y, -c.z);
+  return { geo, material: mat({ color: '#8a3b22', roughness: 0.35 }) };
+}
+
+/** A steak, chop or slice of pork belly: a flattened lump, coloured per kind. */
+function slab(p) {
+  const geo = new THREE.SphereGeometry(0.5, 10, 6);
+  geo.scale(p.w, p.h * 1.4, p.d);
+  geo.translate(0, -p.h * 0.2, 0);
+  // a flat underside
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) if (pos.getY(i) < -p.h / 2) pos.setY(i, -p.h / 2);
+  geo.computeVertexNormals();
+  return { geo, material: mat({ color: '#ffffff', roughness: 0.7 }) };
+}
 
 /** Geometry and material(s) of one kind of product, centred on its middle. */
 function buildLook(p) {
