@@ -530,17 +530,92 @@ export class Ragdoll {
 
     // Cartoon stars circling his head when he's dizzy. They live in the scene
     // rather than on the head, so they stay above him whichever way up he is.
+    // There are a few styles, and every good toss picks a different one.
     this.stars = new THREE.Group();
-    const starMat = new THREE.MeshBasicMaterial({ color: 0xffd23f });
-    for (let i = 0; i < 4; i++) {
-      const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.065, 0), starMat);
-      const a = (i / 4) * Math.PI * 2;
-      star.position.set(Math.cos(a) * 0.26, Math.sin(a * 2) * 0.04, Math.sin(a) * 0.26);
-      star.scale.set(1, 1, 0.45);
-      this.stars.add(star);
-    }
     this.stars.visible = false;
     this.scene.add(this.stars);
+    this.starStyles = [];
+    this.starStyle = null;
+    this.starTime = 0;
+
+    const rhombus = new THREE.OctahedronGeometry(0.065, 0);
+    const starMats = {};
+    const starMat = (color) => (starMats[color] ??= new THREE.MeshBasicMaterial({ color }));
+    // n flattened rhombuses spread evenly round a ring of radius r
+    const ring = (n, r, colors, size = 1) => {
+      const g = new THREE.Group();
+      for (let i = 0; i < n; i++) {
+        const star = new THREE.Mesh(rhombus, starMat(colors[i % colors.length]));
+        const a = (i / n) * Math.PI * 2;
+        star.userData.angle = a;
+        star.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+        star.scale.set(size, size, 0.45 * size);
+        g.add(star);
+      }
+      return g;
+    };
+    const addStyle = (group, animate) => {
+      group.visible = false;
+      this.stars.add(group);
+      this.starStyles.push({ group, animate });
+    };
+    const twirl = (g, dt, speed) => g.traverse((o) => o.isMesh && (o.rotation.y += dt * speed));
+
+    // the classic: four yellow stars on a gently wavy ring
+    const classic = ring(4, 0.26, [0xffd23f]);
+    for (const s of classic.children) s.position.y = Math.sin(s.userData.angle * 2) * 0.04;
+    addStyle(classic, (g, t, dt) => {
+      g.rotation.y += dt * 4;
+      twirl(g, dt, 6);
+    });
+
+    // rainbow: six smaller stars in every colour, going the other way and bobbing like a wave
+    const rainbow = ring(6, 0.28, [0xff4d4d, 0xff9f1c, 0xffe14d, 0x4cd964, 0x3fa9ff, 0xb46bff], 0.75);
+    addStyle(rainbow, (g, t, dt) => {
+      g.rotation.y -= dt * 5;
+      for (const s of g.children) s.position.y = Math.sin(t * 7 + s.userData.angle * 2) * 0.05;
+      twirl(g, dt, 8);
+    });
+
+    // atom: two tilted rings crossing each other, spinning opposite ways
+    const atom = new THREE.Group();
+    const ringA = ring(3, 0.25, [0xffd23f]);
+    const ringB = ring(3, 0.25, [0x8fe3ff]);
+    const tiltA = new THREE.Group();
+    const tiltB = new THREE.Group();
+    tiltA.rotation.z = 0.5;
+    tiltB.rotation.z = -0.5;
+    tiltA.add(ringA);
+    tiltB.add(ringB);
+    atom.add(tiltA, tiltB);
+    addStyle(atom, (g, t, dt) => {
+      ringA.rotation.y += dt * 5;
+      ringB.rotation.y -= dt * 5;
+      g.rotation.y += dt * 1.5;
+      twirl(g, dt, 6);
+    });
+
+    // pulse: pink and gold stars whose ring breathes in and out while they swell and shrink
+    const pulse = ring(5, 0.26, [0xff7eb6, 0xffd23f]);
+    addStyle(pulse, (g, t, dt) => {
+      g.rotation.y += dt * 3;
+      const r = 0.26 + Math.sin(t * 4) * 0.06;
+      for (const s of g.children) {
+        const a = s.userData.angle;
+        const k = 1 + Math.sin(t * 8 + a * 3) * 0.3;
+        s.position.set(Math.cos(a) * r, Math.cos(t * 4) * 0.03, Math.sin(a) * r);
+        s.scale.set(k, k, 0.45 * k);
+      }
+      twirl(g, dt, 6);
+    });
+  }
+
+  /** Show a different style of dizzy stars than last time. */
+  pickStarStyle() {
+    const others = this.starStyles.filter((s) => s !== this.starStyle);
+    this.starStyle = others[Math.floor(Math.random() * others.length)];
+    for (const s of this.starStyles) s.group.visible = s === this.starStyle;
+    this.starTime = 0;
   }
 
   /** Stand Lennie back up in the rest pose. */
@@ -570,8 +645,8 @@ export class Ragdoll {
     if (this.stars.visible) {
       const h = this.parts.head.group.position;
       this.stars.position.set(h.x, h.y + 0.26, h.z);
-      this.stars.rotation.y += dt * 4;
-      for (const s of this.stars.children) s.rotation.y += dt * 6;
+      this.starTime += dt;
+      this.starStyle?.animate(this.starStyle.group, this.starTime, dt);
     }
     if (this.expressionTimer > 0) {
       this.expressionTimer -= dt;
@@ -583,9 +658,10 @@ export class Ragdoll {
   setExpression(kind, duration = 0) {
     // A brief 'ouch' never overrides a lasting dizzy face.
     if (kind === 'ouch' && this.expression === 'dizzy' && this.expressionTimer <= 0) return;
+    const dizzy = kind === 'dizzy';
+    if (dizzy && this.expression !== 'dizzy') this.pickStarStyle();
     this.expression = kind;
     this.expressionTimer = duration;
-    const dizzy = kind === 'dizzy';
     this.face.pupils.forEach((p) => (p.visible = !dizzy));
     this.face.xEyes.forEach((x) => (x.visible = dizzy));
     this.face.smile.visible = kind === 'normal';
