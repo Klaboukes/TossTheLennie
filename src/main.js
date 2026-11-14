@@ -542,7 +542,30 @@ function updateToss(simDt) {
 
 // ---------------------------------------------------------------- collisions & breaking glass and doors
 let lastSoundAt = 0;
+// What pops up at a hard bump: these shouts, mixed with lines for what he hit
+// and for his head when that's what took the hit (bumpLine).
 const EXCLAIM = ['OOF!', 'BONK!', 'WHEE!', 'OUCH!', 'THUD!', 'OW!', 'YIKES!'];
+const HEAD_BUMP = ['Ow, my head!', 'Seeing stars!', 'Headbutt!', 'Coconut!', 'There goes a brain cell!', 'Helmet next time!'];
+const BUMP = {
+  wall: ['Hello, wall!', 'Wall wins!', 'Splat!', 'Pancake!', 'Who put that wall there?'],
+  floor: ['Floor kiss!', 'Belly flop!', 'Faceplant!', 'Flat as a pannenkoek!'],
+  ground: ['Grass stains!', 'Faceplant!', 'Lawn dart!', 'Mud pie!'],
+  stair: ['Mind the step!', 'Step by step!', 'Ba-dum-tss!', 'Stair-ific!'],
+  furniture: ['Not the furniture!', 'Stubbed toe!', 'Sit down, Lennie!', 'Table manners!'],
+  roof: ['Up on the roof!', 'Hello, pigeons!', 'Tile trouble!'],
+  block: ['Sorry, neighbours!', 'Knock knock!', 'Ding dong!'],
+  tree: ['Tree hugger!', 'Timber!', 'Branch manager!'],
+  fence: ['De-fence-less!', 'Over the fence!'],
+  window: ['Window shopping!', 'Nice view!'],
+  door: ['Knock knock!', "Who's there?"],
+  // soft things don't hurt, so they get only their own lines
+  cushion: ['Comfy!', 'Soft landing!', 'Pillow fight!', 'Ahh, cosy!'],
+  leaves: ['Hedgehog!', 'Rustle rustle!', 'Leaf me alone!'],
+};
+function bumpLine(partName, kind, soft) {
+  if (soft && BUMP[kind]) return pickLine(BUMP[kind]);
+  return pickLine([...EXCLAIM, ...(partName === 'head' && !soft ? HEAD_BUMP : []), ...(BUMP[kind] ?? [])]);
+}
 const pendingBreaks = new Set();
 
 function contactPoint(e) {
@@ -613,7 +636,7 @@ lennie.onCollide = (partName, e) => {
       toss.trampoline += 1;
       popAt(point, 'BOING!', 'good');
     } else if (v > 7) {
-      popAt(point, EXCLAIM[Math.floor(Math.random() * EXCLAIM.length)]);
+      popAt(point, bumpLine(partName, surf.kind, SOFT.has(surf.kind)));
     }
   }
   if (v > 7 && !soft) {
@@ -644,17 +667,17 @@ function knockProducts(surf, e, v) {
   }
   if (n >= 4 && now - lastMessAt > 1500) {
     lastMessAt = now;
-    popAt(point.setY(point.y + 0.4), messLine(surf.mess), 'good');
+    popAt(point.setY(point.y + 0.4), pickLine(surf.mess), 'good');
   }
 }
 
-// A surface's `mess` is one line or a list to pick from; don't say the same thing twice in a row.
-let lastMessLine = '';
-function messLine(mess) {
+// A popup line, or one at random from a list; never the same one twice in a row.
+let lastLine = '';
+function pickLine(mess) {
   if (!Array.isArray(mess)) return mess ?? 'CLATTER!';
-  const options = mess.length > 1 ? mess.filter((line) => line !== lastMessLine) : mess;
-  lastMessLine = options[Math.floor(Math.random() * options.length)];
-  return lastMessLine;
+  const options = mess.length > 1 ? mess.filter((line) => line !== lastLine) : mess;
+  lastLine = options[Math.floor(Math.random() * options.length)];
+  return lastLine;
 }
 
 let lastScatterAt = 0;
@@ -670,7 +693,7 @@ function knockClutter(e, v) {
   }
   if (n >= 6 && now - lastScatterAt > 1500) {
     lastScatterAt = now;
-    popAt(point.setY(point.y + 0.4), messLine([...MESS_WORDS, ...(mess ?? [])]), 'good');
+    popAt(point.setY(point.y + 0.4), pickLine([...MESS_WORDS, ...(mess ?? [])]), 'good');
   }
 }
 // said anywhere in the house, mixed in with the lines for the room he's in (clutter.js)
