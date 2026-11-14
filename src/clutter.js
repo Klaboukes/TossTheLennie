@@ -883,7 +883,7 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
     // Everything falls out of the front, and the games spill as they go.
     const out = new THREE.Vector3(0, 0, 1);
     solid.surface.tally = 'games';
-    solid.surface.mess = 'Board game avalanche!';
+    solid.surface.mess = ['Board game avalanche!', 'Game over!', 'Rules? What rules?', 'Who took the dice?', "Now it's a floor game!"];
     solid.surface.onHit = (point, strength, push) => stocks[k].knock(sec, point, out, strength, push, {
       radius: 0.5 + strength * 0.12,
       chance: 0.9,

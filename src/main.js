@@ -293,7 +293,7 @@ function popAt(position, text, cls = '') {
   el.style.left = `${(v.x * 0.5 + 0.5) * innerWidth}px`;
   el.style.top = `${(-v.y * 0.5 + 0.5) * innerHeight}px`;
   el.style.setProperty('--rot', `${(Math.random() * 16 - 8).toFixed(1)}deg`);
-  // Short shouts ("BOING!") flash by; longer lines ("Pindakaas everywhere!") stay up long enough to read.
+  // Short shouts ("BOING!") flash by; longer lines ("Crunchy or smooth?") stay up long enough to read.
   const ms = Math.min(4000, 1400 + 120 * Math.max(0, text.length - 6));
   el.style.setProperty('--dur', `${ms}ms`);
   ui.pops.appendChild(el);
@@ -644,8 +644,17 @@ function knockProducts(surf, e, v) {
   }
   if (n >= 4 && now - lastMessAt > 1500) {
     lastMessAt = now;
-    popAt(point.setY(point.y + 0.4), surf.mess ?? 'CLATTER!', 'good');
+    popAt(point.setY(point.y + 0.4), messLine(surf.mess), 'good');
   }
+}
+
+// A surface's `mess` is one line or a list to pick from; don't say the same thing twice in a row.
+let lastMessLine = '';
+function messLine(mess) {
+  if (!Array.isArray(mess)) return mess ?? 'CLATTER!';
+  const options = mess.length > 1 ? mess.filter((line) => line !== lastMessLine) : mess;
+  lastMessLine = options[Math.floor(Math.random() * options.length)];
+  return lastMessLine;
 }
 
 let lastScatterAt = 0;

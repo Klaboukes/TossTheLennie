@@ -27,6 +27,23 @@ const FADED = 0.12;
 const INK_SIGN = '#2b2b2b';
 const FADE_MARGIN = 0.6;
 
+// What pops up when Lennie knocks a pile of things over: one line at random
+// from the list for that spot (main.js picks it, never the same twice in a row).
+const MESS = {
+  aisle: ['Price check: everything!', 'Shopping the fast way!', 'Everything must go!', 'Self-service!', 'Mind the shelves, Lennie!'],
+  freezers: ['Clean-up at the freezers!', 'Brain freeze!', 'Chill out, Lennie!', 'Frozen chaos!', 'Cool landing!'],
+  fridges: ['Clean-up at the fridges!', 'Fizzy business!', 'Shaken, not stirred!', 'Pop goes the fridge!', 'Soda splash!'],
+  veg: ['Clean-up at the veg!', 'Lettuce pray!', 'Peas out!', 'Eat your greens, Lennie!', 'Romaine calm!', 'Fruit salad!'],
+  bread: ['Crumbs, Lennie!', 'Loaf me alone!', 'Use your loaf!', 'Fresh out of the oven, onto the floor!', 'Lekker brood!'],
+  rolls: ['Rock and roll!', 'Bun voyage!', 'The rolls are rolling!', 'Krentenbollen on the run!', 'Crumbs, Lennie!'],
+  pastries: ['Taart attack!', 'Custard catastrophe!', 'Pink icing on your nose!', 'Splat goes the tompouce!', 'Who ordered a tompouce sandwich?'],
+  cheese: ['Say cheese!', 'Kaastastrophe!', 'Gouda grief!', 'Holey moley!', 'A wheel-y good crash!', 'Brie-lliant!'],
+  pindakaas: ['Smooth move!', 'Nuts!', 'Crunchy or smooth?', 'Sticky situation!', 'Going nuts, Lennie!'],
+  snacks: ['Snack attack!', 'Bitterballen bonanza!', 'Frikandel frenzy!', 'Mustard not included!', 'Frozen solid... and flying!'],
+  sausage: ['What the sausage?!', 'Wurst landing ever!', 'Best of the wurst!', 'Rookworst rain!', 'Meat you on the floor!'],
+  sint: ['In de zak, Lennie!', 'Sint saw that!', 'Strooi, strooi, strooi!', 'Is it 5 December already?', 'Pepernoten party!'],
+};
+
 export function canvasTexture(w, h, draw) {
   const c = document.createElement('canvas');
   c.width = w;
@@ -504,7 +521,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
       }
     }
   }
-  crateTables.forEach((t, i) => looseTable(t, [0, 1, 2].map((p) => produceKinds[(i * 3 + p) % produceKinds.length]), crate, 'Clean-up at the veg!', (p) => prices[(i * 3 + p) % prices.length]));
+  crateTables.forEach((t, i) => looseTable(t, [0, 1, 2].map((p) => produceKinds[(i * 3 + p) % produceKinds.length]), crate, MESS.veg, (p) => prices[(i * 3 + p) % prices.length]));
 
   // ---------------------------------------------------------------- aisles of shelves
   // Each aisle is stocked with products that belong there (products.js); a
@@ -536,7 +553,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
       });
     }
     const shelf = solid([cx - half, 0, z0 - 0.05], [cx + half, h, z1 + 0.05], 'furniture');
-    shelf.surface.mess = `Clean-up in aisle ${a + 1}!`;
+    shelf.surface.mess = [`Clean-up in aisle ${a + 1}!`, ...MESS.aisle];
     shelf.surface.onHit = (point, strength, push) => {
       if (point.y > h - 0.08) {
         // on top: the top shelves on both sides
@@ -641,8 +658,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     return { inside: box(u0 + 0.06, base, 0.04, u1 - 0.06, top, depth - 0.04), doorways };
   }
   // (they stop short of the back corner, where the butcher's counter is)
-  const freezers = cabinets({ axis: 'x', wall: IN.z1, u0: IN.x0 + 1.2, u1: 7.6, assortment: ASSORTMENT.DIEPVRIES, sign: 'DIEPVRIES', signColor: '#3b7dd8', mess: 'Clean-up at the freezers!' });
-  const fridges = cabinets({ axis: 'z', wall: IN.x1, u0: IN.z0 + 5.5, u1: IN.z1 - 0.95, assortment: ASSORTMENT.FRISDRANK, sign: 'FRISDRANK', signColor: '#3fae3a', mess: 'Clean-up at the fridges!' });
+  const freezers = cabinets({ axis: 'x', wall: IN.z1, u0: IN.x0 + 1.2, u1: 7.6, assortment: ASSORTMENT.DIEPVRIES, sign: 'DIEPVRIES', signColor: '#3b7dd8', mess: MESS.freezers });
+  const fridges = cabinets({ axis: 'z', wall: IN.x1, u0: IN.z0 + 5.5, u1: IN.z1 - 0.95, assortment: ASSORTMENT.FRISDRANK, sign: 'FRISDRANK', signColor: '#3fae3a', mess: MESS.fridges });
 
   // ---------------------------------------------------------------- one-sided displays
   // Things put back by R besides the products (see repairAll).
@@ -702,13 +719,13 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const brown = '#7b4a2a';
   const breadRack = shelfUnit({
     axis: 'z', back: IN.x0, dir: 1, u0: IN.z0 + 0.2, u1: 35.4, depth: 0.55, h: 2.0, ys: [0.12, 0.55, 0.98, 1.41],
-    assortment: ASSORTMENT.BAKKERIJ, mats: { frame: wood, shelf: wood, back: darkWood }, mess: 'Bread everywhere!',
+    assortment: ASSORTMENT.BAKKERIJ, mats: { frame: wood, shelf: wood, back: darkWood }, mess: MESS.bread,
   });
   boxAt(...breadRack.box(IN.z0 + 0.2, 2.0, 0, 35.4, 2.45, 0.6), breadRack.withFront(wood, std({ map: labelTexture('VERS GEBAKKEN', '#f4e3c3', brown, 1024, 96) })), { cast: true });
   const bakerySign = std({ map: labelTexture('BAKKERIJ', brown, '#f4e3c3') });
   boxAt([-20.4, 2.75, 33.3], [-18.6, 3.2, 33.35], faces(darkWood, darkWood, darkWood, darkWood, bakerySign, bakerySign));
   for (const x of [-20.2, -18.8]) boxAt([x - 0.01, 3.2, 33.31], [x + 0.01, IN.y1, 33.33], darkFrame);
-  looseTable(breadTable, ['bol', 'pistolet', 'krentenbolLos'], std({ color: 0xb07a3c, roughness: 0.95 }), 'Rolls everywhere!');
+  looseTable(breadTable, ['bol', 'pistolet', 'krentenbolLos'], std({ color: 0xb07a3c, roughness: 0.95 }), MESS.rolls);
 
   // the pastry case along the front wall: a counter with a glass case on top
   const caseF = frame('x', IN.z0, 1);
@@ -729,7 +746,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const pastryCase = pane(caseMeshes, ...caseF.box(CASE.u0, CASE.top, 0.05, CASE.u1, CASE.glass, CASE.depth + 0.04), caseF.out);
   pastryCase.onBreak = () => stock.knock(pastries, pastryCase.center, caseF.out, 7, null, { radius: 1.4, chance: 0.6 });
   const counter = solid(...caseF.box(CASE.u0, 0, 0, CASE.u1, CASE.top, CASE.depth), 'furniture');
-  counter.surface.mess = 'Tompouces everywhere!';
+  counter.surface.mess = MESS.pastries;
   counter.surface.onHit = (point, strength, push) => (point.y > CASE.top - 0.05 ? stock.knock(pastries, point, caseF.out, strength, push) : 0);
 
   // the bread slicer, on its own little stand next to the case
@@ -793,7 +810,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     solid(...vegF.box(VEG.u0, 0, 0, VEG.u1, VEG.front - 0.04, VEG.depth), 'furniture'),
     solid(...vegF.box(VEG.u0, 0, 0, VEG.u1, VEG.back + 0.3, 0.08), 'furniture'),
   ]) {
-    b.surface.mess = 'Clean-up at the veg!';
+    b.surface.mess = MESS.veg;
     b.surface.onHit = vegHit;
   }
   {
@@ -802,7 +819,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     const c = onSlope(slopeLen / 2, (VEG.u0 + VEG.u1) / 2, 0.08 - 0.15);
     b.position.set(c.x, c.y, c.z);
     b.quaternion.set(slopeQ.x, slopeQ.y, slopeQ.z, slopeQ.w);
-    b.surface = { kind: 'furniture', mess: 'Clean-up at the veg!', onHit: vegHit };
+    b.surface = { kind: 'furniture', mess: MESS.veg, onHit: vegHit };
     world.addBody(b);
   }
   // price screens on poles behind the crates
@@ -892,7 +909,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const mid = (CH.u0 + CH.u1) / 2;
   boxAt(...cheeseF.box(mid - 1.5, 2.35, 0.02, mid + 1.5, 3.35, 0.07), cheeseF.withFront(darkWood, std({ map: cowTex })), { cast: true });
   const cooler = solid(...cheeseF.box(CH.u0, 0, 0, CH.u1, CH.roof, CH.depth - 0.03), 'furniture');
-  cooler.surface.mess = 'Cheese everywhere!';
+  cooler.surface.mess = MESS.cheese;
   cooler.surface.onHit = (point, strength, push) => {
     if (point.y > CH.roof - 0.05) return stock.knock(wheels, point, cheeseF.out, strength, push, { radius: Math.min(1.2, 0.4 + strength * 0.06) });
     return stock.knock(cheesePacks, point, cheeseF.out, strength, push);
@@ -960,10 +977,10 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     };
     for (const l of layers) {
       l.body = solid(l.min, l.max, 'furniture');
-      l.body.surface.mess = 'Pindakaas everywhere!';
+      l.body.surface.mess = MESS.pindakaas;
       l.body.surface.onHit = hit;
     }
-    baseBody.surface.mess = 'Pindakaas everywhere!';
+    baseBody.surface.mess = MESS.pindakaas;
     baseBody.surface.onHit = (point, strength, push) => hit(point.setY(Math.max(point.y, base + 0.02)), strength * 0.7, push);
     onRestock.push(() => {
       toRemove.clear();
@@ -997,11 +1014,11 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     for (const [lo, hi, m] of walls) {
       boxAt(lo, hi, m, { cast: true });
       const b = solid(lo, hi, 'furniture');
-      b.surface.mess = 'Kroketten everywhere!';
+      b.surface.mess = MESS.snacks;
       b.surface.onHit = snackHit;
     }
     const bottom = solid([FZ.x0, 0, FZ.z0], [FZ.x1, FZ.floor, FZ.z1], 'furniture');
-    bottom.surface.mess = 'Kroketten everywhere!';
+    bottom.surface.mess = MESS.snacks;
     bottom.surface.onHit = snackHit;
     stock.fillRow(['kroketten', 'frikandellen', 'bitterballen', 'kaassouffle'], {
       along: 'z', a: FZ.z0 + FZ.wall + 0.02, b: FZ.z1 - FZ.wall - 0.02, y: FZ.floor, yaw: Math.PI / 2, maxH: 0.2, section: snacks, rows: 10,
@@ -1019,7 +1036,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     const red = std({ color: 0xc8102e, roughness: 0.8 });
     const sint = shelfUnit({
       axis: 'x', back: 35.3, dir: -1, u0: -1.1, u1: 0.1, depth: 0.45, h: 1.3, ys: [0.1, 0.5, 0.9],
-      assortment: ASSORTMENT.SINT, mats: { frame: red, shelf: cabinetWhite, back: red }, mess: 'Pepernoten everywhere!',
+      assortment: ASSORTMENT.SINT, mats: { frame: red, shelf: cabinetWhite, back: red }, mess: MESS.sint,
     });
     const header = canvasTexture(512, 192, (g, w, h) => {
       g.fillStyle = '#c8102e'; g.fillRect(0, 0, w, h);
@@ -1104,7 +1121,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     const B = { u0: 7.75, u1: 12.75, back: 0.45, aisle: 1.05, ledge: 1.3, front: 1.95, bed: 0.8, top: 1.32 };
     const du0 = B.u0 + 0.75; // the glass counter leaves a gap at this end to get behind it
     const bpart = (ua, ya, wa, ub, yb, wb, m, cast = false) => boxAt(...F.box(ua, ya, wa, ub, yb, wb), m, { cast });
-    const mess = 'Rookworst everywhere!';
+    const mess = MESS.sausage;
     const red = '#b3121f';
 
     // the back counter, the tiled wall above it with a comic pig, and the rail of rookworsten
