@@ -1724,13 +1724,14 @@ const btn = {
   players: $('btn-players'),
 };
 
-const LEVEL_NAMES = ['floor 1', 'floor 2', 'floor 3', 'the roof'];
+const LEVEL_NAMES = ['floor 1', 'floor 2', 'floor 3', 'the roof', 'the supermarket floor'];
+const SHOP_DROP = 4; // 'level' 4 in the drop menu is the supermarket, across the street
 function dropLennie(level) {
   if (grab) endGrab();
   endSling(false);
   stopReplay();
   replay.stop(false);
-  const p = house.spawnPoint(level);
+  const p = level === SHOP_DROP ? shop.spawnPoint() : house.spawnPoint(level);
   lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
   guard.forget();
   aim.guide = null;
@@ -1865,7 +1866,7 @@ addEventListener('keydown', (e) => {
     case 'KeyT': toggleAim(); break;
     case 'KeyM': toggleSound(); break;
     case 'KeyH': setHelp(ui.help.hidden); break;
-    case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': {
+    case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': case 'Digit5': {
       const level = Number(e.code.slice(-1)) - 1;
       dropLennie(level);
       toast(`Lennie dropped on ${LEVEL_NAMES[level]}`, 1200);

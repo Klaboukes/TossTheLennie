@@ -47,7 +47,7 @@
   <!-- All controls: one icon toolbar, top right -->
   <nav id="toolbar" class="glass" aria-label="Game controls">
     <div class="tb-group">
-      <button id="btn-drop" class="icon-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="drop-menu" data-tip="Drop Lennie on… (1–4)" aria-label="Drop Lennie on a floor">
+      <button id="btn-drop" class="icon-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="drop-menu" data-tip="Drop Lennie on… (1–5)" aria-label="Drop Lennie on a floor or in the supermarket">
         <svg viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5 12 14l4.5-4.5M4 20h16"/></svg>
       </button>
       <button id="btn-aim" class="icon-btn" aria-pressed="false" data-tip="Aim mode: click where Lennie should go (T)" aria-label="Aim mode">
@@ -87,6 +87,7 @@
 
     <div id="drop-menu" class="menu" role="menu" hidden>
       <div class="menu-title">Drop Lennie on</div>
+      <button role="menuitem" data-drop="4">Supermarket<kbd>5</kbd></button>
       <button role="menuitem" data-drop="3">Roof<kbd>4</kbd></button>
       <button role="menuitem" data-drop="2">Floor 3 · study &amp; bathroom<kbd>3</kbd></button>
       <button role="menuitem" data-drop="1">Floor 2 · bedrooms<kbd>2</kbd></button>
@@ -166,7 +167,7 @@
       <dt>Drag empty space</dt><dd>turn the camera</dd>
       <dt>Two fingers</dt><dd>pinch to zoom, slide to move the camera</dd>
       <dt>Aim button</dt><dd>tap a spot to see his flight path, tap it again to throw</dd>
-      <dt>Arrow button</dt><dd>drop Lennie on a floor or the roof</dd>
+      <dt>Arrow button</dt><dd>drop Lennie on a floor, the roof or in the supermarket</dd>
       <dt>People button</dt><dd>take turns with 2–4 players</dd>
     </dl>
     <dl class="help-keys mouse-only">
@@ -177,7 +178,7 @@
       <dt>Drag empty space</dt><dd>orbit the camera</dd>
       <dt>Right-drag · Scroll</dt><dd>pan · zoom</dd>
       <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>Q</kbd><kbd>E</kbd></dt><dd>fly the camera</dd>
-      <dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>drop Lennie on floor 1–3 or the roof</dd>
+      <dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>drop Lennie on floor 1–3, the roof or in the supermarket</dd>
       <dt><kbd>R</kbd></dt><dd>reset (fix windows and doors, Lennie downstairs)</dd>
       <dt><kbd>P</kbd></dt><dd>watch the last toss again in slow motion</dd>
       <dt><kbd>F</kbd> <kbd>G</kbd> <kbd>C</kbd> <kbd>Z</kbd> <kbd>M</kbd></dt><dd>focus · follow · cutaway · slow-mo · sound</dd>

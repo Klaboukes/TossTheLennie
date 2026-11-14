@@ -74,7 +74,7 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 | Orbit camera | Drag empty space |
 | Pan / zoom | Right-drag / scroll |
 | Fly the camera | WASD, Q/E down/up |
-| Drop Lennie on floor 1 / 2 / 3 / the roof | 1 / 2 / 3 / 4 |
+| Drop Lennie on floor 1 / 2 / 3 / the roof / in the supermarket | 1 / 2 / 3 / 4 / 5 |
 | Fix the windows and doors, restock the shop and put Lennie back downstairs | R |
 | Watch the last toss again in slow motion | P (or the button on the score card) |
 | Take turns with 2–4 players | The people button |

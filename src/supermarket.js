@@ -1194,7 +1194,11 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     stock.restock();
   }
 
-  const api = { isInside, isOnRoof, updateView, isFaded, spots, windows, breakPiece, repairAll, update };
+  // Where 'Drop Lennie on the supermarket' puts him: the open floor just inside
+  // the sliding doors, between the checkouts, the fruit crates and the aisles.
+  const spawnPoint = () => ({ x: -4.5, z: 34.4, height: 0.05 });
+
+  const api = { isInside, isOnRoof, spawnPoint, updateView, isFaded, spots, windows, breakPiece, repairAll, update };
   for (const piece of windows) piece.owner = api;
   return api;
 }
