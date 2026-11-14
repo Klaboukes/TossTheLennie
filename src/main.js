@@ -16,6 +16,10 @@ import { combineScenery } from './batching.js';
 import { createBlobShadow } from './blobshadow.js';
 
 const FIXED_DT = 1 / 120;
+// Physics may take this long per frame (ms). A slow device that can't keep up
+// then plays a bit slower instead of catching up with ever more steps, which
+// made each frame slower still until the game ran at a few frames a second.
+const PHYSICS_BUDGET = 16;
 // Scales with Lennie's weight (100 kg), so he swings the same however heavy he is.
 const GRAB_FORCE = 7300;
 const MAX_HAND_SPEED = 20;
@@ -300,13 +304,21 @@ function popAt(position, text, cls = '') {
   const el = document.createElement('div');
   el.className = `pop ${cls}`;
   el.textContent = text;
-  el.style.left = `${(v.x * 0.5 + 0.5) * innerWidth}px`;
   el.style.top = `${(-v.y * 0.5 + 0.5) * innerHeight}px`;
   el.style.setProperty('--rot', `${(Math.random() * 16 - 8).toFixed(1)}deg`);
   // Short shouts ("BOING!") flash by; longer lines ("Crunchy or smooth?") stay up long enough to read.
   const ms = Math.min(4000, 1400 + 120 * Math.max(0, text.length - 6));
   el.style.setProperty('--dur', `${ms}ms`);
   ui.pops.appendChild(el);
+  // Keep it on screen: near the edge, or on a phone, a long line ran off the side.
+  // (Room for the 1.15× pop and the tilt.)
+  const room = innerWidth / 1.15 - 24;
+  let w = el.offsetWidth;
+  if (w > room) {
+    el.style.fontSize = `${(parseFloat(getComputedStyle(el).fontSize) * room) / w}px`;
+    w = room;
+  }
+  el.style.left = `${clamp((v.x * 0.5 + 0.5) * innerWidth, 12 + w * 0.6, innerWidth - 12 - w * 0.6)}px`;
   setTimeout(() => el.remove(), ms + 100);
 }
 
@@ -2387,6 +2399,8 @@ function renderBoard() {
 /** Between turns: whose turn it is next, or at the end who won. */
 function showTurnCard() {
   if (!match || replay.playing) return; // after a replay, endReplay shows it
+  // On a phone the score card sits right where the turn card goes; it had its 2.4 s.
+  if (matchMedia('(max-width: 760px)').matches) hideResult();
   ui.turnRanking.hidden = true;
   ui.turnAlt.hidden = true;
   if (matchOver()) {
@@ -2735,16 +2749,19 @@ function tick(dt, now) {
     if (!replayCenter) endReplay();
   } else {
     acc += dt;
+    const start = performance.now();
     let steps = 0;
     while (acc >= FIXED_DT && steps < 12) {
       stepPhysics(FIXED_DT * timeScale);
       acc -= FIXED_DT;
       steps++;
+      if (performance.now() - start > PHYSICS_BUDGET) break;
     }
-    if (steps === 12) acc = 0;
+    // Behind: let the time go rather than catching up on the next frames.
+    if (acc >= FIXED_DT) acc = 0;
     lennie.sync();
     updateToss(dt * timeScale);
-    replay.capture(dt * timeScale);
+    replay.capture(steps * FIXED_DT * timeScale); // the physics time, which falls behind on a slow device
   }
   lennie.update(dt);
   updateGrabVisual();
