@@ -660,7 +660,7 @@ function messLine(mess) {
 let lastScatterAt = 0;
 function knockClutter(e, v) {
   const point = contactPoint(e);
-  const n = house.scatter(point, v, e.target.velocity);
+  const { n, mess } = house.scatter(point, v, e.target.velocity);
   if (!n) return;
   if (toss.state === 'flying' || toss.state === 'held') toss.mess += n;
   const now = performance.now();
@@ -670,9 +670,10 @@ function knockClutter(e, v) {
   }
   if (n >= 6 && now - lastScatterAt > 1500) {
     lastScatterAt = now;
-    popAt(point.setY(point.y + 0.4), MESS_WORDS[Math.floor(Math.random() * MESS_WORDS.length)], 'good');
+    popAt(point.setY(point.y + 0.4), messLine([...MESS_WORDS, ...(mess ?? [])]), 'good');
   }
 }
+// said anywhere in the house, mixed in with the lines for the room he's in (clutter.js)
 const MESS_WORDS = ['CRASH!', 'WHAT A MESS!', 'OOPS!', 'KABOOM!'];
 
 // Lennie's velocities before each physics step, so that smashing through a

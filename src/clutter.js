@@ -32,6 +32,17 @@ const ROOMS = {
   bath: { k: 2, x0: 1.09, x1: 5.875, z0: -2.31, z1: 3.8 },
 };
 
+// What pops up when Lennie sends a room's mess flying (main.js mixes in a few
+// general shouts and never says the same thing twice in a row).
+const ROOM_MESS = {
+  living: ['Who left their socks here?', 'Remote? What remote?', 'Movie night is cancelled!', 'Controller down!', 'Living room? Flying room!', 'Crisps for everyone!'],
+  kitchen: ['Hagelslag avalanche!', "Who's doing the dishes?", 'Breakfast in the air!', 'Pan-demonium!', "Don't cry over spilt milk!", 'Plate-tectonics!'],
+  bedroom: ['Laundry day!', 'Sock it to me!', 'Lost a slipper!', 'Wake-up call!', 'Bedtime? Not yet!', 'Bed head!'],
+  kids: ['Teddy, nooo!', 'Clean your room, Lennie!', 'Art attack!', 'Playtime!', 'Ouch, building blocks!', 'Teddy takes flight!'],
+  study: ['Homework destroyed!', 'Out of office!', 'Box office smash!', 'Working from home!', 'Paperwork? Flying work!', 'Undo! Undo!'],
+  bath: ['Rubber duck rescue!', 'Splish splash!', 'Quack attack!', 'Toilet roll tornado!', 'Bath time!', 'Squeaky clean... not!'],
+};
+
 // Where the furniture stands in each room, so things strewn on the floor stay clear of it.
 const FURNITURE = {
   living: [[-5.875, -4.85, 0.2, 3.2], [-4.2, -2.9, 0.9, 2.5], [0.25, 0.91, 2.2, 4.0], [-3.4, -1.2, -2.31, -1.6], [0.2, 0.91, -2.31, -1.4], [-5.875, -5.2, 4.1, 4.875]],
@@ -974,19 +985,27 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
   /**
    * Lennie hit something at `point` this hard: the clutter around it goes
    * flying, the things already on the floor too. Returns how many things
-   * left their place (not counting ones kicked about again).
+   * left their place (not counting ones kicked about again) as `n`, and the
+   * popup lines for the room where most of them came from as `mess`.
    */
   function scatter(point, strength, push) {
     const k = THREE.MathUtils.clamp(Math.floor((point.y + 0.3) / H), 0, 2);
     let n = 0;
+    let most = 0;
+    let mess = null;
     for (const sec of sections[k]) {
       const r = sec.bounds;
       if (point.x < r.x0 - 0.3 || point.x > r.x1 + 0.3 || point.z < r.z0 - 0.3 || point.z > r.z1 + 0.3) continue;
-      n += stocks[k].knock(sec, point, null, strength, push, {
+      const m = stocks[k].knock(sec, point, null, strength, push, {
         radial: true, again: true, fresh: sec.fresh !== false, chance: 0.9, power: 0.75, radius: Math.min(0.85, 0.25 + strength * 0.05),
       });
+      n += m;
+      if (m > most && ROOM_MESS[sec.name]) {
+        most = m;
+        mess = ROOM_MESS[sec.name];
+      }
     }
-    return n;
+    return { n, mess };
   }
 
   const spots = [
