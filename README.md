@@ -37,10 +37,15 @@ Lennie's house is a brick rowhouse in a 1970s Dutch terrace, with two floors and
 
 Across the road, after the real one: an orange building under a zigzag of grey gables, with posters, parked bikes and a brick-and-glass entrance under a big green PLUS-style logo (hand-drawn, not the official artwork). A green carpet runs from the road to the open sliding doors, so Lennie can be flung straight inside: checkouts, fruit and veg crates with red ACTIE offer cards, six aisles of shelves, glass-door freezers along the back wall and drinks fridges along the side. Its back wall is the far end of the play area, and he can land on its roof too. The roof and walls fade when you look inside.
 
-- **The shelves** are stocked with products that belong in each aisle, in cartoon packaging with plain Dutch names (no real brands): bread, krentenbollen, hagelslag, pindakaas and jam; milk, karnemelk, chocomelk, yoghurt, vla, butter and eggs; Gouda wheels, cheese packs and Edam balls; chips, drop, sweets, chocolate and stroopwafels; cola, sinas, water, juice and cans; spaghetti, macaroni, rice, soup cans and pasta sauce. The freezers hold ice cream, pizza, fries, peas and fish sticks, and the fridges drinks.
-- **Crash into a shelf** and the products near the impact tumble out onto the floor: the harder the hit, the bigger the mess. The fruit and veg on the crate tables by the door go the same way: land in them or bump a table and they roll off across the floor.
-- **The shop window** by the entrance and **every freezer and fridge door** is glass that shatters like the house's windows. Smash a freezer or fridge door and the products behind it spill out; land Lennie in that doorway and he's in the freezer.
-- R puts the glass back and restocks the shelves.
+- **The shelves** are stocked with products that belong in each aisle, in cartoon packaging with plain Dutch names (no real brands): beschuit, ontbijtkoek, hagelslag, vlokken, muisjes, three kinds of pindakaas, chocopasta, jam, appelstroop and honey; milk, karnemelk, chocomelk, yoghurt, vla, kwark, slagroom, koffiemelk, butter and eggs; coffee, coffee pads and tea; chips, drop, sweets, chocolate, stroopwafels, speculaas and pepernoten; cola, sinas, water, juice and cans; spaghetti, macaroni, rice, soup, appelmoes, pasta sauce, pindasaus, sambal, mustard, mayo and fritessaus. The freezers hold ice cream, pizza, fries, peas and fish sticks, and the fridges drinks.
+- **The bakery** in the front corner: a wooden bread rack (tijgerbrood, volkoren, witbrood, suikerbrood, stokbrood, krentenbollen, croissants), a table of rolls in baskets, the bread slicer, and a glass case of tompouces, appeltaart, gevulde koeken and cinnamon rolls. The case's glass shatters and the pastries fly out.
+- **The pindakaas pyramid** by the entrance: a pallet stacked with jars in steps under a giant jar, with a 1+1 offer. Knock out enough of a layer and everything above it comes down.
+- **The sloping veg stand** along the side wall: rows of black crates tilted towards the shop, piled with paprika, cucumbers, leeks, broccoli, tomatoes, onions and more, with price screens on poles.
+- **The cheese cooler** along the other wall: an open fridge with sloping shelves of cheese packs (jong, oud, komijn, geit, slices), big Gouda wheels stacked on top, and a Hollandse kaas sign with a cow.
+- **More Dutch things:** an open snack freezer with kroketten, frikandellen, bitterballen and kaassoufflés; a Sinterklaas stand with pepernoten and chocolate letters; buckets of tulips inside the window; and the bottle return machine for the deposit.
+- **Crash into any of it** and the products near the impact tumble out onto the floor: the harder the hit, the bigger the mess. The fruit and veg and the bread rolls on the tables go the same way: land in them or bump a table and they roll off across the floor.
+- **The shop window** by the entrance, **every freezer and fridge door** and **the pastry case** are glass that shatters like the house's windows. Smash a freezer or fridge door and the products behind it spill out; land Lennie in that doorway and he's in the freezer.
+- R puts the glass back and restocks everything, the pyramid too.
 
 ## The neighbourhood (decoration)
 
@@ -98,14 +103,14 @@ The game opens close up on Lennie with a "Grab me!" bubble over him, which stays
 - **Contortion**: every joint (neck, spine, shoulders, elbows, hips, knees) is measured against its relaxed pose. A bit of bend counts as relaxed and is free; past that, points grow with the square of the bend.
 - **Pose tricks**: Upside down, The splits, Pretzel legs, Straitjacket, Foot in face, and Human knot (any three of those at once). One crossed leg or one tangled arm is a small extra that doesn't count towards the knot.
 - **House feats**: Defenestrated! (thrown out of the house), Hanging out the window!, Fell N floors (a modest bonus, so rolling him off the roof isn't the easy way to a big score), Stair tumble/Full flight, Stranded on the roof!, Went shopping! (landed in the supermarket), On the supermarket roof!, Knocked products off the shelves (5 or more, 10 points each, up to 400), Trampoline bounces.
-- **Landing spots**: where he comes to rest can earn a bonus, with Lennie saying something about it: in the bath, on the loo, on the desk, in the armchair, on top of the wardrobe, in either bed, on the beanbag or the toy box, on top of the fridge, on the dinner table or kitchen counter, on the couch; in the supermarket in a freezer or a drinks fridge (through a smashed door, half in counts), on top of the freezers, the drinks fridges or the shelves, in the trolleys, in the fruit and veg, or scanned at a checkout; outside stuck in a tree, in the bushes, or napping on the trampoline.
+- **Landing spots**: where he comes to rest can earn a bonus, with Lennie saying something about it: in the bath, on the loo, on the desk, in the armchair, on top of the wardrobe, in either bed, on the beanbag or the toy box, on top of the fridge, on the dinner table or kitchen counter, on the couch; in the supermarket in a freezer or a drinks fridge (through a smashed door, half in counts), on top of the freezers, the drinks fridges, the shelves, the bread rack or the cheese cooler, in the trolleys, in the fruit and veg, in the bread baskets, in the smashed pastry case, in the pindakaas, in the snack freezer, in the tulips, or scanned at a checkout; outside stuck in a tree, in the bushes, or napping on the trampoline.
 - **Multiplier**: +0.1 per hard bounce, +0.25 per mid-air juggle (re-grabbing him while he's airborne), +0.3 per smashed window (the shop window and the freezer and fridge doors count too), +0.4 per smashed door, up to ×4.
 - A toss that's too gentle doesn't score.
 - The best score is remembered in the browser, so it survives a reload on the same computer.
 
 ## Challenges
 
-Under the score there's always one challenge to go for, from easy ("Smash a window") to hard ("Put Lennie in the freezer", "Score 2,500 points in one toss"): 21 in all. Doing one adds 300 points to that toss and brings up the next. *Skip* moves on and comes back to it later. Progress is remembered in the browser. Challenges pause during a game of turns.
+Under the score there's always one challenge to go for, from easy ("Smash a window") to hard ("Put Lennie in the freezer", "Score 2,500 points in one toss"): 23 in all. Doing one adds 300 points to that toss and brings up the next. *Skip* moves on and comes back to it later. Progress is remembered in the browser. Challenges pause during a game of turns.
 
 ## Taking turns
 
@@ -127,7 +132,7 @@ Lennie reacts: a grin and a "wheee!" when he's flung, "ow!" and "oof" when he hi
 - `src/street.js`: the neighbour houses, and the details every house in the row shares (porch, chimney, dormer, skylight, vents, downpipe)
 - `src/yard.js`: sky, lighting, lawn, back-garden fence, the play area's edges, garden trees, bushes, the hedge and the trampoline
 - `src/streetscape.js`: the street in front: cycle path, verge trees and lamps, road and the townhouses
-- `src/supermarket.js`: the supermarket across the road, inside and out (the breakable shop window, aisles, freezers and fridges), with its own fading walls and roof
+- `src/supermarket.js`: the supermarket across the road, inside and out (the breakable shop window, aisles, freezers and fridges, the bakery, the sloping veg stand, the cheese cooler, the pindakaas pyramid and the other displays), with its own fading walls and roof
 - `src/seethrough.js`: the see-through circle that keeps Lennie in view through whatever is between him and the camera
 - `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking
 - `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, breeze blocks, wallpaper, wood, floor tiles, grass)

@@ -24,6 +24,7 @@ export const SHOP = {
 const IN = { x0: SHOP.hall + SHOP.t, x1: SHOP.x1 - SHOP.t, z0: SHOP.z0 + SHOP.t, z1: SHOP.z1 - SHOP.t, y1: SHOP.h - 0.25 };
 
 const FADED = 0.12;
+const INK_SIGN = '#2b2b2b';
 const FADE_MARGIN = 0.6;
 
 export function canvasTexture(w, h, draw) {
@@ -273,8 +274,9 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   // the storeroom's wall, with a staff door on the shop side
   boxAt([SHOP.hall, 0, IN.z0], [IN.x0, SHOP.h, IN.z1], innerWall);
   solid([SHOP.hall, 0, IN.z0], [IN.x0, SHOP.h, IN.z1], 'wall');
-  boxAt([IN.x0, 0, 40], [IN.x0 + 0.04, 2.2, 41.4], std({ color: 0x8d949a, roughness: 0.5 }));
-  boxAt([IN.x0, 2.3, 40], [IN.x0 + 0.04, 2.6, 41.4], std({ map: labelTexture('Alleen personeel', '#ffffff', '#c0392b', 512, 96) }));
+  // (in the back corner, past the cheese cooler)
+  boxAt([IN.x0, 0, 43.1], [IN.x0 + 0.04, 2.2, 44.5], std({ color: 0x8d949a, roughness: 0.5 }));
+  boxAt([IN.x0, 2.3, 43.1], [IN.x0 + 0.04, 2.6, 44.5], std({ map: labelTexture('Alleen personeel', '#ffffff', '#c0392b', 512, 96) }));
 
   // ---------------------------------------------------------------- roof, with the zigzag of gables
   boxAt([SHOP.hall, IN.y1, SHOP.z0], [SHOP.x1, SHOP.h, SHOP.z1], faces(orange, orange, roofGrey, ceiling, orange, orange), { fade: 'roof' });
@@ -448,46 +450,60 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const produceKinds = ['appel', 'sinaasappel', 'kool', 'citroen', 'tomaat', 'pruim', 'boontjes', 'wortel', 'peer'];
   const prices = ['0,99', '1,49', '2,49', '0,79', '1,99', '0,89'];
   const CRATE = { z0: IN.z0 + 2.0, z1: IN.z0 + 3.6, top: 0.72 };
-  const crateXs = [[0.6, 4.1], [4.6, 8.1], [8.6, 12.1]];
-  const stock = createStock(scene, { bounds: IN, tables: crateXs.map(([x0, x1]) => ({ x0, x1, z0: CRATE.z0, z1: CRATE.z1, y: CRATE.top })) });
+  const crateXs = [[0.6, 3.6], [4.1, 7.1], [7.6, 10.6]];
+  const crateTables = crateXs.map(([x0, x1]) => ({ x0, x1, z0: CRATE.z0, z1: CRATE.z1, y: CRATE.top }));
+  // the bakery's table of bread baskets, by the bread rack
+  const breadTable = { x0: -20.1, x1: -18.8, z0: 32.3, z1: 34.4, y: 0.72 };
+  const stock = createStock(scene, { bounds: IN, tables: [...crateTables, breadTable] });
   const _mid = new THREE.Vector3();
-  crateXs.forEach(([x0, x1], t) => {
-    const { z0, z1, top } = CRATE;
-    boxAt([x0, 0, z0], [x1, top, z1], crate, { cast: true });
-    const table = solid([x0, 0, z0], [x1, 0.8, z1], 'furniture');
+  /**
+   * A table piled with loose products (fruit, rolls) in compartments, one kind
+   * each: a knock sends them rolling off the table and across the floor.
+   * `card` puts a red offer card on a pole behind each compartment.
+   */
+  function looseTable({ x0, x1, z0, z1, y: top }, kinds, mat, mess, card = null) {
+    boxAt([x0, 0, z0], [x1, top, z1], mat, { cast: true });
+    const table = solid([x0, 0, z0], [x1, top + 0.08, z1], 'furniture');
     const section = stock.section();
-    table.surface.mess = 'Clean-up at the veg!';
+    table.surface.mess = mess;
     table.surface.onHit = (point, strength, push) => {
-      if (point.y > 0.77) {
-        // on top: the fruit scatters away from where he lands, the way he was going
+      if (point.y > top + 0.05) {
+        // on top: they scatter away from where he lands, the way he was going
         _out.set(push?.x ?? 0, 0, push?.z ?? 0);
         if (_out.lengthSq() < 1) _out.add(_mid.set(point.x - (x0 + x1) / 2, 0, point.z - (z0 + z1) / 2).normalize());
         return stock.knock(section, point, _out.normalize(), strength, push, { radius: Math.min(0.9, 0.3 + strength * 0.06) });
       }
-      // a side: the fruit along that edge rolls off it
+      // a side: the ones along that edge roll off it
       const dx = Math.min(point.x - x0, x1 - point.x);
       const dz = Math.min(point.z - z0, z1 - point.z);
       if (dx < dz) _out.set(point.x < (x0 + x1) / 2 ? -1 : 1, 0, 0);
       else _out.set(0, 0, point.z < (z0 + z1) / 2 ? -1 : 1);
       return stock.knock(section, _mid.set(point.x, top, point.z), _out, strength, push, { chance: 0.8 });
     };
-    const parts = 3;
-    const w = (x1 - x0) / parts;
+    // compartments across the long side
+    const alongX = x1 - x0 >= z1 - z0;
+    const parts = kinds.length;
+    const w = ((alongX ? x1 - x0 : z1 - z0)) / parts;
     for (let p = 0; p < parts; p++) {
-      const id = produceKinds[(t * parts + p) % produceKinds.length];
+      const id = kinds[p];
       const r = halfSize(PRODUCTS[id])[0];
-      for (let x = x0 + p * w + r + 0.05; x < x0 + (p + 1) * w - r - 0.03; x += r * 2.05) {
-        for (let z = z0 + r + 0.05; z < z1 - r - 0.03; z += r * 2.05) {
+      const [a0, a1] = alongX ? [x0 + p * w, x0 + (p + 1) * w] : [z0 + p * w, z0 + (p + 1) * w];
+      const [b0, b1] = alongX ? [z0, z1] : [x0, x1];
+      for (let a = a0 + r + 0.05; a < a1 - r - 0.03; a += r * 2.05) {
+        for (let b = b0 + r + 0.05; b < b1 - r - 0.03; b += r * 2.05) {
+          const [x, z] = alongX ? [a, b] : [b, a];
           stock.place(id, x + (rnd() - 0.5) * 0.02, top + r * (rnd() - 0.5) * 0.3, z, rnd() * Math.PI * 2, section);
         }
       }
-      // the red offer card on a pole behind each compartment
-      const cx = x0 + (p + 0.5) * w;
-      boxAt([cx - 0.02, 0.72, z1 - 0.06], [cx + 0.02, 1.55, z1 - 0.02], darkFrame);
-      const card = std({ map: offerTexture(prices[(t * parts + p) % prices.length]) });
-      boxAt([cx - 0.24, 1.45, z1 - 0.06], [cx + 0.24, 2.05, z1 - 0.03], faces(card, card, card, card, card, card));
+      if (card) {
+        const cx = (a0 + a1) / 2;
+        boxAt([cx - 0.02, top, z1 - 0.06], [cx + 0.02, 1.55, z1 - 0.02], darkFrame);
+        const m = std({ map: offerTexture(card(p)) });
+        boxAt([cx - 0.24, 1.45, z1 - 0.06], [cx + 0.24, 2.05, z1 - 0.03], m);
+      }
     }
-  });
+  }
+  crateTables.forEach((t, i) => looseTable(t, [0, 1, 2].map((p) => produceKinds[(i * 3 + p) % produceKinds.length]), crate, 'Clean-up at the veg!', (p) => prices[(i * 3 + p) % prices.length]));
 
   // ---------------------------------------------------------------- aisles of shelves
   // Each aisle is stocked with products that belong there (products.js); a
@@ -496,7 +512,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const endCap = green;
   const AISLE = { z0: 36.2, z1: 42.4, h: 1.95, half: 0.55 };
   const shelfYs = [0.12, 0.55, 0.98, 1.41];
-  const aisleNames = ['BROOD', 'ZUIVEL', 'KAAS', 'SNOEP', 'DRINKEN', 'PASTA & SOEP'];
+  const aisleNames = ['BROODBELEG', 'ZUIVEL', 'KOFFIE & THEE', 'SNOEP', 'DRINKEN', 'PASTA & SAUS'];
   const aisleXs = [-18, -13, -8, -3, 2, 7];
   aisleXs.forEach((cx, a) => {
     const { z0, z1, h, half } = AISLE;
@@ -625,6 +641,457 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   }
   const freezers = cabinets({ axis: 'x', wall: IN.z1, u0: IN.x0 + 1.2, u1: IN.x1 - 1.3, assortment: ASSORTMENT.DIEPVRIES, sign: 'DIEPVRIES', signColor: '#3b7dd8', mess: 'Clean-up at the freezers!' });
   const fridges = cabinets({ axis: 'z', wall: IN.x1, u0: IN.z0 + 5.5, u1: IN.z1 - 0.95, assortment: ASSORTMENT.FRISDRANK, sign: 'FRISDRANK', signColor: '#3fae3a', mess: 'Clean-up at the fridges!' });
+
+  // ---------------------------------------------------------------- one-sided displays
+  // Things put back by R besides the products (see repairAll).
+  const onRestock = [];
+  // Bodies to take out of the world once the physics step that knocked them is over.
+  const toRemove = new Set();
+  // Landing spots of the displays below: [id, label, value, say, min, max, when]
+  const spotsExtra = [];
+  /**
+   * The frame of a display that runs along `axis` ('z' or 'x') with its back
+   * at `back` and faces `dir` (+1 or −1) across it: u runs along it, w from
+   * its back towards its front.
+   */
+  function frame(axis, back, dir) {
+    const P = (u, y, w) => (axis === 'z' ? [back + dir * w, y, u] : [u, y, back + dir * w]);
+    const box = (ua, ya, wa, ub, yb, wb) => {
+      const p = P(ua, ya, wa);
+      const q = P(ub, yb, wb);
+      return [[Math.min(p[0], q[0]), ya, Math.min(p[2], q[2])], [Math.max(p[0], q[0]), yb, Math.max(p[2], q[2])]];
+    };
+    const out = axis === 'z' ? new THREE.Vector3(dir, 0, 0) : new THREE.Vector3(0, 0, dir);
+    const yaw = axis === 'z' ? (dir * Math.PI) / 2 : dir > 0 ? 0 : Math.PI; // a product's, so its front faces out
+    // the box face (+x, −x, +y, −y, +z, −z) that looks out
+    const front = axis === 'z' ? (dir > 0 ? 0 : 1) : dir > 0 ? 4 : 5;
+    const withFront = (mat, frontMat) => Array.from({ length: 6 }, (_, i) => (i === front ? frontMat : mat));
+    return { P, box, out, yaw, withFront, wAxis: axis === 'z' ? 0 : 2 };
+  }
+
+  /** A shelf unit against a wall (or back to back with nothing), stocked shelf by shelf from `assortment`. */
+  function shelfUnit({ axis, back, dir, u0, u1, depth, h, ys, assortment, mats, mess }) {
+    const F = frame(axis, back, dir);
+    const part = (ua, ya, wa, ub, yb, wb, m, cast = false) => boxAt(...F.box(ua, ya, wa, ub, yb, wb), m, { cast });
+    part(u0, 0, 0, u1, h, 0.04, mats.back, true);
+    for (const u of [u0, u1 - 0.04]) part(u, 0, 0, u + 0.04, h, depth, mats.frame, true);
+    part(u0, 0, 0.04, u1, ys[0], depth, mats.frame);
+    for (const y of ys.slice(1)) part(u0 + 0.04, y - 0.03, 0.04, u1 - 0.04, y, depth, mats.shelf);
+    part(u0, h - 0.04, 0, u1, h, depth, mats.frame);
+    const section = stock.section();
+    ys.forEach((y, i) => {
+      const above = (ys[i + 1] ?? h) - 0.04;
+      stock.fillRow(assortment[i], {
+        along: axis, a: u0 + 0.07, b: u1 - 0.07, y, yaw: F.yaw, maxH: Math.min(0.42, above - y), section,
+        depthAt: (row, d) => F.P(0, 0, depth - 0.02 - d / 2 - row * (d + 0.01))[F.wAxis], room: depth - 0.08,
+      });
+    });
+    const body = solid(...F.box(u0, 0, 0, u1, h, depth), 'furniture');
+    body.surface.mess = mess;
+    body.surface.onHit = (point, strength, push) => stock.knock(section, point, F.out, strength, push, point.y > h - 0.08 ? { chance: 0.6 } : {});
+    return F;
+  }
+
+  // ---------------------------------------------------------------- the bakery, in the front corner by the storeroom
+  // A wooden bread rack along the wall, a glass case of pastries, a table of
+  // rolls in baskets and the bread slicer.
+  const wood = std({ color: 0xb98550, roughness: 0.75 });
+  const darkWood = std({ color: 0x6b4423, roughness: 0.8 });
+  const brown = '#7b4a2a';
+  const breadRack = shelfUnit({
+    axis: 'z', back: IN.x0, dir: 1, u0: IN.z0 + 0.2, u1: 35.4, depth: 0.55, h: 2.0, ys: [0.12, 0.55, 0.98, 1.41],
+    assortment: ASSORTMENT.BAKKERIJ, mats: { frame: wood, shelf: wood, back: darkWood }, mess: 'Bread everywhere!',
+  });
+  boxAt(...breadRack.box(IN.z0 + 0.2, 2.0, 0, 35.4, 2.45, 0.6), breadRack.withFront(wood, std({ map: labelTexture('VERS GEBAKKEN', '#f4e3c3', brown, 1024, 96) })), { cast: true });
+  const bakerySign = std({ map: labelTexture('BAKKERIJ', brown, '#f4e3c3') });
+  boxAt([-20.4, 2.75, 33.3], [-18.6, 3.2, 33.35], faces(darkWood, darkWood, darkWood, darkWood, bakerySign, bakerySign));
+  for (const x of [-20.2, -18.8]) boxAt([x - 0.01, 3.2, 33.31], [x + 0.01, IN.y1, 33.33], darkFrame);
+  looseTable(breadTable, ['bol', 'pistolet', 'krentenbolLos'], std({ color: 0xb07a3c, roughness: 0.95 }), 'Rolls everywhere!');
+
+  // the pastry case along the front wall: a counter with a glass case on top
+  const caseF = frame('x', IN.z0, 1);
+  const CASE = { u0: -21.1, u1: -18.6, depth: 0.82, top: 0.85, glass: 1.3 };
+  boxAt(...caseF.box(CASE.u0, 0, 0, CASE.u1, CASE.top, CASE.depth), caseF.withFront(wood, std({ map: labelTexture('Vers van de bakker', '#f4e3c3', brown, 1024, 160) })), { cast: true });
+  boxAt(...caseF.box(CASE.u0, CASE.top - 0.01, 0, CASE.u1, CASE.top, CASE.depth), std({ color: 0xf6f1e6, roughness: 0.5 }));
+  const pastries = stock.section();
+  stock.fillRow(ASSORTMENT.GEBAK[0], {
+    along: 'x', a: CASE.u0 + 0.08, b: CASE.u1 - 0.08, y: CASE.top, yaw: 0, maxH: 0.3, section: pastries, rows: 4,
+    depthAt: (row, d) => caseF.P(0, 0, CASE.depth - 0.1 - d / 2 - row * (d + 0.03))[2], room: CASE.depth - 0.2,
+  });
+  const caseMeshes = [
+    boxAt(...caseF.box(CASE.u0, CASE.top, CASE.depth - 0.02, CASE.u1, CASE.glass, CASE.depth), cabinetGlass),
+    boxAt(...caseF.box(CASE.u0, CASE.glass - 0.02, 0.05, CASE.u1, CASE.glass, CASE.depth), cabinetGlass),
+    ...[CASE.u0, CASE.u1 - 0.02].map((u) => boxAt(...caseF.box(u, CASE.top, 0.05, u + 0.02, CASE.glass, CASE.depth), cabinetGlass)),
+    boxAt(...caseF.box(CASE.u0, CASE.glass, CASE.depth - 0.03, CASE.u1, CASE.glass + 0.03, CASE.depth), handleMat),
+  ];
+  const pastryCase = pane(caseMeshes, ...caseF.box(CASE.u0, CASE.top, 0.05, CASE.u1, CASE.glass, CASE.depth + 0.04), caseF.out);
+  pastryCase.onBreak = () => stock.knock(pastries, pastryCase.center, caseF.out, 7, null, { radius: 1.4, chance: 0.6 });
+  const counter = solid(...caseF.box(CASE.u0, 0, 0, CASE.u1, CASE.top, CASE.depth), 'furniture');
+  counter.surface.mess = 'Tompouces everywhere!';
+  counter.surface.onHit = (point, strength, push) => (point.y > CASE.top - 0.05 ? stock.knock(pastries, point, caseF.out, strength, push) : 0);
+
+  // the bread slicer, on its own little stand next to the case
+  const steel = std({ color: 0xc9ced3, metalness: 0.5, roughness: 0.35 });
+  boxAt([-18.45, 0, IN.z0 + 0.05], [-17.85, 0.85, IN.z0 + 0.65], wood, { cast: true });
+  boxAt([-18.42, 0.85, IN.z0 + 0.1], [-17.88, 1.45, IN.z0 + 0.6], faces(steel, steel, steel, steel, std({ map: labelTexture('SNIJMACHINE', '#c9ced3', '#2b2b2b', 512, 96) }), steel), { cast: true });
+  boxAt([-18.3, 1.12, IN.z0 + 0.6], [-18.0, 1.32, IN.z0 + 0.62], darkFrame);
+  boxAt([-18.06, 0.95, IN.z0 + 0.6], [-17.98, 1.03, IN.z0 + 0.63], std({ color: 0x3fae3a, emissive: 0x1d5a1b }));
+  solid([-18.45, 0, IN.z0 + 0.05], [-17.85, 1.45, IN.z0 + 0.65], 'furniture');
+
+  // ---------------------------------------------------------------- the sloping fruit and veg stand against the east wall
+  // Rows of black crates tilted towards the shop, each piled with one kind of
+  // vegetable, with price screens on poles behind them.
+  const VEG = { u0: IN.z0 + 0.3, u1: 35.5, depth: 1.55, front: 0.7, back: 1.2, rows: 3 };
+  const vegF = frame('z', IN.x1, -1);
+  const slope = Math.atan2(VEG.back - VEG.front, VEG.depth - 0.1);
+  const slopeLen = Math.hypot(VEG.back - VEG.front, VEG.depth - 0.1);
+  // a point on the slope: s up it from the front edge, n off its surface, at u along the stand
+  const slopeDir = new THREE.Vector3(Math.cos(slope) * -vegF.out.x, Math.sin(slope), 0);
+  const slopeNormal = new THREE.Vector3(Math.sin(slope) * vegF.out.x, Math.cos(slope), 0);
+  const [fx] = vegF.P(0, 0, VEG.depth);
+  const onSlope = (s, u, n) => new THREE.Vector3(fx, VEG.front, u).addScaledVector(slopeDir, s).addScaledVector(slopeNormal, n);
+  const slopeQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -vegF.out.x * slope);
+  const lightWood = std({ color: 0xd8b98a, roughness: 0.8 });
+  boxAt(...vegF.box(VEG.u0, 0, 0.08, VEG.u1, VEG.front - 0.04, VEG.depth), lightWood, { cast: true });
+  boxAt(...vegF.box(VEG.u0, 0, 0, VEG.u1, VEG.back + 0.3, 0.08), lightWood, { cast: true });
+  const plate = add(new THREE.Mesh(new THREE.BoxGeometry(slopeLen, 0.04, VEG.u1 - VEG.u0), lightWood));
+  plate.position.copy(onSlope(slopeLen / 2, (VEG.u0 + VEG.u1) / 2, -0.02));
+  plate.quaternion.copy(slopeQ);
+  // the crates: one instanced mesh of black boxes (floors and rims)
+  const vegKinds = ['paprikaRood', 'komkommer', 'paprikaGeel', 'broccoli', 'tomaat', 'prei', 'paprikaGroen', 'champignon', 'ui', 'aubergine', 'wortel', 'aardappel', 'boontjes', 'citroen'];
+  const vegSection = stock.section();
+  const crateW = { s: (slopeLen - 0.08) / VEG.rows - 0.04, u: 0.6 };
+  const cratesAlong = Math.floor((VEG.u1 - VEG.u0 - 0.04) / (crateW.u + 0.04));
+  const crateParts = [];
+  const _p = new THREE.Vector3();
+  for (let r = 0; r < VEG.rows; r++) {
+    for (let c = 0; c < cratesAlong; c++) {
+      const sc = 0.04 + r * (crateW.s + 0.04) + crateW.s / 2;
+      const uc = VEG.u0 + 0.04 + c * (crateW.u + 0.04) + crateW.u / 2;
+      const { s: ws, u: wu } = crateW;
+      // floor, then the four rims, as (s, n, u) centre and size
+      crateParts.push([sc, 0.01, uc, ws, 0.02, wu], [sc - ws / 2, 0.06, uc, 0.015, 0.12, wu], [sc + ws / 2, 0.06, uc, 0.015, 0.12, wu], [sc, 0.06, uc - wu / 2, ws, 0.12, 0.015], [sc, 0.06, uc + wu / 2, ws, 0.12, 0.015]);
+      const id = vegKinds[(c * 2 + r * 5) % vegKinds.length];
+      const [hu, hn, hs] = halfSize(PRODUCTS[id]); // a stick lies along u
+      for (let s = sc - ws / 2 + hs + 0.02; s < sc + ws / 2 - hs - 0.01; s += hs * 2.1) {
+        for (let u = uc - wu / 2 + hu + 0.02; u < uc + wu / 2 - hu - 0.01; u += hu * 2.1) {
+          _p.copy(onSlope(s, u, 0.02 + hn + rnd() * 0.01));
+          stock.place(id, _p.x, _p.y - hn, _p.z, Math.PI / 2 + (PRODUCTS[id].shape === 'stick' ? 0 : rnd() * Math.PI * 2), vegSection);
+        }
+      }
+    }
+  }
+  const crateMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), std({ color: 0x1f2123, roughness: 0.7 }), crateParts.length);
+  crateParts.forEach(([s, n, u, ws, hn, wu], i) => {
+    crateMesh.setMatrixAt(i, new THREE.Matrix4().compose(onSlope(s, u, n), slopeQ, new THREE.Vector3(ws, hn, wu)));
+  });
+  add(crateMesh, { cast: true });
+  const vegHit = (point, strength, push) => stock.knock(vegSection, point, vegF.out, strength, push, { radius: Math.min(0.8, 0.25 + strength * 0.05) });
+  for (const b of [
+    solid(...vegF.box(VEG.u0, 0, 0, VEG.u1, VEG.front - 0.04, VEG.depth), 'furniture'),
+    solid(...vegF.box(VEG.u0, 0, 0, VEG.u1, VEG.back + 0.3, 0.08), 'furniture'),
+  ]) {
+    b.surface.mess = 'Clean-up at the veg!';
+    b.surface.onHit = vegHit;
+  }
+  {
+    // the slope itself, tilted like the crates
+    const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3(slopeLen / 2, 0.15, (VEG.u1 - VEG.u0) / 2)) });
+    const c = onSlope(slopeLen / 2, (VEG.u0 + VEG.u1) / 2, 0.08 - 0.15);
+    b.position.set(c.x, c.y, c.z);
+    b.quaternion.set(slopeQ.x, slopeQ.y, slopeQ.z, slopeQ.w);
+    b.surface = { kind: 'furniture', mess: 'Clean-up at the veg!', onHit: vegHit };
+    world.addBody(b);
+  }
+  // price screens on poles behind the crates
+  const screens = [['KOMKOMMER', '0,89'], ['PAPRIKA', '1,29'], ['PREI', '0,99'], ['BROCCOLI', '1,49'], ['TOMATEN', '1,79'], ['UIEN', '0,69']];
+  [0.2, 0.5, 0.8].forEach((f, i) => {
+    const u = VEG.u0 + (VEG.u1 - VEG.u0) * f;
+    boxAt(...vegF.box(u - 0.03, VEG.back + 0.3, 0.02, u + 0.03, 2.1, 0.07), darkFrame);
+    const tex = canvasTexture(384, 224, (g, w, h) => {
+      g.fillStyle = '#10213a'; g.fillRect(0, 0, w, h);
+      g.font = 'bold 34px "Trebuchet MS", sans-serif'; g.textBaseline = 'middle';
+      for (const [k, [name, price]] of screens.slice(i * 2, i * 2 + 2).entries()) {
+        const y = 62 + k * 100;
+        g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.fillText(name, 20, y);
+        g.fillStyle = '#f6d04d'; g.textAlign = 'right'; g.fillText(price, w - 20, y);
+      }
+      g.strokeStyle = '#3c4146'; g.lineWidth = 14; g.strokeRect(0, 0, w, h);
+    });
+    boxAt(...vegF.box(u - 0.38, 1.65, 0.07, u + 0.38, 2.1, 0.12), vegF.withFront(darkFrame, std({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.5 })));
+  });
+  const vegSign = std({ map: labelTexture('GROENTE & FRUIT') });
+  boxAt([12.88, 2.75, (VEG.u0 + VEG.u1) / 2 - 0.9], [12.93, 3.2, (VEG.u0 + VEG.u1) / 2 + 0.9], faces(vegSign, vegSign, green, green, green, green));
+  for (const dz of [-0.7, 0.7]) boxAt([12.9, 3.2, (VEG.u0 + VEG.u1) / 2 + dz - 0.01], [12.91, IN.y1, (VEG.u0 + VEG.u1) / 2 + dz + 0.01], darkFrame);
+
+  // ---------------------------------------------------------------- the open cheese cooler along the west wall
+  // Sloping shelves of cheese packs under a lit canopy, with big Gouda wheels
+  // stacked on top and a sign with a cow above them.
+  const cheeseF = frame('z', IN.x0, 1);
+  const CH = { u0: 36.4, u1: 42.6, depth: 1.05, top: 1.85, roof: 2.0 };
+  const cpart = (ua, ya, wa, ub, yb, wb, m, cast = false) => boxAt(...cheeseF.box(ua, ya, wa, ub, yb, wb), m, { cast });
+  cpart(CH.u0, 0, 0, CH.u1, 0.36, CH.depth, darkFrame);
+  cpart(CH.u0, 0.3, CH.depth - 0.05, CH.u1, 0.42, CH.depth, cabinetWhite);
+  cpart(CH.u0, 0, 0, CH.u1, CH.roof, 0.05, coldLight);
+  for (const u of [CH.u0, CH.u1 - 0.06]) cpart(u, 0, 0, u + 0.06, CH.roof, CH.depth, cabinetWhite, true);
+  cpart(CH.u0, CH.top, 0, CH.u1, CH.roof, 0.8, cheeseF.withFront(cabinetWhite, std({ map: labelTexture('HOLLANDSE KAAS  •  HOLLANDSE KAAS  •  HOLLANDSE KAAS', '#3fae3a', '#ffffff', 2048, 96) })), true);
+  cpart(CH.u0 + 0.06, CH.top - 0.03, 0.1, CH.u1 - 0.06, CH.top, 0.16, lightStrip);
+  const cheesePacks = stock.section();
+  const packKinds = ['jongkaas', 'oudekaas', 'komijnekaas', 'plakken', 'geitenkaas', 'jongkaas'];
+  const tilt = 0.2;
+  const shelfMesh = [];
+  [[1.0, 0.42], [0.9, 0.78], [0.8, 1.12], [0.7, 1.46]].forEach(([wf, yf], i) => {
+    // the shelf: a sloping wire shelf from its front edge back to the wall, with a price rail
+    const len = (wf - 0.06) / Math.cos(tilt);
+    const m = add(new THREE.Mesh(new THREE.BoxGeometry(len, 0.02, CH.u1 - CH.u0 - 0.12), wireShelf));
+    const [mx] = cheeseF.P(0, 0, wf - (wf - 0.06) / 2);
+    m.position.set(mx, yf + Math.tan(tilt) * (wf - 0.06) / 2 - 0.01, (CH.u0 + CH.u1) / 2);
+    m.rotation.z = -tilt; // rising towards the wall (−x is the back)
+    shelfMesh.push(m);
+    cpart(CH.u0 + 0.06, yf - 0.04, wf - 0.015, CH.u1 - 0.06, yf + 0.03, wf, cabinetWhite);
+    // runs of packs lying on it, in rows up the slope
+    let u = CH.u0 + 0.1;
+    let n = i;
+    while (u < CH.u1 - 0.1) {
+      const id = packKinds[n++ % packKinds.length];
+      const [hw, hh, hd] = halfSize(PRODUCTS[id]);
+      const run = 3 + Math.floor(rnd() * 4);
+      for (let j = 0; j < run && u + 2 * hw <= CH.u1 - 0.1; j++) {
+        for (let s = 0.03 + hd; (s + hd) * Math.cos(tilt) < wf - 0.08; s += 2 * hd + 0.012) {
+          const [x] = cheeseF.P(0, 0, wf - 0.02 - s * Math.cos(tilt));
+          stock.place(id, x, yf + s * Math.sin(tilt) + 0.002, u + hw, cheeseF.yaw, cheesePacks, s > 0.2 ? 1 : 0, tilt);
+        }
+        u += 2 * hw + 0.012;
+      }
+      u += 0.02;
+    }
+  });
+  // big wheels on the roof of the cooler
+  const wheels = stock.section();
+  stock.fillRow(['kaaswiel', 'kaaswiel', 'edammer'], {
+    along: 'z', a: CH.u0 + 0.1, b: CH.u1 - 0.1, y: CH.roof, yaw: cheeseF.yaw, maxH: 0.3, section: wheels, rows: 1,
+    depthAt: (row, d) => cheeseF.P(0, 0, 0.78 - d / 2)[0], room: 0.75,
+  });
+  const cowTex = canvasTexture(768, 256, (g, w, h) => {
+    g.fillStyle = '#3fae3a'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#9fd36a'; g.fillRect(0, h * 0.72, w, h * 0.28);
+    // a comic cow
+    g.lineWidth = 6; g.strokeStyle = INK_SIGN; g.fillStyle = '#ffffff';
+    g.beginPath(); g.ellipse(170, 140, 95, 55, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    for (const x of [100, 140, 205, 240]) { g.fillRect(x - 9, 180, 18, 52); g.strokeRect(x - 9, 180, 18, 52); }
+    g.beginPath(); g.ellipse(285, 105, 42, 34, 0.3, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#f2a2b8'; g.beginPath(); g.ellipse(305, 125, 24, 16, 0.3, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = INK_SIGN;
+    for (const [x, y, r] of [[140, 120, 26], [200, 160, 20], [120, 165, 14], [270, 92, 9]]) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+    g.font = '900 64px "Arial Black", "Trebuchet MS", sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'left';
+    g.lineWidth = 10; g.strokeText('Hollandse', 370, 90); g.fillStyle = '#ffffff'; g.fillText('Hollandse', 370, 90);
+    g.fillStyle = INK_SIGN; g.strokeText('kaas', 430, 170); g.fillStyle = '#f6d04d'; g.fillText('kaas', 430, 170);
+  });
+  const mid = (CH.u0 + CH.u1) / 2;
+  boxAt(...cheeseF.box(mid - 1.5, 2.35, 0.02, mid + 1.5, 3.35, 0.07), cheeseF.withFront(darkWood, std({ map: cowTex })), { cast: true });
+  const cooler = solid(...cheeseF.box(CH.u0, 0, 0, CH.u1, CH.roof, CH.depth - 0.03), 'furniture');
+  cooler.surface.mess = 'Cheese everywhere!';
+  cooler.surface.onHit = (point, strength, push) => {
+    if (point.y > CH.roof - 0.05) return stock.knock(wheels, point, cheeseF.out, strength, push, { radius: Math.min(1.2, 0.4 + strength * 0.06) });
+    return stock.knock(cheesePacks, point, cheeseF.out, strength, push);
+  };
+
+  // ---------------------------------------------------------------- the pindakaas pyramid by the entrance
+  // A cardboard pallet stacked with jars in steps, the giant jar on top. Knock
+  // out enough of a layer and everything above it comes down too.
+  {
+    const P0 = { x: -7.4, z: 34.2 };
+    const base = 0.45;
+    const pitch = 0.095;
+    const jarH = halfSize(PRODUCTS.pindakaas)[1] * 2;
+    const cardboard = std({ color: 0xb8925a, roughness: 0.9 });
+    const printed = std({ map: labelTexture('PINDAKAAS', '#f2c14e', '#c0392b', 512, 112) });
+    boxAt([P0.x - 0.62, 0, P0.z - 0.52], [P0.x + 0.62, base, P0.z + 0.52], faces(printed, printed, cardboard, cardboard, printed, printed), { cast: true });
+    const baseBody = solid([P0.x - 0.62, 0, P0.z - 0.52], [P0.x + 0.62, base, P0.z + 0.52], 'furniture');
+    const layers = [];
+    let y = base;
+    for (let L = 0; L < 5; L++) {
+      const cols = 12 - 2 * L;
+      const rows = 10 - 2 * L;
+      const hx = (cols * pitch) / 2;
+      const hz = (rows * pitch) / 2;
+      boxAt([P0.x - hx - 0.01, y, P0.z - hz - 0.01], [P0.x + hx + 0.01, y + 0.008, P0.z + hz + 0.01], cardboard);
+      y += 0.008;
+      const section = stock.section();
+      for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) stock.place('pindakaas', P0.x - hx + (i + 0.5) * pitch, y, P0.z - hz + (j + 0.5) * pitch, Math.PI + (rnd() - 0.5) * 0.6, section);
+      }
+      layers.push({ section, min: [P0.x - hx, y - 0.008, P0.z - hz], max: [P0.x + hx, y + jarH, P0.z + hz] });
+      y += jarH;
+    }
+    const xlSection = stock.section();
+    stock.place('pindakaasXL', P0.x, y, P0.z, Math.PI, xlSection);
+    const xlR = halfSize(PRODUCTS.pindakaasXL)[0];
+    layers.push({ section: xlSection, min: [P0.x - xlR, y, P0.z - xlR], max: [P0.x + xlR, y + 2 * halfSize(PRODUCTS.pindakaasXL)[1], P0.z + xlR] });
+    const pyramidTop = layers.at(-1).max[1];
+    const left = (sec) => sec.items.filter((it) => it.state === 'home').length / sec.items.length;
+    const hit = (point, strength, push) => {
+      _out.set(point.x - P0.x, 0, point.z - P0.z);
+      if (_out.lengthSq() < 0.01) _out.set(push?.x ?? 0, 0, push?.z ?? 1);
+      _out.normalize();
+      let n = 0;
+      // the layer he hit and the ones above it
+      let at = layers.findIndex((l) => point.y < l.max[1]);
+      if (at < 0) at = layers.length - 1;
+      for (let L = at; L < Math.min(layers.length, at + 2); L++) n += stock.knock(layers[L].section, point, _out, strength, push);
+      if (point.y >= pyramidTop - 0.1 || at >= layers.length - 1) n += stock.knock(xlSection, point, _out, strength + 4, push, { radius: 1 });
+      // a layer more than half gone: everything on top of it comes down
+      const fallen = layers.findIndex((l) => left(l.section) < 0.5);
+      if (fallen >= 0) {
+        for (let L = fallen; L < layers.length; L++) {
+          for (const item of layers[L].section.items) {
+            if (item.state !== 'home') continue;
+            _mid.set(item.home.x - P0.x, 0, item.home.z - P0.z);
+            if (_mid.lengthSq() < 0.01) _mid.copy(_out);
+            n += stock.knock({ items: [item] }, item.home, _mid.normalize(), 4 + rnd() * 3, null, { radius: 1 });
+          }
+          // (not in the middle of a physics step: after it, in update())
+          if (layers[L].body.world) toRemove.add(layers[L].body);
+        }
+      }
+      return n;
+    };
+    for (const l of layers) {
+      l.body = solid(l.min, l.max, 'furniture');
+      l.body.surface.mess = 'Pindakaas everywhere!';
+      l.body.surface.onHit = hit;
+    }
+    baseBody.surface.mess = 'Pindakaas everywhere!';
+    baseBody.surface.onHit = (point, strength, push) => hit(point.setY(Math.max(point.y, base + 0.02)), strength * 0.7, push);
+    onRestock.push(() => {
+      toRemove.clear();
+      for (const l of layers) if (!l.body.world) world.addBody(l.body);
+    });
+    // the offer: buy one, get one free
+    boxAt([P0.x + 0.56, base, P0.z + 0.46], [P0.x + 0.6, 2.1, P0.z + 0.5], darkFrame);
+    const card = std({ map: offerTexture('1+1') });
+    boxAt([P0.x + 0.28, 1.5, P0.z + 0.45], [P0.x + 0.88, 2.25, P0.z + 0.48], card);
+    spotsExtra.push(['pindakaas', 'In the pindakaas!', 550, 'PINDAKAAS!', [P0.x - 0.75, base - 0.1, P0.z - 0.65], [P0.x + 0.75, 1.9, P0.z + 0.65]]);
+  }
+
+  // ---------------------------------------------------------------- the open snack freezer: kroketten, frikandellen, bitterballen
+  {
+    const FZ = { x0: 9.6, x1: 10.8, z0: 36.6, z1: 41.6, floor: 0.45, rim: 0.85, wall: 0.1 };
+    const icy = std({ color: 0xdff2fa, emissive: 0x6a8a99, roughness: 0.5 });
+    const band = std({ map: labelTexture('SNACKS  •  SNACKS  •  SNACKS', '#3b7dd8', '#ffffff', 1024, 96) });
+    boxAt([FZ.x0, 0, FZ.z0], [FZ.x1, FZ.floor, FZ.z1], faces(cabinetWhite, cabinetWhite, icy, cabinetWhite, cabinetWhite, cabinetWhite), { cast: true });
+    boxAt([FZ.x0, 0.06, FZ.z0 - 0.01], [FZ.x1, 0.12, FZ.z1 + 0.01], darkFrame);
+    const walls = [
+      [[FZ.x0, FZ.floor, FZ.z0], [FZ.x0 + FZ.wall, FZ.rim, FZ.z1], faces(icy, band, cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite)],
+      [[FZ.x1 - FZ.wall, FZ.floor, FZ.z0], [FZ.x1, FZ.rim, FZ.z1], faces(band, icy, cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite)],
+      [[FZ.x0, FZ.floor, FZ.z0], [FZ.x1, FZ.rim, FZ.z0 + FZ.wall], faces(cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite, icy, cabinetWhite)],
+      [[FZ.x0, FZ.floor, FZ.z1 - FZ.wall], [FZ.x1, FZ.rim, FZ.z1], faces(cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite, cabinetWhite, icy)],
+    ];
+    const snacks = stock.section();
+    const snackHit = (point, strength, push) => {
+      _out.set(point.x < (FZ.x0 + FZ.x1) / 2 ? -1 : 1, 0, 0);
+      return stock.knock(snacks, point, _out, strength, push, { radius: Math.min(0.9, 0.3 + strength * 0.06) });
+    };
+    for (const [lo, hi, m] of walls) {
+      boxAt(lo, hi, m, { cast: true });
+      const b = solid(lo, hi, 'furniture');
+      b.surface.mess = 'Kroketten everywhere!';
+      b.surface.onHit = snackHit;
+    }
+    const bottom = solid([FZ.x0, 0, FZ.z0], [FZ.x1, FZ.floor, FZ.z1], 'furniture');
+    bottom.surface.mess = 'Kroketten everywhere!';
+    bottom.surface.onHit = snackHit;
+    stock.fillRow(['kroketten', 'frikandellen', 'bitterballen', 'kaassouffle'], {
+      along: 'z', a: FZ.z0 + FZ.wall + 0.02, b: FZ.z1 - FZ.wall - 0.02, y: FZ.floor, yaw: Math.PI / 2, maxH: 0.2, section: snacks, rows: 10,
+      depthAt: (row, d) => FZ.x0 + FZ.wall + 0.02 + d / 2 + row * (d + 0.01), room: FZ.x1 - FZ.x0 - 2 * FZ.wall - 0.04,
+    });
+    const sign = std({ map: labelTexture('SNACKS', '#3b7dd8') });
+    const cx = (FZ.x0 + FZ.x1) / 2;
+    boxAt([cx - 0.9, 2.75, FZ.z0 - 0.45], [cx + 0.9, 3.2, FZ.z0 - 0.4], faces(green, green, green, green, sign, sign));
+    for (const dx of [-0.7, 0.7]) boxAt([cx + dx - 0.01, 3.2, FZ.z0 - 0.43], [cx + dx + 0.01, IN.y1, FZ.z0 - 0.42], darkFrame);
+    spotsExtra.push(['snacks', 'In the snack freezer!', 550, 'KROKET!', [FZ.x0, 0.3, FZ.z0], [FZ.x1, 1.3, FZ.z1]]);
+  }
+
+  // ---------------------------------------------------------------- the Sinterklaas stand: pepernoten and chocolate letters
+  {
+    const red = std({ color: 0xc8102e, roughness: 0.8 });
+    const sint = shelfUnit({
+      axis: 'x', back: 35.3, dir: -1, u0: -1.1, u1: 0.1, depth: 0.45, h: 1.3, ys: [0.1, 0.5, 0.9],
+      assortment: ASSORTMENT.SINT, mats: { frame: red, shelf: cabinetWhite, back: red }, mess: 'Pepernoten everywhere!',
+    });
+    const header = canvasTexture(512, 192, (g, w, h) => {
+      g.fillStyle = '#c8102e'; g.fillRect(0, 0, w, h);
+      // a mitre
+      g.lineWidth = 5; g.strokeStyle = INK_SIGN;
+      g.fillStyle = '#e8473b';
+      g.beginPath(); g.moveTo(45, 175); g.lineTo(45, 95); g.quadraticCurveTo(45, 45, 95, 12); g.quadraticCurveTo(145, 45, 145, 95); g.lineTo(145, 175); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#f6d04d'; g.fillRect(45, 150, 100, 22); g.strokeRect(45, 150, 100, 22);
+      g.fillRect(87, 55, 16, 80); g.fillRect(68, 80, 54, 15);
+      g.font = '900 52px "Arial Black", "Trebuchet MS", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = '#ffffff'; g.fillText('SINT', 330, 65);
+      g.fillStyle = '#f6d04d'; g.font = '900 40px "Arial Black", "Trebuchet MS", sans-serif'; g.fillText('pepernoten!', 330, 135);
+    });
+    boxAt(...sint.box(-1.1, 1.3, 0, 0.1, 1.75, 0.04), sint.withFront(red, std({ map: header })), { cast: true });
+  }
+
+  // ---------------------------------------------------------------- tulips by the entrance, and the bottle return machine
+  {
+    const T = { x0: -8.7, x1: -6.3, z0: IN.z0 + 0.1, z1: IN.z0 + 0.85 };
+    boxAt([T.x0, 0, T.z0], [T.x1, 0.25, T.z1], darkWood, { cast: true });
+    boxAt([T.x0, 0.25, T.z0], [T.x1, 0.5, (T.z0 + T.z1) / 2], darkWood, { cast: true });
+    boxAt([T.x0 + 0.6, 0.12, T.z1], [T.x1 - 0.6, 0.24, T.z1 + 0.01], std({ map: labelTexture('BLOEMEN', '#ffffff', '#3fae3a', 512, 112) }));
+    const colours = [0xe2231a, 0xf6c21d, 0xf28cb1, 0xf59a23, 0xfbf5f0, 0x8e44ad, 0xe2231a, 0xf6c21d];
+    const buckets = [];
+    for (let i = 0; i < 8; i++) {
+      const back = i >= 4;
+      buckets.push([T.x0 + 0.3 + (i % 4) * 0.6, back ? 0.5 : 0.25, back ? T.z0 + 0.2 : T.z1 - 0.18, colours[i]]);
+    }
+    const bucketMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.12, 0.28, 14), std({ color: 0xa9b1b8, metalness: 0.5, roughness: 0.4 }), buckets.length);
+    const perBucket = 14;
+    const stems = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.006, 0.006, 0.45, 4), std({ color: 0x3e8f3a }), buckets.length * perBucket);
+    const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.032, 8, 6), std({ color: 0xffffff, roughness: 0.6 }), buckets.length * perBucket);
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const col = new THREE.Color();
+    let k = 0;
+    buckets.forEach(([x, y0, z, c], i) => {
+      bucketMesh.setMatrixAt(i, m4.makeTranslation(x, y0 + 0.14, z));
+      for (let j = 0; j < perBucket; j++) {
+        const a = j * 2.4;
+        const r = 0.03 + (j % 4) * 0.025;
+        e.set(Math.cos(a) * r * 1.6, 0, -Math.sin(a) * r * 1.6);
+        q.setFromEuler(e);
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+        const base = new THREE.Vector3(x + Math.sin(a) * r, y0 + 0.2, z + Math.cos(a) * r);
+        stems.setMatrixAt(k, m4.compose(base.clone().addScaledVector(up, 0.225), q, new THREE.Vector3(1, 1, 1)));
+        heads.setMatrixAt(k, m4.compose(base.clone().addScaledVector(up, 0.46), q, new THREE.Vector3(1, 1.4, 1)));
+        heads.setColorAt(k, col.setHex(c));
+        k++;
+      }
+    });
+    for (const m of [bucketMesh, stems, heads]) add(m, { cast: true });
+    solid([T.x0, 0, T.z0], [T.x1, 0.5, T.z1], 'furniture');
+    spotsExtra.push(['tulips', 'In the tulips!', 350, 'TULPEN!', [T.x0 - 0.1, 0.2, T.z0 - 0.1], [T.x1 + 0.1, 1.4, T.z1 + 0.2]]);
+
+    // the bottle return: hand in your empties for the deposit
+    const B = { x0: 2.3, x1: 3.1, z0: IN.z0, z1: IN.z0 + 0.65, h: 1.9 };
+    const machine = canvasTexture(256, 512, (g, w, h) => {
+      g.fillStyle = '#4f6b66'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#3fae3a'; g.fillRect(0, 0, w, 90);
+      g.fillStyle = '#ffffff'; g.font = '900 34px "Arial Black", "Trebuchet MS", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('STATIEGELD', w / 2, 32); g.font = 'bold 26px "Trebuchet MS", sans-serif'; g.fillText('lege flessen', w / 2, 68);
+      g.fillStyle = '#10213a'; g.fillRect(48, 130, 160, 100);
+      g.fillStyle = '#7fd36a'; g.font = 'bold 24px "Trebuchet MS", sans-serif'; g.fillText('€ 0,25', w / 2, 180);
+      g.fillStyle = '#1b1b1b'; g.beginPath(); g.arc(w / 2, 320, 52, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = '#c9ced3'; g.lineWidth = 10; g.stroke();
+      g.fillStyle = '#f6d04d'; g.beginPath(); g.moveTo(w / 2 - 30, 410); g.lineTo(w / 2 + 30, 410); g.lineTo(w / 2, 450); g.closePath(); g.fill();
+    });
+    const grey = std({ color: 0x4f6b66, roughness: 0.5 });
+    boxAt([B.x0, 0, B.z0], [B.x1, B.h, B.z1], faces(grey, grey, grey, grey, std({ map: machine }), grey), { cast: true });
+    solid([B.x0, 0, B.z0], [B.x1, B.h, B.z1], 'furniture');
+  }
+
   stock.build();
 
   // ---------------------------------------------------------------- a row of shopping trolleys by the door
@@ -692,7 +1159,19 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     S('fruit', 'In the fruit and veg!', 400, 'SQUISH!', [0.55, 0.7, IN.z0 + 1.95], [12.15, 1.5, IN.z0 + 3.65]),
     ...[-17, -13.5, -10].map((c) => S('checkout', 'Scanned at the checkout!', 500, 'BEEP!', [c - 0.45, 0.85, IN.z0 + 1.15], [c + 1.05, 1.6, IN.z0 + 3.85])),
     ...[-18, -13, -8, -3, 2, 7].map((cx) => S('shelves', 'On top of the shelves!', 500, 'HELP!', [cx - 0.6, 1.9, 36.1], [cx + 0.6, 2.8, 42.5])),
+    S('fruit', 'In the fruit and veg!', 400, 'SQUISH!', [12.05, 0.6, VEG.u0], [IN.x1, 1.9, VEG.u1]),
+    S('pastry', 'In the pastry case!', 600, 'TOMPOUCE!', ...caseF.box(CASE.u0, CASE.top - 0.1, 0, CASE.u1, CASE.glass + 0.5, CASE.depth + 0.1), () => pastryCase.broken),
+    S('bread', 'In the bread baskets!', 400, 'FRESH!', [breadTable.x0 - 0.05, 0.7, breadTable.z0 - 0.05], [breadTable.x1 + 0.05, 1.5, breadTable.z1 + 0.05]),
+    S('breadrack', 'On top of the bread rack!', 500, 'HELP!', ...breadRack.box(IN.z0 + 0.2, 2.4, 0, 35.4, 3.2, 0.65)),
+    S('cheese', 'On top of the cheese!', 500, 'SAY CHEESE!', ...cheeseF.box(CH.u0, CH.roof - 0.05, 0, CH.u1, 3.0, CH.depth)),
+    ...spotsExtra.map((a) => S(...a)),
   ];
+
+  function update(dt) {
+    for (const b of toRemove) if (b.world) world.removeBody(b);
+    toRemove.clear();
+    return stock.update(dt);
+  }
 
   /** Smashes a pane of glass (the shop window or a fridge door) out of its frame. */
   function breakPiece(piece) {
@@ -705,6 +1184,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
 
   /** New glass everywhere and the shelves stocked again. */
   function repairAll() {
+    for (const fix of onRestock) fix();
     for (const piece of windows) {
       if (!piece.broken) continue;
       piece.broken = false;
@@ -714,7 +1194,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     stock.restock();
   }
 
-  const api = { isInside, isOnRoof, updateView, isFaded, spots, windows, breakPiece, repairAll, update: (dt) => stock.update(dt) };
+  const api = { isInside, isOnRoof, updateView, isFaded, spots, windows, breakPiece, repairAll, update };
   for (const piece of windows) piece.owner = api;
   return api;
 }
