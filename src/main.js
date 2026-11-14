@@ -9,6 +9,7 @@ import { measureContortion, evaluateToss, chainMultiplier } from './scoring.js';
 import { Sfx } from './audio.js';
 import { StuckGuard } from './guard.js';
 import { Replay } from './replay.js';
+import { Zap } from './zap.js';
 import { Challenges, CHALLENGES, CHALLENGE_BONUS } from './challenges.js';
 import { createSeeThrough } from './seethrough.js';
 import { combineScenery } from './batching.js';
@@ -35,6 +36,14 @@ const GLASS_BREAK_SPEED = 4.5;
 // hit only cracks it, and the next such knock (a moment later) finishes it.
 const DOOR_BREAK_SPEED = 7;
 const DOOR_CRACK_SPEED = GLASS_BREAK_SPEED;
+// Hitting the TV this hard cracks its screen and gives Lennie a shock; once
+// it's cracked, bumping into it at least ZAP_SPEED shocks him again. A real
+// bump, not his own twitching against it, and only a few shocks per toss,
+// or a Lennie lying against the TV would never stop being zapped.
+const TV_CRACK_SPEED = GLASS_BREAK_SPEED;
+const ZAP_SPEED = 3;
+const ZAP_COOLDOWN = 1800; // ms after a shock ends before the next one
+const MAX_ZAPS = 3;
 // Hitting a supermarket shelf at least this hard knocks products off it.
 const SHELF_KNOCK_SPEED = 3.5;
 // Landing at least this hard among the mess in the house (dishes, toys,
@@ -245,6 +254,7 @@ addEventListener('pointerdown', (e) => {
 }, { capture: true });
 
 const replay = new Replay(lennie);
+const zap = new Zap(scene, lennie);
 const challenges = new Challenges();
 const hint = { on: true }; // the "Grab me!" bubble over Lennie, until he's first grabbed (and at each turn)
 
@@ -386,6 +396,8 @@ const toss = {
   juggles: 0,
   smashed: 0,
   doors: 0,
+  tv: 0, // cracked the TV
+  zaps: 0, // electric shocks from the cracked TV
   trampoline: 0,
   products: 0, // knocked off the supermarket's shelves
   mess: 0, // dishes, toys and clothes in the house sent flying
@@ -400,6 +412,8 @@ function resetChain() {
   toss.juggles = 0;
   toss.smashed = 0;
   toss.doors = 0;
+  toss.tv = 0;
+  toss.zaps = 0;
   toss.trampoline = 0;
   toss.products = 0;
   toss.mess = 0;
@@ -453,6 +467,11 @@ function houseBonuses(center) {
   const steps = toss.stairs.size;
   if (steps >= 10) add('fullflight', `Full flight! (${steps} steps)`, 400);
   else if (steps >= 3) add('stairs', `Stair tumble (${steps} steps)`, 200);
+  if (toss.tv) add('tv', 'Broke the TV!', 300);
+  if (toss.zaps) {
+    const n = Math.min(toss.zaps, 3);
+    add('zapped', n > 1 ? `Electrocuted ×${n}` : 'Electrocuted!', 250 * n);
+  }
   if (toss.trampoline) {
     const n = Math.min(toss.trampoline, 5);
     add('trampoline', n > 1 ? `Trampoline ×${n}` : 'Trampoline!', 80 * n);
@@ -468,7 +487,7 @@ function houseBonuses(center) {
 }
 
 function finishToss() {
-  if (toss.maxSpeed < MIN_TOSS_SPEED && !toss.smashed && !toss.doors) {
+  if (toss.maxSpeed < MIN_TOSS_SPEED && !toss.smashed && !toss.doors && !toss.tv && !toss.zaps) {
     toss.state = 'idle';
     replay.stop(false);
     resetChain();
@@ -558,6 +577,7 @@ const BUMP = {
   fence: ['De-fence-less!', 'Over the fence!'],
   window: ['Window shopping!', 'Nice view!'],
   door: ['Knock knock!', "Who's there?"],
+  tv: ['Not the TV!', 'Channel surfing!', 'Off the air!', 'Screen time!'],
   // soft things don't hurt, so they get only their own lines
   cushion: ['Comfy!', 'Soft landing!', 'Pillow fight!', 'Ahh, cosy!'],
   leaves: ['Hedgehog!', 'Rustle rustle!', 'Leaf me alone!'],
@@ -597,6 +617,7 @@ lennie.onCollide = (partName, e) => {
     }
     return;
   }
+  if (surf.kind === 'tv') hitTV(surf.piece, e, v, now);
   if (surf.kind === 'door' && !surf.piece.broken && v > DOOR_CRACK_SPEED) {
     const door = surf.piece;
     // The cooldown stops one impact (several limbs at once) from counting twice.
@@ -652,6 +673,30 @@ lennie.onCollide = (partName, e) => {
   }
 };
 let lastVoiceAt = 0;
+
+// The TV: a hard hit cracks the screen and electrocutes him; once it's
+// broken, touching it shocks him again (zap.js does the fireworks).
+const ZAP_LINES = ['BZZZZT!', 'Shocking!', 'Watt was that?!', 'Hair-raising!', 'Electrifying!', 'What a jolt!', 'Lights out!', 'Positively charged!'];
+let zapEndedAt = -Infinity;
+function hitTV(tv, e, v, now) {
+  if (!tv.cracked) {
+    if (v < TV_CRACK_SPEED) return;
+    tv.crack(contactPoint(e));
+    sfx.crash();
+    popAt(tv.hole, 'CRACK!', 'big');
+    if (toss.state === 'flying' || toss.state === 'held') toss.tv += 1;
+  } else if (v < ZAP_SPEED || zap.active || now - zapEndedAt < ZAP_COOLDOWN || toss.zaps >= MAX_ZAPS) {
+    return;
+  }
+  zap.start(tv.hole);
+  zapEndedAt = now + 1400;
+  sfx.zap(1.4);
+  sfx.voice('zap');
+  lastVoiceAt = now + 1000; // no ouches over the scream
+  toss.zaps += 1;
+  const head = lennie.parts.head.group.position;
+  setTimeout(() => popAt(head.clone().setY(head.y + 0.5), pickLine(ZAP_LINES), 'good'), 250);
+}
 
 let lastMessAt = 0;
 let lastClatterAt = 0;
@@ -1844,6 +1889,7 @@ function dropLennie(level) {
   replay.stop(false);
   const p = level === SHOP_DROP ? shop.spawnPoint() : house.spawnPoint(level);
   lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
+  zap.clear();
   guard.forget();
   aim.guide = null;
   nudge();
@@ -1874,7 +1920,7 @@ function resetAll(say = true) {
   shop.repairAll();
   clearShards();
   dropLennie(0);
-  if (say) toast('Windows and doors fixed, shelves stocked, the mess back where it was, Lennie back downstairs', 1900);
+  if (say) toast('Windows, doors and TV fixed, shelves stocked, the mess back where it was, Lennie back downstairs', 1900);
 }
 
 function toggleFollow() {
@@ -2432,6 +2478,8 @@ function updateHud(dt, now) {
     if (toss.juggles) bits.push(plural(toss.juggles, 'juggle'));
     if (toss.smashed) bits.push(plural(toss.smashed, 'window'));
     if (toss.doors) bits.push(plural(toss.doors, 'door'));
+    if (toss.tv) bits.push('TV');
+    if (toss.zaps) bits.push(plural(toss.zaps, 'zap'));
     if (toss.stairs.size) bits.push(plural(toss.stairs.size, 'step'));
     status = `Flying! ${bits.join(' · ')}${combo}`;
   } else {
@@ -2665,6 +2713,7 @@ function tick(dt, now) {
   seeThrough.update(camera, lennieOnScreen(_seeCenter), dt);
   blobShadow.update(lennieOnScreen(_blobCenter));
   updateShards(dt * timeScale);
+  zap.update(dt * timeScale, !replay.playing);
   if (!replay.playing) {
     shop.update(dt * timeScale);
     house.update(dt * timeScale);
@@ -2677,7 +2726,7 @@ requestAnimationFrame(frame);
 // Handy for debugging from the console. advance() runs the game loop by hand,
 // e.g. when the tab is in the background and requestAnimationFrame is paused.
 window.lennie = {
-  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing,
+  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap,
   advance(seconds) {
     for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60, performance.now());
   },

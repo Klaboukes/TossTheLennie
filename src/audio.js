@@ -54,6 +54,12 @@ const LINES = {
     [{ v: 'i', f: [640, 700], d: 0.12 }], // eep
     [{ v: 'u', f: [260, 380], d: 0.24, wobble: 10 }], // uh?
   ],
+  // Electrocuted: a long shaky scream.
+  zap: [
+    [{ v: 'a', f: [380, 420], d: 1.1, wobble: 24 }], // aaa-a-a-a-ah
+    [{ v: 'ai', f: [420, 560], d: 1.0, wobble: 20 }], // aaaiii
+    [{ v: 'e', f: [300, 340], d: 0.25 }, { v: 'ao', f: [420, 380], d: 0.9, wobble: 26 }], // eh-aaah
+  ],
   // A challenge done or a match won.
   cheer: [
     [{ v: 'ea', f: [380, 520], d: 0.4 }], // yay
@@ -359,6 +365,40 @@ export class Sfx {
     this.#tone(t, { f: 140 * p, to: 60, glide: 0.15, peak: 0.4, release: 0.18 });
     // a creak as the door settles
     if (Math.random() < 0.5) this.#tone(t + 0.12, { type: 'sawtooth', f: rand(160, 240), to: rand(120, 300), glide: 0.25, peak: 0.04, attack: 0.03, release: 0.25, lowpass: 900 });
+  }
+
+  /** An electric shock: a mains hum buzzing in and out, crackles and a pop at the end. */
+  zap(duration = 1.4) {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const end = t + duration;
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
+    out.gain.setValueAtTime(0.22, end - 0.15);
+    out.gain.exponentialRampToValueAtTime(0.0001, end);
+    // chopped on and off at random, like an arcing wire
+    const chop = ctx.createGain();
+    for (let tt = t; tt < end; tt += 0.03 + Math.random() * 0.05) chop.gain.setValueAtTime(Math.random() < 0.75 ? 1 : 0.15, tt);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = rand(900, 1400);
+    bp.Q.value = 0.7;
+    chop.connect(bp).connect(out).connect(this.master);
+    for (const [type, f] of [['sawtooth', 100 * rand(0.95, 1.05)], ['square', 150 * rand(0.95, 1.05)]]) {
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.value = f;
+      osc.connect(chop);
+      osc.start(t);
+      osc.stop(end + 0.05);
+    }
+    const n = 14 + Math.floor(Math.random() * 10);
+    for (let i = 0; i < n; i++) {
+      this.#burst(t + Math.random() * duration, { filter: 'highpass', f: rand(2500, 6000), peak: rand(0.1, 0.25), release: rand(0.01, 0.04) });
+    }
+    this.#burst(end - 0.05, { filter: 'bandpass', f: 600, Q: 1.2, peak: 0.35, release: 0.15 });
   }
 
   /** Groceries raining down: tins, boxes and bottles; more for more products. */

@@ -31,6 +31,7 @@ Lennie's house is a brick rowhouse in a 1970s Dutch terrace, with two floors and
 - **The board game closet** in the living room is stuffed with Dutch games: Mens erger je niet, Ganzenbord, Dammen, Schaken, Zeeslag, Vier op een rij, Kwartet, Domino, Memo, Mikado, jigsaw puzzles and more, with a sjoelbak on top (plain names, no brands). Crash into it and it empties itself across the floor, and every box spills its pawns, dice, cards, puzzle pieces and play money.
 - A switchback staircase in the back hallway connects the floors, with open stairwells to fall down.
 - Every window has glass that shatters when Lennie hits it hard enough, including the dormer window up in the attic.
+- The TV in the living room is on. Throw Lennie into it hard and the screen cracks where he hit it, flickers and spits sparks, and he gets electrocuted: he flashes between glowing blue and an X-ray of his skeleton while lightning crackles over him, then lies there sooty and smoking. Bump him into the cracked TV again and he gets another shock. R fixes the TV.
 - Every doorway has a closed door. Doors are a bit tougher than windows: a hard hit smashes one straight away, a lighter one only cracks it, and the next knock breaks it.
 - **Outside:** two brick storeys with a tall window column and dark panels, small high windows, a flat canopy over the front door beside a little brick screen with breeze blocks, and a steep dark tiled roof with a chimney and the dormer. Lennie can land on the canopy, the roof and the dormer, and slide down the roof into the front garden.
 - **The gardens:** an open front garden with a big dark shrub in front of the window column and a low hedge along the cycle path; a fenced back garden with trees and a trampoline.
@@ -78,7 +79,7 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 | Pan / zoom | Right-drag / scroll |
 | Fly the camera | WASD, Q/E down/up |
 | Drop Lennie on floor 1 / 2 / 3 / the roof / in the supermarket | 1 / 2 / 3 / 4 / 5 |
-| Fix the windows and doors, restock the shop, put the mess back and Lennie downstairs | R |
+| Fix the windows, doors and TV, restock the shop, put the mess back and Lennie downstairs | R |
 | Watch the last toss again in slow motion | P (or the button on the score card) |
 | Take turns with 2–4 players | The people button |
 | Focus camera on Lennie | F |
@@ -106,7 +107,7 @@ The game opens close up on Lennie with a "Grab me!" bubble over him, which stays
 
 - **Contortion**: every joint (neck, spine, shoulders, elbows, hips, knees) is measured against its relaxed pose. A bit of bend counts as relaxed and is free; past that, points grow with the square of the bend.
 - **Pose tricks**: Upside down, The splits, Pretzel legs, Straitjacket, Foot in face, and Human knot (any three of those at once). One crossed leg or one tangled arm is a small extra that doesn't count towards the knot.
-- **House feats**: Defenestrated! (thrown out of the house), Hanging out the window!, Fell N floors (a modest bonus, so rolling him off the roof isn't the easy way to a big score), Stair tumble/Full flight, Stranded on the roof!, Went shopping! (landed in the supermarket), On the supermarket roof!, Knocked products off the shelves (5 or more, 10 points each, up to 400), Board game avalanche! (3 or more games out of the closet, 20 points each, up to 500), Made the mess even worse (5 or more things in the house sent flying, 6 points each, up to 300), Trampoline bounces.
+- **House feats**: Defenestrated! (thrown out of the house), Hanging out the window!, Fell N floors (a modest bonus, so rolling him off the roof isn't the easy way to a big score), Stair tumble/Full flight, Stranded on the roof!, Went shopping! (landed in the supermarket), On the supermarket roof!, Knocked products off the shelves (5 or more, 10 points each, up to 400), Board game avalanche! (3 or more games out of the closet, 20 points each, up to 500), Made the mess even worse (5 or more things in the house sent flying, 6 points each, up to 300), Broke the TV! (300), Electrocuted! (250 a shock, up to 3), Trampoline bounces.
 - **Landing spots**: where he comes to rest can earn a bonus, with Lennie saying something about it: in the bath, on the loo, on the desk, in the armchair, on top of the wardrobe or the game closet, in the wash (on the washing machine), in either bed, on the beanbag or the toy box, on top of the fridge, on the dinner table or kitchen counter, on the couch; in the supermarket in a freezer or a drinks fridge (through a smashed door, half in counts), on top of the freezers, the drinks fridges, the shelves, the bread rack or the cheese cooler, in the trolleys, in the fruit and veg, in the bread baskets, in the smashed pastry case or meat counter, behind the butcher counter, in the pindakaas, in the snack freezer, in the tulips, or scanned at a checkout; outside stuck in a tree, in the bushes, or napping on the trampoline.
 - **Multiplier**: +0.1 per hard bounce, +0.25 per mid-air juggle (re-grabbing him while he's airborne), +0.3 per smashed window (the shop window and the freezer and fridge doors count too), +0.4 per smashed door, up to ×4.
 - A toss that's too gentle doesn't score.
@@ -137,6 +138,8 @@ The game is made to run smoothly on cheap tablets and older phones too. That's w
 - `index.html`, `style.css`: the page, toolbar, score panel, challenge, players board, turn card and help; the import map that loads three.js and cannon-es
 - `src/main.js`: scene, input (mouse and touch), camera, toss state machine, breaking glass and doors, landing spots, putting Lennie back when he leaves the play area, HUD, challenges, taking turns and the replay controls
 - `src/house.js`: the house (walls with windows and breakable doors, floors, stairs, the row's roof, furniture), plus cutaway and wall fading
+- `src/tv.js`: the living room TV, its screen cracking where Lennie hits it, flickering and sparking
+- `src/zap.js`: Lennie getting electrocuted: the X-ray skeleton, lightning, the blue flash, the spasms, soot and smoke
 - `src/clutter.js`: the mess in the house (dishes, toys, clothes, household stuff) and the board game closet, and sending it flying when Lennie lands in it
 - `src/street.js`: the neighbour houses, and the details every house in the row shares (porch, chimney, dormer, skylight, vents, downpipe)
 - `src/yard.js`: sky, lighting, lawn, back-garden fence, the play area's edges, garden trees, bushes, the hedge and the trampoline

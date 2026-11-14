@@ -3,6 +3,7 @@ import * as CANNON from 'cannon-es';
 import { textures, meterBoxUVs, floorGeometry } from './textures.js';
 import { makeDetails, buildNeighbours, LAYOUT } from './street.js';
 import { buildClutter } from './clutter.js';
+import { buildTV } from './tv.js';
 
 // A Dutch terraced house: two brick storeys and an attic under a steep roof,
 // with a dormer. Footprint x ∈ [-6, 6], z ∈ [-5, 5]; the front door faces +z.
@@ -539,6 +540,8 @@ export function buildHouse(scene, world, physMats) {
   details.downpipe(OUT.x0 + LAYOUT.pipe, 2.55, (k) => ({ story: k, line: `south-${k}` }));
   buildNeighbours(kit, details);
   buildFurniture();
+  // the TV on its cabinet, which cracks and sparks when Lennie hits it (tv.js)
+  const tv = buildTV(kit);
   // the mess: dishes, toys, clothes, household stuff and the board game closet (clutter.js)
   const clutter = buildClutter({ ...kit, H });
 
@@ -755,7 +758,6 @@ export function buildHouse(scene, world, physMats) {
       [[-5.5, 0.45, 1.75], [-5.0, 0.52, 2.8], 0x4fa7a0, { soft: true, phys: false }],
       ...table(-4.1, 1.0, -3.0, 2.4, 0.45, WOOD),
       [[0.35, 0, 2.3], [0.88, 0.5, 3.9], DARK],
-      [[0.55, 0.5, 2.45], [0.62, 1.25, 3.75], 0x111114],
       // kitchen
       [[5.25, 0, -2.2], [5.875, 0.85, 3.4], 0x5d8fb3],
       [[5.2, 0.85, -2.25], [5.875, 0.9, 3.45], 0xe8e4dc],
@@ -964,6 +966,7 @@ export function buildHouse(scene, world, physMats) {
   /** Fixes the windows and doors, and puts all the mess back where it was. */
   function repairAll() {
     clutter.restock();
+    tv.repair();
     for (const piece of [...windows, ...doors]) {
       if (piece.kind === 'door') {
         piece.cracked = false;
@@ -993,8 +996,12 @@ export function buildHouse(scene, world, physMats) {
     breakPiece,
     crackDoor,
     repairAll,
+    tv,
     scatter: clutter.scatter,
-    update: clutter.update,
+    update(dt) {
+      clutter.update(dt);
+      tv.update(dt);
+    },
     get cutLevel() { return level; },
   };
 }

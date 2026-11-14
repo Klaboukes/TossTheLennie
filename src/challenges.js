@@ -12,6 +12,7 @@ export const CHALLENGES = [
   { id: 'door', text: 'Crash through a door', test: (r) => r.chain.doors >= 1 },
   { id: 'upside', text: 'Leave Lennie upside down', test: (r) => r.ids.has('upside') },
   { id: 'couch', text: 'Make Lennie a couch potato', test: (r) => r.ids.has('couch') },
+  { id: 'tv', text: 'Throw Lennie into the TV', test: (r) => r.ids.has('tv') },
   { id: 'out', text: 'Throw Lennie out of the house', test: (r) => r.ids.has('defenestrated') || r.ids.has('hanging') },
   { id: 'stairs', text: 'Tumble Lennie down the stairs', test: (r) => r.ids.has('stairs') || r.ids.has('fullflight') },
   { id: 'bed', text: 'Put Lennie to bed', test: (r) => r.ids.has('bed') },
