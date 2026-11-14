@@ -253,8 +253,11 @@ function popAt(position, text, cls = '') {
   el.style.left = `${(v.x * 0.5 + 0.5) * innerWidth}px`;
   el.style.top = `${(-v.y * 0.5 + 0.5) * innerHeight}px`;
   el.style.setProperty('--rot', `${(Math.random() * 16 - 8).toFixed(1)}deg`);
+  // Short shouts ("BOING!") flash by; longer lines ("Pindakaas everywhere!") stay up long enough to read.
+  const ms = Math.min(4000, 1400 + 120 * Math.max(0, text.length - 6));
+  el.style.setProperty('--dur', `${ms}ms`);
   ui.pops.appendChild(el);
-  setTimeout(() => el.remove(), 1200);
+  setTimeout(() => el.remove(), ms + 100);
 }
 
 const CONFETTI = ['#ff6b4a', '#3f5fd6', '#22a06b', '#ffd166', '#d63384', '#4cc9f0'];
@@ -461,7 +464,7 @@ function finishToss() {
   const cheer = beatBest ? 'best' : result.total >= BIG_TOSS ? 'big' : null;
   showResult(result, locate(center), cheer);
   sfx.score(result.total > 1600 ? 3 : result.total > 900 ? 2 : result.total > 400 ? 1 : 0);
-  sfx.voice(result.total >= 900 ? 'ohh' : 'oof');
+  sfx.voice(result.total >= 900 ? 'land' : 'grunt');
   // A good toss leaves him seeing stars until he's picked up again.
   if (result.total >= 400 || toss.bounces >= 5) lennie.setExpression('dizzy');
   else lennie.setExpression('ouch', 4);
@@ -527,7 +530,7 @@ lennie.onCollide = (partName, e) => {
     if (!surf.piece.broken && v > GLASS_BREAK_SPEED) pendingBreaks.add(surf.piece);
     else if (v > 1.5 && now - lastSoundAt > 60) {
       lastSoundAt = now;
-      sfx.thud(Math.min(1, v / 16));
+      sfx.impact('glass', Math.min(1, v / 16));
     }
     return;
   }
@@ -556,8 +559,7 @@ lennie.onCollide = (partName, e) => {
   const soft = SOFT.has(surf.kind);
   if (now - lastSoundAt > 45) {
     lastSoundAt = now;
-    if (soft) sfx.boing(strength);
-    else sfx.thud(strength);
+    sfx.impact(surf.sound ?? surf.kind, strength);
   }
 
   const flying = toss.state === 'flying';
@@ -578,11 +580,11 @@ lennie.onCollide = (partName, e) => {
     lennie.setExpression('ouch', 0.7);
     if (flying && now - lastVoiceAt > 700) {
       lastVoiceAt = now;
-      sfx.voice(v > 11 ? 'ow' : Math.random() < 0.5 ? 'ow' : 'oof');
+      sfx.voice('hit');
     }
   } else if (flying && surf.kind === 'trampoline' && v > BOUNCE_IMPACT && now - lastVoiceAt > 700) {
     lastVoiceAt = now;
-    sfx.voice('whee');
+    sfx.voice('fly');
     lennie.setExpression('whee', 0.8);
   }
 };
@@ -789,7 +791,7 @@ function startGrab(pick, pointerId, pointerType = 'mouse') {
   hint.on = false;
   hideResult();
   if (lennie.expression !== 'normal') lennie.setExpression('normal');
-  sfx.squeak();
+  sfx.grab();
   canvas.style.cursor = 'grabbing';
   grabLine.visible = grabDot.visible = true;
   hideAim();
@@ -859,7 +861,7 @@ function endGrab() {
   const speed = v.length();
   if (speed > 5) sfx.whoosh(Math.min(1, speed / 20));
   if (speed > 9) {
-    sfx.voice('whee');
+    sfx.voice('fly');
     lennie.setExpression('whee', 1.2);
   }
   if (canvas.hasPointerCapture?.(grab.pointerId)) canvas.releasePointerCapture(grab.pointerId);
@@ -910,7 +912,7 @@ function startSling(pick, e) {
   hint.on = false;
   hideResult();
   if (lennie.expression !== 'normal') lennie.setExpression('normal');
-  sfx.squeak();
+  sfx.grab();
   canvas.style.cursor = 'grabbing';
   grabLine.visible = grabDot.visible = true;
   hideAim();
@@ -1433,7 +1435,7 @@ function launch(v) {
   const speed = v.length();
   sfx.whoosh(Math.min(1, speed / 20));
   if (speed > 7) {
-    sfx.voice('whee');
+    sfx.voice('fly');
     lennie.setExpression('whee', 1.2);
   }
   beginFlight();
@@ -1753,13 +1755,14 @@ const btn = {
   players: $('btn-players'),
 };
 
-const LEVEL_NAMES = ['floor 1', 'floor 2', 'floor 3', 'the roof'];
+const LEVEL_NAMES = ['floor 1', 'floor 2', 'floor 3', 'the roof', 'the supermarket floor'];
+const SHOP_DROP = 4; // 'level' 4 in the drop menu is the supermarket, across the street
 function dropLennie(level) {
   if (grab) endGrab();
   endSling(false);
   stopReplay();
   replay.stop(false);
-  const p = house.spawnPoint(level);
+  const p = level === SHOP_DROP ? shop.spawnPoint() : house.spawnPoint(level);
   lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
   guard.forget();
   aim.guide = null;
@@ -1894,7 +1897,7 @@ addEventListener('keydown', (e) => {
     case 'KeyT': toggleAim(); break;
     case 'KeyM': toggleSound(); break;
     case 'KeyH': setHelp(ui.help.hidden); break;
-    case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': {
+    case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': case 'Digit5': {
       const level = Number(e.code.slice(-1)) - 1;
       dropLennie(level);
       toast(`Lennie dropped on ${LEVEL_NAMES[level]}`, 1200);
@@ -1985,7 +1988,7 @@ function renderChallenge() {
 
 function challengeDone(c) {
   sfx.chime();
-  sfx.voice('yay');
+  sfx.voice('cheer');
   toast(`Challenge done: ${c.text}! +${CHALLENGE_BONUS}`, 2600);
   ui.chText.textContent = `✔ ${c.text}`;
   ui.challenge.classList.remove('done');
@@ -2140,7 +2143,7 @@ function showTurnCard() {
     ui.turnAlt.hidden = false;
     ui.turnAlt.dataset.action = 'free';
     sfx.score(3);
-    sfx.voice('yay');
+    sfx.voice('cheer');
   } else {
     const p = match.players[match.turn];
     const first = match.players.every((q) => q.scores.length === 0);

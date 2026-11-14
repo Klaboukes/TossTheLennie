@@ -23,6 +23,19 @@ GitHub Pages serves `main` as it is at https://klaboukes.github.io/TossTheLennie
 ## Before merging
 The local run is the merge gate: run `node tests/check.mjs` (when Node is installed) and play the change in the browser, with no errors in the console. Nothing on GitHub checks a pull request.
 
+## One worktree per session
+Every Claude Code session works in its own git worktree on its own branch, never directly in the main checkout, so several sessions can run at once without editing the same files or overwriting each other's work. If a session finds itself in the main checkout, it moves into a fresh worktree (branched from the latest `origin/main`) before changing any file.
+
+## "Land"
+When the owner says **land**, put the session's work live:
+1. Commit everything on the session's branch.
+2. Fetch and rebase onto the latest `origin/main`. Other sessions may have landed meanwhile: on a conflict, keep both sides' changes.
+3. Run the merge gate above (check script plus playing it in the browser, no console errors) on the rebased code. After another session's update, hard-refresh the browser (Ctrl+Shift+R) so it doesn't run stale cached files.
+4. Push the result to `main` (`git push origin HEAD:main`). GitHub Pages then updates the live page within a minute or so.
+5. Tell the owner in plain words what went live, and anything that didn't.
+
+If the push is refused because `main` moved again, repeat from step 2. Never force-push `main`.
+
 ## CI
 `.github/workflows/ci.yml` runs `tests/check.mjs` **once a night** at 03:00 UTC on `main`, plus by hand through *Run workflow* on the Actions tab, **never per push or pull request**. The repo is public, so GitHub's standard runners cost no minutes, but the owner's private repos share the free plan's 2,000 minutes a month: on another project a run per push and PR used them up in one week, after which GitHub ran nothing at all. Nightly stays the policy, also if this repo goes private again. Don't add `push` or `pull_request` triggers back. GitHub pauses scheduled runs in a public repo after 60 days without commits; *Enable workflow* on the Actions tab turns them back on.
 

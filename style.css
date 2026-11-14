@@ -419,7 +419,7 @@ kbd {
   paint-order: stroke fill;
   text-shadow: 3px 3px 0 var(--accent);
   white-space: nowrap;
-  animation: pop 1.1s ease-out forwards;
+  animation: pop var(--dur, 1.4s) ease-out forwards;
 }
 .pop.big { font-size: 34px; text-shadow: 3px 3px 0 var(--blue); }
 .pop.good { color: #ffd166; text-shadow: 3px 3px 0 var(--good); }
@@ -440,7 +440,13 @@ kbd {
   0% { opacity: 0; transform: translate(-50%, -30%) rotate(var(--rot)) scale(0.4); }
   15% { opacity: 1; transform: translate(-50%, -60%) rotate(var(--rot)) scale(1.15); }
   30% { transform: translate(-50%, -70%) rotate(var(--rot)) scale(1); }
+  75% { opacity: 1; }
   100% { opacity: 0; transform: translate(-50%, -190%) rotate(var(--rot)) scale(0.95); }
+}
+/* Reduced motion: no jumping or rising, but stay up just as long so the words can still be read. */
+@keyframes pop-still {
+  0%, 80% { opacity: 1; transform: translate(-50%, -60%) rotate(var(--rot)); }
+  100% { opacity: 0; transform: translate(-50%, -60%) rotate(var(--rot)); }
 }
 
 /* ---------- Touch or mouse: show the matching help ---------- */
@@ -768,7 +774,8 @@ body:not(.touch) .touch-only { display: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pop, .bump, .r-lines li, .r-badge { animation-duration: 0.01s; }
+  .bump, .r-lines li, .r-badge { animation-duration: 0.01s; }
+  .pop { animation-name: pop-still; }
   .confetti { display: none; }
   .replay-btn.invite { animation: none; }
   #result { transition: none; }
