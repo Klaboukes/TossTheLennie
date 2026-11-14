@@ -58,8 +58,14 @@ const CAMERA_SPEED = 6;
 const GRAVITY = 9.82;
 const AIM_MAX_SPEED = MAX_PART_SPEED - 2; // leaves room for the somersault spin
 const AIM_MIN_SPEED = 6; // short throws become line drives rather than limp lobs
-const AIM_MIN_IMPACT = DOOR_BREAK_SPEED + 1.5; // aimed at a wall or window, he hits it at least this hard
-const DOOR_AIM_IMPACT = DOOR_BREAK_SPEED + 4; // and a door this hard, so it smashes whichever limb hits first
+const AIM_MIN_IMPACT = DOOR_BREAK_SPEED + 1.5; // aimed at a wall, he hits it at least this hard
+// Aimed at a door or window that's still whole, he goes through it and on for
+// a few metres, rather than dropping in the doorway: he's thrown at it this
+// hard (so it smashes whichever limb hits first), and crashing through it
+// leaves him this much of his speed (a door or window in his way by chance
+// slows him more, see subStep).
+const THROUGH_IMPACT = DOOR_BREAK_SPEED + 6;
+const THROUGH_KEEP = 0.9;
 const DOOR_AIM_LOW = 0.8; // aimed at a door, he goes for no lower than this above its foot
 // For this long after an aimed launch the "hand" keeps his centre on the arc,
 // while he peels off the floor (his limbs and joints tugging against it would
@@ -961,7 +967,7 @@ function startGrab(pick, pointerId, pointerType = 'mouse') {
   canvas.style.cursor = 'grabbing';
   grabLine.visible = grabDot.visible = true;
   hideAim();
-  aim.guide = null;
+  aim.guide = aim.through = null;
   camAnim = null;
 }
 
@@ -1083,7 +1089,7 @@ function startSling(pick, e) {
   grabLine.visible = grabDot.visible = true;
   hideAim();
   aim.pin = null;
-  aim.guide = null;
+  aim.guide = aim.through = null;
   camAnim = null;
 }
 
@@ -1352,9 +1358,10 @@ const aim = {
   hover: false,
   press: null,
   loft: AIM_LOFT.start,
-  shot: null, // { v, blocked, tooFar } for the current pointer target
+  shot: null, // { v, blocked, tooFar, through } for the current pointer target
   pin: null, // touch screens: the tapped target, { point, normal, body, x, y }
   guide: null, // the launch still being steered, { v, t0, spin }
+  through: null, // the door or window the flying Lennie was aimed through, until he smashes it
 };
 
 const AIM_DOTS = 150;
@@ -1486,6 +1493,8 @@ const _aimTo = new THREE.Vector3();
 const _aimA = new THREE.Vector3();
 const _aimB = new THREE.Vector3();
 const _aimM = new THREE.Matrix4();
+const _aimO = new THREE.Vector3();
+const _aimV = new THREE.Vector3();
 const _zAxis = new THREE.Vector3(0, 0, 1);
 
 function placeRing(ring, point, normal) {
@@ -1496,24 +1505,42 @@ function placeRing(ring, point, normal) {
 
 /**
  * Draws the dotted arc of a launch from `from` at `v`, for up to `maxTime`
- * seconds, through the scenery until it hits something. Returns where it ends:
- * { point, normal, impact }, with `impact` (point, normal, body) if it hit something.
+ * seconds, through the scenery until it hits something. It goes on through
+ * `pass` (the body of a door or window he'll crash through), a bit slower
+ * after it. Returns where it ends: { point, normal, impact, passed }, with
+ * `impact` (point, normal, body) if it hit something, and `passed` if it went through `pass`.
  */
-function traceArc(from, v, maxTime) {
+function traceArc(from, v, maxTime, pass = null) {
   let dots = 0;
   let carry = 0;
   let impact = null;
+  let passed = false;
+  const passGroup = pass?.collisionFilterGroup;
+  const o = _aimO.copy(from);
+  const vel = _aimV.copy(v);
+  let t0 = 0;
   _aimA.copy(from);
   for (let t = 1 / 30; t < maxTime; t += 1 / 30) {
-    flightPoint(from, v, t, _aimB);
+    flightPoint(o, vel, t - t0, _aimB);
     _from.set(_aimA.x, _aimA.y, _aimA.z);
     _to.set(_aimB.x, _aimB.y, _aimB.z);
     _rayHit.reset();
     if (world.raycastClosest(_from, _to, SCENERY_ONLY, _rayHit)) {
       const p = _rayHit.hitPointWorld;
       const n = _rayHit.hitNormalWorld;
-      impact = { point: new THREE.Vector3(p.x, p.y, p.z), normal: new THREE.Vector3(n.x, n.y, n.z), body: _rayHit.body };
-      _aimB.copy(impact.point);
+      if (!passed && _rayHit.body === pass) {
+        // Through it: the arc starts again from there, at the speed he keeps.
+        const decay = Math.exp(-DRAG * (t - t0));
+        vel.set(vel.x * decay, (vel.y + GRAVITY / DRAG) * decay - GRAVITY / DRAG, vel.z * decay).multiplyScalar(THROUGH_KEEP);
+        o.set(p.x, p.y, p.z);
+        t0 = t;
+        passed = true;
+        pass.collisionFilterGroup = 0; // the rays look past it from now on
+        _aimB.copy(o);
+      } else {
+        impact = { point: new THREE.Vector3(p.x, p.y, p.z), normal: new THREE.Vector3(n.x, n.y, n.z), body: _rayHit.body };
+        _aimB.copy(impact.point);
+      }
     }
     const seg = _aimA.distanceTo(_aimB);
     for (let d = AIM_DOT_GAP - carry; d <= seg && dots < AIM_DOTS; d += AIM_DOT_GAP) {
@@ -1525,11 +1552,12 @@ function traceArc(from, v, maxTime) {
     _aimA.copy(_aimB);
     if (impact || _aimB.y < -1) break;
   }
+  if (passed) pass.collisionFilterGroup = passGroup;
   aimDots.count = dots;
   aimDots.instanceMatrix.needsUpdate = true;
   aimDots.visible = dots > 0;
   const point = _aimB.clone();
-  return { point, normal: impact?.normal ?? new THREE.Vector3(0, 1, 0), impact };
+  return { point, normal: impact?.normal ?? new THREE.Vector3(0, 1, 0), impact, passed };
 }
 
 function updateAim() {
@@ -1544,23 +1572,25 @@ function updateAim() {
   // A door is aimed at no lower than its lower panel (aimed at its foot he
   // skids into it along the floor), and thrown at harder than a window: the
   // somersault means the limb that hits it may be going slower than his middle.
-  const door = target.body?.surface?.kind === 'door' && !target.body.surface.piece.broken ? target.body.surface.piece : null;
+  const surf = target.body?.surface;
+  const through = (surf?.kind === 'door' || surf?.kind === 'glass') && !surf.piece.broken ? surf.piece : null;
   let to = target.point;
-  if (door) {
-    const low = door.center.y - door.height / 2 + DOOR_AIM_LOW;
+  if (surf?.kind === 'door' && through) {
+    const low = through.center.y - through.height / 2 + DOOR_AIM_LOW;
     if (to.y < low) to = _aimTo.copy(to).setY(low);
   }
-  const shot = solveShot(from, to, facing, door ? DOOR_AIM_IMPACT : AIM_MIN_IMPACT);
-  const { impact, point } = traceArc(from, shot.v, shot.time + 1.5);
+  const shot = solveShot(from, to, facing, through ? THROUGH_IMPACT : AIM_MIN_IMPACT);
+  const { impact, point, passed } = traceArc(from, shot.v, shot.time + 1.5, through ? target.body : null);
 
-  // Falling short of the pointer means something is in the way (or it's out of reach).
+  // Falling short of the pointer means something is in the way (or it's out
+  // of reach). Through a door or window, the ring shows where he ends up.
   const end = impact ?? { point, normal: target.normal };
-  const blocked = !shot.tooFar && end.point.distanceTo(target.point) > 0.5 && !(impact && impact.body === target.body);
+  const blocked = !shot.tooFar && !passed && end.point.distanceTo(target.point) > 0.5 && !(impact && impact.body === target.body);
   placeRing(aimRing, end.point, end.normal);
   aimRing.material.color.setHex(shot.tooFar || blocked ? 0xffffff : 0xff6b4a);
-  if (shot.tooFar || blocked) placeRing(aimMark, target.point, target.normal);
+  if (shot.tooFar || blocked || passed) placeRing(aimMark, target.point, target.normal);
   else aimMark.visible = false;
-  aim.shot = { v: shot.v, tooFar: shot.tooFar, blocked };
+  aim.shot = { v: shot.v, tooFar: shot.tooFar, blocked, through: passed ? through : null };
 }
 
 function aimThrow() {
@@ -1576,15 +1606,16 @@ function aimThrow() {
   aim.pin = null;
   if (!shot) return;
   sfx.squeak();
-  launch(shot.v);
+  launch(shot.v, shot.through);
 }
 
 /**
  * Sends all of Lennie off at `v` (an aimed throw or the slingshot): his centre
  * follows the planned arc, and once he's clear he somersaults the way he's going.
  */
-function launch(v) {
+function launch(v, through = null) {
   replay.start();
+  aim.through = through;
   hint.on = false;
   resetChain();
   hideResult();
@@ -1940,7 +1971,7 @@ function dropLennie(level) {
   lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
   zap.clear();
   guard.forget();
-  aim.guide = null;
+  aim.guide = aim.through = null;
   nudge();
   lennie.setExpression('normal');
   toss.state = 'idle';
@@ -2125,7 +2156,7 @@ addEventListener('resize', () => {
 function playReplay() {
   if (grab || sling || replay.playing || !replay.play(0.4)) return;
   camAnim = null;
-  aim.guide = null;
+  aim.guide = aim.through = null;
   hideAim();
   hideResult();
   ui.replayBadge.hidden = false;
@@ -2578,12 +2609,14 @@ function subStep(h) {
   world.step(h);
   if (pendingBreaks.size) {
     // Lennie crashes through: undo this step's bounce, minus a little drag
-    // (more for a door).
-    const keep = [...pendingBreaks].some((p) => p.kind === 'door') ? 0.65 : 0.8;
+    // (more for a door, less for the one he was aimed through).
+    const aimed = aim.through && pendingBreaks.has(aim.through);
+    const keep = aimed ? THROUGH_KEEP : [...pendingBreaks].some((p) => p.kind === 'door') ? 0.65 : 0.8;
     bodies.forEach((b, i) => preStep[i].scale(keep, b.velocity));
     for (const piece of pendingBreaks) smash(piece);
     pendingBreaks.clear();
     aim.guide = null;
+    if (aimed) aim.through = null;
   }
   if (aim.guide) guideLaunch();
   const guarded = guard.check();
@@ -2647,7 +2680,7 @@ function placedBack(message) {
   stopReplay();
   replay.stop(false);
   guard.forget();
-  aim.guide = null;
+  aim.guide = aim.through = null;
   nudge();
   lennie.setExpression('normal');
   toss.state = 'idle';

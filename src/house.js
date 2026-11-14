@@ -69,6 +69,8 @@ const COLUMN = [1.2, 4.5];
 // The low windows (the bedroom's small high ones and the dormer's) look as
 // small as the real ones, but give Lennie some slack to get through (see `wall`).
 const SLACK = { side: 0.15, below: 0.35, above: 0.2 };
+// A doorway gets a little too: a tumbling Lennie's arms and legs snagged on its frame.
+const DOOR_SLACK = { side: 0.12, below: 0, above: 0.15 };
 const SMALL = { sill: 1.45, top: 2.25, bars: { v: [], h: [] }, slack: SLACK };
 const FRONT = [
   [{ a: -4.8, b: -2.9 }, { a: COLUMN[0], b: COLUMN[1], bars: { v: [1 / 3, 2 / 3], h: [0.7] } }],
@@ -280,9 +282,9 @@ export function buildHouse(scene, world, physMats) {
       if (cur < to) pieces.push([cur, to, y0, y1]);
       return pieces;
     };
-    // A window with `slack` has a bigger hole in the physics than you see: its
-    // glass reaches into the frame around it, so once that's smashed a
-    // flailing Lennie fits through a small window instead of snagging on it.
+    // An opening with `slack` has a bigger hole in the physics than you see: its
+    // glass or door reaches into the frame around it, so once that's smashed a
+    // flailing Lennie fits through instead of snagging on it.
     const physHole = (o) => (o.slack ? {
       ...o,
       a: Math.max(from, o.a - o.slack.side),
@@ -322,14 +324,14 @@ export function buildHouse(scene, world, physMats) {
         trimBox(o.a - 0.1, o.b + 0.1, o.bottom - 0.05, o.bottom, thick + 0.12);
         addWindow(run, at, o, physHole(o), physThick, physOffset, story, outward, line);
       } else {
-        addDoor(run, at, o, physThick, physOffset, story, line);
+        addDoor(run, at, o, physThick, physOffset, story, line, physHole(o));
       }
     }
   }
 
   // A closed door filling the opening. A hard hit breaks it at once; a softer
   // one cracks it, and the next knock finishes it off (see main.js).
-  function addDoor(run, at, o, physThick, physOffset, story, line) {
+  function addDoor(run, at, o, physThick, physOffset, story, line, hole = o) {
     const midA = (o.a + o.b) / 2;
     const midY = (o.bottom + o.top) / 2;
     const [cmin, cmax] = extents(run, at, midA, midA, midY, midY, 0);
@@ -351,7 +353,7 @@ export function buildHouse(scene, world, physMats) {
     part(o.b - 0.2, o.b - 0.07, o.bottom + 1.0, o.bottom + 1.03, 0.2, M.handle);
     groups[story].add(group);
 
-    const [pmin, pmax] = extents(run, at, o.a, o.b, o.bottom, o.top, physThick, physOffset);
+    const [pmin, pmax] = extents(run, at, hole.a, hole.b, hole.bottom, hole.top, physThick, physOffset);
     const door = {
       kind: 'door',
       group,
@@ -425,7 +427,7 @@ export function buildHouse(scene, world, physMats) {
     const y1 = (k + 1) * H - T;
     const R = ROOMS[k];
     const win = (o) => ({ ...o, bottom: y0 + (o.sill ?? WIN.sill), top: y0 + (o.top ?? WIN.top), glass: true });
-    const door = ([a, b], front = false) => ({ a, b, bottom: y0, top: y0 + DOOR_TOP, front });
+    const door = ([a, b], front = false) => ({ a, b, bottom: y0, top: y0 + DOOR_TOP, front, slack: DOOR_SLACK });
     const roomAt = (x, z) => (z < HALL_Z ? R.hall : x < MID_X ? R.left : R.right);
     const common = { y0, y1, story: k, thick: EXT, physThick: EXT_PHYS };
     const off = (EXT_PHYS - EXT) / 2;
