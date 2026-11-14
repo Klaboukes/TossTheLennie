@@ -65,7 +65,9 @@ const ROOMS = [
 // along the wall plus optional sill/top heights and glazing bars (fractions).
 // The side walls are party walls with the neighbours, so they have no windows.
 const COLUMN = [1.2, 4.5];
-const SMALL = { sill: 1.45, top: 2.25, bars: { v: [], h: [] } };
+// The bedroom's small high windows look as small as the real ones, but give
+// Lennie some slack to get through (see `wall`).
+const SMALL = { sill: 1.45, top: 2.25, bars: { v: [], h: [] }, slack: { side: 0.15, below: 0.35, above: 0.2 } };
 const FRONT = [
   [{ a: -4.8, b: -2.9 }, { a: COLUMN[0], b: COLUMN[1], bars: { v: [1 / 3, 2 / 3], h: [0.7] } }],
   [{ a: -5.7, b: -4.6, ...SMALL }, { a: -4.0, b: -2.6, ...SMALL }, { a: COLUMN[0], b: COLUMN[1], sill: 0.6, top: 2.5, bars: { v: [0.32], h: [] } }],
@@ -264,18 +266,31 @@ export function buildHouse(scene, world, physMats) {
    */
   function wall({ run, at, from, to, y0, y1, thick, physThick, physOffset = 0, openings = [], mats, story, line, outward = 0 }) {
     const ops = [...openings].sort((p, q) => p.a - q.a);
-    const pieces = [];
-    let cur = from;
-    for (const o of ops) {
-      if (o.a > cur) pieces.push([cur, o.a, y0, y1]);
-      if (o.bottom > y0) pieces.push([o.a, o.b, y0, o.bottom]);
-      if (o.top < y1) pieces.push([o.a, o.b, o.top, y1]);
-      cur = o.b;
-    }
-    if (cur < to) pieces.push([cur, to, y0, y1]);
+    const piecesAround = (holes) => {
+      const pieces = [];
+      let cur = from;
+      for (const o of holes) {
+        if (o.a > cur) pieces.push([cur, o.a, y0, y1]);
+        if (o.bottom > y0) pieces.push([o.a, o.b, y0, o.bottom]);
+        if (o.top < y1) pieces.push([o.a, o.b, o.top, y1]);
+        cur = o.b;
+      }
+      if (cur < to) pieces.push([cur, to, y0, y1]);
+      return pieces;
+    };
+    // A window with `slack` has a bigger hole in the physics than you see: its
+    // glass reaches into the frame around it, so once that's smashed a
+    // flailing Lennie fits through a small window instead of snagging on it.
+    const physHole = (o) => (o.slack ? {
+      ...o,
+      a: Math.max(from, o.a - o.slack.side),
+      b: Math.min(to, o.b + o.slack.side),
+      bottom: Math.max(y0, o.bottom - o.slack.below),
+      top: Math.min(y1, o.top + o.slack.above),
+    } : o);
 
     const pick = (m, along) => (typeof m === 'function' ? m(along) : m);
-    for (const [a, b, ya, yb] of pieces) {
+    for (const [a, b, ya, yb] of piecesAround(ops)) {
       const mid = (a + b) / 2;
       const pos = pick(mats.pos, mid);
       const neg = pick(mats.neg, mid);
@@ -285,6 +300,8 @@ export function buildHouse(scene, world, physMats) {
       const faceMats = run === 'x' ? [endHi, endLo, M.trim, M.trim, pos, neg] : [pos, neg, M.trim, M.trim, endLo, endHi];
       const [min, max] = extents(run, at, a, b, ya, yb, thick);
       box(min, max, faceMats, { story, line });
+    }
+    for (const [a, b, ya, yb] of piecesAround(ops.map(physHole))) {
       const [pmin, pmax] = extents(run, at, a, b, ya, yb, physThick, physOffset);
       body(pmin, pmax, physMats.hard, { kind: 'wall' });
     }
@@ -301,7 +318,7 @@ export function buildHouse(scene, world, physMats) {
       trimBox(o.a - w, o.b + w, o.top, o.top + w);
       if (o.glass) {
         trimBox(o.a - 0.1, o.b + 0.1, o.bottom - 0.05, o.bottom, thick + 0.12);
-        addWindow(run, at, o, physThick, physOffset, story, outward, line);
+        addWindow(run, at, o, physHole(o), physThick, physOffset, story, outward, line);
       } else {
         addDoor(run, at, o, physThick, physOffset, story, line);
       }
@@ -350,7 +367,7 @@ export function buildHouse(scene, world, physMats) {
     doors.push(door);
   }
 
-  function addWindow(run, at, o, physThick, physOffset, story, outward, line) {
+  function addWindow(run, at, o, hole, physThick, physOffset, story, outward, line) {
     const group = new THREE.Group();
     const [min, max] = extents(run, at, o.a, o.b, o.bottom, o.top, 0.03);
     const pane = new THREE.Mesh(new THREE.BoxGeometry(max[0] - min[0], max[1] - min[1], max[2] - min[2]), M.glass);
@@ -372,7 +389,7 @@ export function buildHouse(scene, world, physMats) {
     }
     groups[story].add(group);
 
-    const [pmin, pmax] = extents(run, at, o.a, o.b, o.bottom, o.top, physThick, physOffset);
+    const [pmin, pmax] = extents(run, at, hole.a, hole.b, hole.bottom, hole.top, physThick, physOffset);
     const win = {
       kind: 'window',
       group,
