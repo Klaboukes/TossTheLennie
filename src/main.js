@@ -1608,7 +1608,7 @@ controls.maxPolarAngle = Math.PI / 2;
 controls.update();
 
 let camAnim = null;
-let follow = false;
+let follow = true; // on from the start, so Lennie stays in the picture; G turns it off
 let chase = false; // following Lennie for the rest of this toss, because he was leaving the picture
 let replayCenter = null; // while a replay plays, the camera follows Lennie's replayed position
 let cutaway = true;
@@ -1684,7 +1684,7 @@ function updateCamera(dt) {
     if (k >= 1) camAnim = null;
   } else if (replayCenter || ((follow || chase) && !grab && !sling)) {
     // a chase keeps up more tightly, so a fast fall doesn't leave him behind
-    const rate = chase && !follow && !replayCenter ? 10 : 4;
+    const rate = chase && !replayCenter ? 10 : 4;
     const d = (replayCenter ? _center.copy(replayCenter) : lennie.center(_center)).sub(controls.target).multiplyScalar(1 - Math.exp(-dt * rate));
     controls.target.add(d);
     camera.position.add(d);
@@ -1828,6 +1828,7 @@ const btn = {
   cutaway: $('btn-cutaway'),
   slowmo: $('btn-slowmo'),
   sound: $('btn-sound'),
+  fullscreen: $('btn-fullscreen'),
   drop: $('btn-drop'),
   help: $('btn-help'),
   aim: $('btn-aim'),
@@ -1900,6 +1901,32 @@ function toggleSound() {
   btn.sound.setAttribute('aria-pressed', String(!sfx.muted));
 }
 
+// Full screen through the page itself rather than the browser's F11: then the
+// browser bar doesn't slide back in when the mouse touches the top of the screen.
+// Esc leaves it (the browser handles that). The button stays hidden where the
+// browser can't do it (an iPhone, for one).
+const root = document.documentElement;
+const canFullscreen = !!(root.requestFullscreen || root.webkitRequestFullscreen) &&
+  (document.fullscreenEnabled ?? document.webkitFullscreenEnabled ?? false);
+const fullscreenElement = () => document.fullscreenElement ?? document.webkitFullscreenElement ?? null;
+function toggleFullscreen() {
+  if (!canFullscreen) return;
+  if (fullscreenElement()) {
+    (document.exitFullscreen ?? document.webkitExitFullscreen)?.call(document);
+    return;
+  }
+  const request = root.requestFullscreen ?? root.webkitRequestFullscreen;
+  Promise.resolve(request.call(root, { navigationUI: 'hide' }))
+    .catch(() => toast('Full screen isn\'t allowed here', 1600));
+}
+function syncFullscreen() {
+  btn.fullscreen.setAttribute('aria-pressed', String(!!fullscreenElement()));
+  btn.fullscreen.dataset.tip = fullscreenElement() ? 'Leave full screen (B or Esc)' : 'Full screen (B)';
+}
+btn.fullscreen.hidden = !canFullscreen;
+document.addEventListener('fullscreenchange', syncFullscreen);
+document.addEventListener('webkitfullscreenchange', syncFullscreen);
+
 btn.reset.addEventListener('click', () => resetAll());
 btn.focus.addEventListener('click', () => focusLennie());
 btn.follow.addEventListener('click', toggleFollow);
@@ -1907,6 +1934,7 @@ btn.cutaway.addEventListener('click', toggleCutaway);
 btn.slowmo.addEventListener('click', toggleSlowmo);
 btn.aim.addEventListener('click', toggleAim);
 btn.sound.addEventListener('click', toggleSound);
+btn.fullscreen.addEventListener('click', toggleFullscreen);
 // Drop menu
 function setDropMenu(open) {
   ui.dropMenu.hidden = !open;
@@ -1978,6 +2006,7 @@ addEventListener('keydown', (e) => {
     case 'KeyT': toggleAim(); break;
     case 'KeyM': toggleSound(); break;
     case 'KeyH': setHelp(ui.help.hidden); break;
+    case 'KeyB': toggleFullscreen(); break;
     case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': case 'Digit5': {
       const level = Number(e.code.slice(-1)) - 1;
       dropLennie(level);

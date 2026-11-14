@@ -82,10 +82,11 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 | Watch the last toss again in slow motion | P (or the button on the score card) |
 | Take turns with 2–4 players | The people button |
 | Focus camera on Lennie | F |
-| Camera follows Lennie | G |
+| Camera follows Lennie (on at the start) | G |
 | Cutaway (hide upper floors when looking down) | C |
 | Slow motion | Z |
 | Sound on/off | M |
+| Full screen on/off (no browser bar sliding in at the top) | B (or the corners button); Esc also leaves it |
 | How to play | H |
 | Close the help, a menu or a replay | Esc |
 
@@ -97,7 +98,7 @@ In aim mode a dotted arc runs from Lennie to whatever you point at: a window, a 
 
 Walls, floors and the roof between the camera and the point it's looking at fade out automatically, so you can see Lennie anywhere in the house. Anything else between the camera and Lennie (a shelf, a freezer, the couch, a tree, a pile of fallen groceries) turns see-through in a soft circle around him, and so does anything right in front of the lens, so he's never hidden. The camera only moves in when it would otherwise end up inside furniture, a bush, a tree or a neighbour's house, and glides there and back instead of hopping. Turning the camera goes no lower than eye level, so it can't dip under the floor.
 
-During a toss the camera stays put while Lennie is in view; once he's about to fly out of the picture (on a phone that's almost straight away), it chases him until he lands.
+The camera follows Lennie from the start, gliding along wherever he goes; G (or the camera button) turns that off. With it off, the camera stays put during a toss while Lennie is in view; once he's about to fly out of the picture (on a phone that's almost straight away), it chases him until he lands.
 
 The game opens close up on Lennie with a "Grab me!" bubble over him, which stays until he's first picked up.
 

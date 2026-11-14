@@ -376,6 +376,14 @@ kbd {
 #btn-sound[aria-pressed="false"] .sound-on { display: none; }
 #btn-sound[aria-pressed="false"] .sound-off { display: inline; }
 
+/* Full screen: a plain button that swaps between the "grow" and "shrink" corners. */
+#btn-fullscreen[hidden] { display: none; }
+#btn-fullscreen[aria-pressed="true"] { color: var(--text); background: transparent; box-shadow: none; }
+#btn-fullscreen[aria-pressed="true"]:hover { background: var(--hover); }
+#btn-fullscreen .fs-exit { display: none; }
+#btn-fullscreen[aria-pressed="true"] .fs-enter { display: none; }
+#btn-fullscreen[aria-pressed="true"] .fs-exit { display: inline; }
+
 /* Tooltips */
 .icon-btn[data-tip]::after {
   content: attr(data-tip);
