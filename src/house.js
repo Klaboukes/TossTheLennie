@@ -65,9 +65,10 @@ const ROOMS = [
 // along the wall plus optional sill/top heights and glazing bars (fractions).
 // The side walls are party walls with the neighbours, so they have no windows.
 const COLUMN = [1.2, 4.5];
-// The bedroom's small high windows look as small as the real ones, but give
-// Lennie some slack to get through (see `wall`).
-const SMALL = { sill: 1.45, top: 2.25, bars: { v: [], h: [] }, slack: { side: 0.15, below: 0.35, above: 0.2 } };
+// The low windows (the bedroom's small high ones and the dormer's) look as
+// small as the real ones, but give Lennie some slack to get through (see `wall`).
+const SLACK = { side: 0.15, below: 0.35, above: 0.2 };
+const SMALL = { sill: 1.45, top: 2.25, bars: { v: [], h: [] }, slack: SLACK };
 const FRONT = [
   [{ a: -4.8, b: -2.9 }, { a: COLUMN[0], b: COLUMN[1], bars: { v: [1 / 3, 2 / 3], h: [0.7] } }],
   [{ a: -5.7, b: -4.6, ...SMALL }, { a: -4.0, b: -2.6, ...SMALL }, { a: COLUMN[0], b: COLUMN[1], sill: 0.6, top: 2.5, bars: { v: [0.32], h: [] } }],
@@ -589,7 +590,7 @@ export function buildHouse(scene, world, physMats) {
     wall({
       run: 'x', at: DORMER.front, from: MID_X + INT / 2, to: DORMER.x1 + DORMER.wallT / 2, y0, y1: DORMER.top,
       thick: DORMER.wallT, physThick: 0.5, physOffset: 0.15, outward: 1, story: k, line: `dormer-${k}`,
-      openings: [{ a: 1.5, b: 4.2, bottom: underside(zf) + 0.45, top: DORMER.top - 0.25, glass: true, bars: { v: [0.5], h: [] } }],
+      openings: [{ a: 1.5, b: 4.2, bottom: underside(zf) + 0.45, top: DORMER.top - 0.25, glass: true, bars: { v: [0.5], h: [] }, slack: SLACK }],
       mats: { pos: M.cladding, neg: bath, ends: M.cladding },
     });
   }
