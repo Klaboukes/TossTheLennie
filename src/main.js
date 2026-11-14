@@ -2501,9 +2501,77 @@ function placedBack(message) {
 // Last resort when Lennie is stuck in the scenery with no good pose to go back to.
 function rescueLost() {
   if (bodies.some((b) => outsideArea(b.position, 0.05)) && putBackNearEdge()) return;
-  const level = Math.min(2, house.levelOf(lennie.center(_center)));
+  if (putBackNearby()) return;
+  // Nowhere free close by: back to where you'd drop him on this floor.
+  const c = lennie.center(_center);
+  const level = shop.isInside(c) ? SHOP_DROP : Math.min(2, house.levelOf(c));
   dropLennie(level);
-  toast(`Lennie got stuck, so he's back on floor ${level + 1}`, 1800);
+  toast(`Lennie got stuck, so he's back on ${LEVEL_NAMES[level]}`, 1800);
+}
+
+/** Ray from (ax, ay, az) to (bx, by, bz): does it hit any scenery? */
+function blocked(ax, ay, az, bx, by, bz) {
+  _from.set(ax, ay, az);
+  _to.set(bx, by, bz);
+  _rayHit.reset();
+  return world.raycastClosest(_from, _to, SCENERY_ONLY, _rayHit);
+}
+
+/**
+ * Lennie got stuck: stand him up on the nearest free bit of floor (or table,
+ * or bed...) around where he is, rather than sending him back to the start.
+ * Spots he can be seen from, so not behind a wall, come first. Returns false
+ * if there's no room for him anywhere nearby.
+ */
+const NEARBY_MAX = 5; // metres to look around him
+const NEARBY_STEP = 0.4;
+const BODY_R = 0.32; // half Lennie's width, arms included
+const BODY_H = 1.9; // Lennie standing up
+const _probe = new CANNON.Vec3();
+function putBackNearby() {
+  const c = lennie.center(_center).clone();
+  const fits = (x, ground, z) => {
+    // headroom straight up, then his width at knees, hips, chest and head
+    if (blocked(x, ground + 0.05, z, x, ground + BODY_H + 0.05, z)) return false;
+    for (const h of [0.35, 0.9, 1.4, 1.8]) {
+      const y = ground + h;
+      if (guard.isEmbedded(_probe.set(x, y, z))) return false;
+      if (blocked(x, y, z, x + BODY_R, y, z) || blocked(x, y, z, x - BODY_R, y, z)) return false;
+      if (blocked(x, y, z, x, y, z + BODY_R) || blocked(x, y, z, x, y, z - BODY_R)) return false;
+    }
+    return true;
+  };
+  // How far a spot is: a step up or down counts double, so stuck in a shelf
+  // he goes on the floor beside it rather than on top of it.
+  const feet = Math.min(...bodies.map((b) => b.position.y)) - 0.2;
+  const found = [];
+  let bestSeen = Infinity;
+  for (let r = 0; r <= NEARBY_MAX && r <= bestSeen; r += NEARBY_STEP) {
+    const n = r === 0 ? 1 : Math.ceil((Math.PI * 2 * r) / NEARBY_STEP);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const x = c.x + Math.cos(a) * r;
+      const z = c.z + Math.sin(a) * r;
+      if (outsideArea({ x, z }, -EDGE_INSET)) continue;
+      // the floor (or whatever he'd land on) below this spot, near his height
+      if (!blocked(x, c.y + 0.6, z, x, c.y - 3, z)) continue;
+      const ground = _rayHit.hitPointWorld.y;
+      if (!fits(x, ground, z)) continue;
+      const seen = !blocked(c.x, c.y, c.z, x, ground + 1.0, z);
+      const far = Math.hypot(r, 2 * (ground - feet));
+      if (seen) bestSeen = Math.min(bestSeen, far);
+      found.push({ x, ground, z, far: seen ? far : far + 100 }); // behind a wall: only if nothing else
+    }
+  }
+  found.sort((p, q) => p.far - q.far);
+  return found.slice(0, 8).some((s) => standAt(s.x, s.ground, s.z, c));
+}
+
+function standAt(x, ground, z, from) {
+  lennie.reset({ x, z, height: ground + 0.05, yaw: Math.atan2(x - from.x, z - from.z) });
+  if (bodies.some((b) => guard.isEmbedded(b.position))) return false;
+  placedBack("Lennie got stuck, so he's on a free spot nearby");
+  return true;
 }
 
 function frame(now) {
