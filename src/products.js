@@ -100,7 +100,7 @@ export const ASSORTMENT = {
 
 /** Size of a product as half extents (x across the front, y up, z depth). */
 export function halfSize(p) {
-  if (p.shape === 'box') return [p.w / 2, p.h / 2, p.d / 2];
+  if (p.w !== undefined) return [p.w / 2, p.h / 2, p.d / 2];
   if (p.shape === 'ball') return [p.r, p.r, p.r];
   return [p.r, p.h / 2, p.r];
 }
@@ -334,6 +334,7 @@ const mat = (opts) => new THREE.MeshStandardMaterial({ roughness: 0.55, metalnes
 
 /** Geometry and material(s) of one kind of product, centred on its middle. */
 function buildLook(p) {
+  if (p.look) return p.look(p); // a catalogue can bring its own models (the house's clutter does)
   const f = p.face;
   const px = (m) => Math.min(256, m * PX_PER_M);
   switch (p.shape) {
@@ -403,6 +404,36 @@ function buildLook(p) {
   }
 }
 
+/**
+ * One draw call per material instead of one per face: the faces of a model
+ * that share a material (a box's two sides, its front and back) are put
+ * together. Geometries shared between looks are only regrouped once.
+ */
+const regrouped = new WeakMap();
+function regroup({ geo, material }) {
+  if (!Array.isArray(material) || !geo.groups.length) return { geo, material };
+  if (regrouped.has(geo)) return regrouped.get(geo);
+  const uniq = [...new Set(geo.groups.map((g) => material[g.materialIndex]))];
+  let look = { geo, material };
+  if (uniq.length < geo.groups.length) {
+    if (!geo.index) geo.setIndex([...Array(geo.attributes.position.count).keys()]);
+    const src = geo.index.array;
+    const out = [];
+    const groups = [];
+    uniq.forEach((m, mi) => {
+      const start = out.length;
+      for (const g of geo.groups) if (material[g.materialIndex] === m) for (let i = g.start; i < g.start + g.count; i++) out.push(src[i]);
+      groups.push([start, out.length - start, mi]);
+    });
+    geo.setIndex(out);
+    geo.clearGroups();
+    if (uniq.length > 1) for (const [start, count, mi] of groups) geo.addGroup(start, count, mi);
+    look = { geo, material: uniq.length > 1 ? uniq : uniq[0] };
+  }
+  regrouped.set(geo, look);
+  return look;
+}
+
 // ---------------------------------------------------------------- the stock: placing, knocking off, restocking
 const GRAVITY = 9.8;
 const _m = new THREE.Matrix4();
@@ -410,24 +441,34 @@ const _one = new THREE.Vector3(1, 1, 1);
 const _v = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _axis = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _color = new THREE.Color();
 const UP = new THREE.Vector3(0, 1, 0);
 
 /**
  * All the products in the shop. `bounds` keeps tumbling products inside the
  * shop floor ({x0, x1, z0, z1}); `floorY` is the floor's height. `tables`
- * ({x0, x1, z0, z1, y}) are flat tops products can land and roll on (and off).
+ * ({x0, x1, z0, z1, y}, optionally `floor`: the height of the floor they stand
+ * on) are flat tops products can land and roll on (and off). A section can
+ * have its own `bounds` and `floorY` (a room on another floor of the house).
+ * `catalogue` says what each product id looks like (the supermarket's
+ * PRODUCTS unless given).
  */
-export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
+export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalogue = PRODUCTS }) {
   const kinds = new Map(); // product id → { look, items, mesh }
   const items = [];
   const flying = new Set();
   let seed = 7;
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 
+  // A catalogue entry can be another one in a different colour ({ base, color }):
+  // they share one model, coloured per item, so they cost no extra draw calls.
   function kind(id) {
+    const variant = catalogue[id];
+    if (variant?.base) id = variant.base;
     let k = kinds.get(id);
     if (!k) {
-      const p = PRODUCTS[id];
+      const p = catalogue[id];
       if (!p) throw new Error(`unknown product ${id}`);
       k = { id, p, half: halfSize(p), items: [], mesh: null };
       kinds.set(id, k);
@@ -435,22 +476,39 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
     return k;
   }
 
-  /** Puts one product on a shelf: (x, z) its middle, y the shelf top, yaw which way its front faces. */
-  function place(id, x, y, z, yaw, section, row = 0) {
+  /**
+   * Puts one product on a shelf: (x, z) its middle, y the shelf top, yaw which
+   * way its front faces. `tilt` (a quaternion) turns it further, after the yaw,
+   * e.g. to lay it on its side; `lift` is then its middle's height above y.
+   * With `inside` it's hidden in another product (the pieces in a board game
+   * box): it isn't knocked itself, but comes flying out when that one is.
+   * With `on` it rests on another product (a pile of plates, a stack of
+   * games), so it falls when that one is knocked away from under it.
+   */
+  function place(id, x, y, z, yaw, section, row = 0, { tilt = null, lift = null, inside = null, on = null } = {}) {
     const k = kind(id);
+    const tint = catalogue[id].base ? catalogue[id].color : null;
+    if (tint !== null) k.tinted = true;
+    const homeQ = new THREE.Quaternion().setFromAxisAngle(UP, yaw + (rnd() - 0.5) * 0.08);
+    if (tilt) homeQ.multiply(tilt);
     const item = {
-      k, idx: k.items.length, section, row,
-      home: new THREE.Vector3(x, y + k.half[1], z),
-      homeQ: new THREE.Quaternion().setFromAxisAngle(UP, yaw + (rnd() - 0.5) * 0.08),
+      k, idx: k.items.length, section: inside ? inside.section : section, row,
+      home: new THREE.Vector3(x, y + (lift ?? k.half[1]), z),
+      homeQ,
       pos: new THREE.Vector3(), quat: new THREE.Quaternion(),
       vel: new THREE.Vector3(), spin: new THREE.Vector3(),
-      state: 'home', restQ: null, t: 0, ground: floorY,
+      state: 'home', restQ: null, t: 0, ground: floorY, contents: null, above: null, tint,
     };
+    if (on) (on.above ??= []).push(item);
     k.items.push(item);
     items.push(item);
-    section.items.push(item);
+    if (inside) (inside.contents ??= []).push(item);
+    else section.items.push(item);
     return item;
   }
+
+  const boundsOf = (item) => item.section?.bounds ?? bounds;
+  const floorOf = (item) => item.section?.floorY ?? floorY;
 
   /** Fills a row of shelf from `a` to `b` along its length with runs of products. */
   function fillRow(ids, { along, a, b, y, depthAt, yaw, maxH, section, rows = 2, room = 0.45 }) {
@@ -480,10 +538,14 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
 
   function build() {
     for (const k of kinds.values()) {
-      const look = buildLook(k.p);
+      const look = regroup(buildLook(k.p));
       const mesh = new THREE.InstancedMesh(look.geo, look.material, k.items.length);
       mesh.frustumCulled = false; // its products move around, so the precomputed bounds would be wrong
-      mesh.castShadow = true;
+      mesh.castShadow = k.p.shadow !== false;
+      if (k.tinted) {
+        for (const item of k.items) mesh.setColorAt(item.idx, _color.set(item.tint ?? 0xffffff));
+        mesh.instanceColor.needsUpdate = true;
+      }
       mesh.receiveShadow = true;
       mesh.userData.products = true;
       k.mesh = mesh;
@@ -502,6 +564,7 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
     flying.clear();
     for (const item of items) {
       item.state = 'home';
+      item.ground = floorOf(item);
       item.pos.copy(item.home);
       item.quat.copy(item.homeQ);
       _m.compose(item.pos, item.quat, _one);
@@ -514,26 +577,42 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
    * Knocks the products of `section` near `point` off the shelf. `out` is the
    * way they fall (out of the shelf), `push` Lennie's velocity, `strength`
    * how hard he hit. Returns how many fell.
+   * With `radial` they fly away from the point instead (things lying on a
+   * floor or table that he lands among); with `again` the ones that already
+   * fell get kicked about again too (they don't count a second time).
+   * `power` makes them fly further (or less far). With `fresh: false` only the
+   * ones already knocked down move.
    */
-  function knock(section, point, out, strength, push = null, { radius = null, chance = 1 } = {}) {
+  function knock(section, point, out, strength, push = null, { radius = null, chance = 1, radial = false, again = false, fresh = true, power: boost = 1 } = {}) {
     const r = radius ?? Math.min(0.7, 0.15 + strength * 0.05);
-    const power = Math.min(1.6, 0.5 + strength / 10);
+    const power = Math.min(1.6, 0.5 + strength / 10) * boost;
     let n = 0;
     for (const item of section.items) {
-      if (item.state !== 'home') continue;
-      const dx = item.home.x - point.x;
-      const dy = (item.home.y - point.y) / 1.2;
-      const dz = item.home.z - point.z;
+      const home = item.state === 'home';
+      if (home ? !fresh : !(again && item.state === 'down')) continue;
+      const at = home ? item.home : item.pos;
+      const dx = at.x - point.x;
+      const dy = (at.y - point.y) / 1.2;
+      const dz = at.z - point.z;
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
       // the ones nearest the impact almost always go; the row behind the front one less often
       if (d > r || rnd() > chance * (1 - 0.5 * (d / r) ** 2) * (item.row ? 0.45 : 1)) continue;
-      launch(item, out, power, push);
-      n++;
+      let dir = out;
+      if (radial) {
+        dir = _dir.set(dx, 0, dz);
+        if (dir.lengthSq() < 1e-6) dir.set(rnd() - 0.5, 0, rnd() - 0.5);
+        dir.normalize();
+      }
+      if (home) n += launch(item, dir, power, push);
+      else launch(item, dir, power * 0.6, push);
     }
     return n;
   }
 
+  /** Sends a product flying, and whatever rests on it or is inside it. Returns how many of those were home. */
   function launch(item, out, power, push) {
+    let n = item.state === 'home' ? 1 : 0;
+    if (item.state === 'down') item.pos.y += 0.01; // kicked up off the floor
     item.state = 'flying';
     item.t = 0;
     _axis.crossVectors(out, UP); // sideways along the shelf
@@ -543,6 +622,26 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
     if (push) item.vel.addScaledVector(_v.set(push.x, 0, push.z), 0.15);
     item.spin.set((rnd() - 0.5) * 16, (rnd() - 0.5) * 8, (rnd() - 0.5) * 16).multiplyScalar(power);
     flying.add(item);
+    // what was inside it spills out, every which way
+    if (item.contents) {
+      const ox = out.x;
+      const oz = out.z;
+      for (const c of item.contents) {
+        if (c.state !== 'home') continue;
+        const dir = new THREE.Vector3(ox + (rnd() - 0.5) * 1.6, 0, oz + (rnd() - 0.5) * 1.6).normalize();
+        launch(c, dir, power * (0.6 + rnd() * 0.7), push);
+      }
+    }
+    // what was stacked on it topples too (counted: it's a mess as well)
+    if (item.above) {
+      const ox = out.x;
+      const oz = out.z;
+      for (const a of item.above) {
+        if (a.state !== 'home') continue;
+        n += launch(a, new THREE.Vector3(ox + (rnd() - 0.5) * 0.6, 0, oz + (rnd() - 0.5) * 0.6).normalize(), power * (0.5 + rnd() * 0.5), push);
+      }
+    }
+    return n;
   }
 
   /** Height of the lowest point of a product below its middle, at its current tilt. */
@@ -555,7 +654,7 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
 
   /** What a product would land on right below it: a table top it's above, or the floor. */
   function groundUnder(item, low) {
-    let g = floorY;
+    let g = floorOf(item);
     const bottom = item.pos.y - low + 0.03;
     for (const t of tables) {
       if (t.y > g && t.y <= bottom && item.pos.x > t.x0 && item.pos.x < t.x1 && item.pos.z > t.z0 && item.pos.z < t.z1) g = t.y;
@@ -568,7 +667,7 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
     const r = Math.max(item.k.half[0], item.k.half[2]);
     const p = item.pos;
     for (const t of tables) {
-      if (p.y - low > t.y - 0.02) continue;
+      if (p.y - low > t.y - 0.02 || (t.floor !== undefined && p.y < t.floor)) continue;
       if (p.x < t.x0 - r || p.x > t.x1 + r || p.z < t.z0 - r || p.z > t.z1 + r) continue;
       // out through the nearest side
       const sides = [[t.x0 - r - p.x, 'x'], [t.x1 + r - p.x, 'x'], [t.z0 - r - p.z, 'z'], [t.z1 + r - p.z, 'z']];
@@ -591,6 +690,7 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
         const angle = item.spin.length() * dt;
         if (angle > 0) item.quat.multiply(_q.setFromAxisAngle(_axis.copy(item.spin).normalize(), angle));
         // the shop's walls
+        const bounds = boundsOf(item);
         if (item.pos.x < bounds.x0 + 0.1 || item.pos.x > bounds.x1 - 0.1) { item.pos.x = Math.min(bounds.x1 - 0.1, Math.max(bounds.x0 + 0.1, item.pos.x)); item.vel.x *= -0.3; }
         if (item.pos.z < bounds.z0 + 0.1 || item.pos.z > bounds.z1 - 0.1) { item.pos.z = Math.min(bounds.z1 - 0.1, Math.max(bounds.z0 + 0.1, item.pos.z)); item.vel.z *= -0.3; }
         const low = lowest(item);
@@ -620,10 +720,11 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
         item.vel.z *= f;
         item.pos.x += item.vel.x * dt;
         item.pos.z += item.vel.z * dt;
+        const bounds = boundsOf(item);
         item.pos.x = Math.min(bounds.x1 - 0.1, Math.max(bounds.x0 + 0.1, item.pos.x));
         item.pos.z = Math.min(bounds.z1 - 0.1, Math.max(bounds.z0 + 0.1, item.pos.z));
         const low = lowest(item);
-        if (item.ground < 0.1) keepOutOfTables(item, low); // rolling on the floor
+        if (item.ground < floorOf(item) + 0.05) keepOutOfTables(item, low); // rolling on the floor
         const ground = groundUnder(item, low);
         if (ground < item.ground - 0.01) {
           // rolled off the edge of a table: fall again
@@ -663,7 +764,7 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [] }) {
 
   return {
     place, fillRow, build, restock, knock, update,
-    section: () => ({ items: [] }),
+    section: (opts = {}) => ({ items: [], ...opts }),
     get falling() { return flying.size; },
   };
 }
