@@ -317,13 +317,16 @@ function confettiAt(position, gold = false) {
   if (v.z > 1) return;
   const x = THREE.MathUtils.clamp((v.x * 0.5 + 0.5) * innerWidth, 0, innerWidth);
   const y = THREE.MathUtils.clamp((-v.y * 0.5 + 0.5) * innerHeight, 0, innerHeight);
-  const colors = gold ? [...CONFETTI, '#f5b301', '#f5b301', '#ffe08a'] : CONFETTI;
-  const n = gold ? 56 : 30;
+  confettiFrom(x, y, gold ? [...CONFETTI, '#f5b301', '#f5b301', '#ffe08a'] : CONFETTI, gold ? 56 : 30, gold);
+}
+
+/** A burst of `n` bits of confetti in `colors` from a point on the screen; `big` throws them further. */
+function confettiFrom(x, y, colors, n, big = false) {
   for (let i = 0; i < n; i++) {
     const el = document.createElement('i');
     el.className = 'confetti';
     const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.2; // mostly upwards
-    const power = (gold ? 170 : 130) * (0.5 + Math.random());
+    const power = (big ? 170 : 130) * (0.5 + Math.random());
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
     el.style.background = colors[i % colors.length];
@@ -426,6 +429,25 @@ function resetChain() {
 const _center = new THREE.Vector3();
 
 const spots = [...house.spots, ...shop.spots];
+
+// The landing spots found so far (kept in the browser): the first time Lennie
+// comes to rest in one, the score card says so, so there's always a new one to hunt for.
+// (Both beds are one spot, and so on: it's the ids that count.)
+const SPOTS_KEY = 'toss-the-lennie:spots';
+const ALL_SPOTS = new Set([...spots.map((s) => s.id), 'tree', 'bush', 'trampnap']);
+const spotsFound = new Set();
+try {
+  for (const id of JSON.parse(localStorage.getItem(SPOTS_KEY) ?? '[]')) if (ALL_SPOTS.has(id)) spotsFound.add(id);
+} catch { /* storage unavailable */ }
+
+/** If this toss ended in a spot Lennie never landed in before: remembers it and returns the score card line. */
+function newSpotLine(tricks) {
+  const id = tricks.find((t) => ALL_SPOTS.has(t.id))?.id;
+  if (!id || spotsFound.has(id)) return null;
+  spotsFound.add(id);
+  try { localStorage.setItem(SPOTS_KEY, JSON.stringify([...spotsFound])); } catch { /* ignore */ }
+  return { label: `New spot found! ${spotsFound.size} of ${ALL_SPOTS.size}`, value: '★', trick: true };
+}
 // (a spot with a `when` only counts while that holds, like a freezer whose glass door is smashed)
 const inBox = (p, s) => p.x > s.min[0] && p.x < s.max[0] && p.y > s.min[1] && p.y < s.max[1] && p.z > s.min[2] && p.z < s.max[2] && (!s.when || s.when());
 /** The named spot (bath, bed, freezer...) Lennie's hips or chest ended up in, if any. */
@@ -446,6 +468,16 @@ function touching() {
   return kinds;
 }
 
+/**
+ * Whether Lennie (his middle at `center`) is hanging out of a window: his middle
+ * just outside the house, high up, or lower down (over a living room
+ * windowsill) with part of him still indoors.
+ */
+function isHanging(center) {
+  if (house.isInside(center) || house.isOnRoof(center) || !house.nearHouse(center)) return false;
+  return center.y > 1.5 || (center.y > 0.5 && lennie.bodies.some((b) => house.isInside(b.position)));
+}
+
 /** The feats of a toss, each with an id that challenges can look for. */
 function houseBonuses(center) {
   const bonuses = [];
@@ -453,13 +485,14 @@ function houseBonuses(center) {
   const endInside = house.isInside(center);
   const onRoof = house.isOnRoof(center);
   const endLevel = house.levelOf(center);
-  const hanging = !endInside && !onRoof && center.y > 1.5 && house.nearHouse(center);
+  const hanging = isHanging(center);
   if (toss.startInside && hanging) add('hanging', 'Hanging out the window!', 400);
   else if (toss.startInside && !endInside && !onRoof) add('defenestrated', 'Defenestrated!', 400);
   const fell = (toss.startLevel ?? 0) - endLevel;
   if (fell >= 1) add('fell', `Fell ${fell} floor${fell === 1 ? '' : 's'}`, 80 * fell);
   if (onRoof && toss.startLevel < 3) add('roof', 'Stranded on the roof!', 400);
   if (shop.isInside(center) && !toss.startInShop) add('shopping', 'Went shopping!', 500);
+  else if (toss.startInShop && !shop.isInside(center) && !shop.isOnRoof(center)) add('shopout', 'Kicked out of the shop!', 400);
   if (shop.isOnRoof(center) && !toss.startOnShopRoof) add('shoproof', 'On the supermarket roof!', 600);
   if (toss.products >= 5) add('mess', `Knocked ${toss.products} products off the shelves`, Math.min(400, 10 * toss.products));
   if (toss.games >= 3) add('games', `Board game avalanche! (${toss.games} games)`, Math.min(500, 20 * toss.games));
@@ -499,6 +532,8 @@ function finishToss() {
   const center = lennie.center(_center);
   const chain = { bounces: toss.bounces, juggles: toss.juggles, smashed: toss.smashed, doors: toss.doors, trampoline: toss.trampoline };
   const result = evaluateToss(lennie, { ...chain, bonuses: houseBonuses(center) });
+  const found = newSpotLine(result.tricks);
+  if (found) result.lines.push(found);
 
   // The challenge (free play only): a bonus on top when it's done.
   const done = match ? null : challenges.check({ total: result.total, ids: new Set(result.tricks.map((t) => t.id)), chain });
@@ -859,6 +894,7 @@ function pickPart() {
 function locate(p) {
   if (shop.isInside(p)) return 'in the supermarket';
   if (shop.isOnRoof(p)) return 'on the supermarket roof';
+  if (isHanging(p)) return 'hanging out of a window';
   const where = house.locate(p);
   if (where === 'in the yard' && p.z > STREET.cycle[0] - 0.6) return p.z > STREET.road[0] && p.z < STREET.road[1] ? 'in the road' : 'in the street';
   return where;
@@ -1203,7 +1239,8 @@ canvas.addEventListener('pointerdown', (e) => {
     return;
   }
   controls.enabled = false;
-  canvas.setPointerCapture(e.pointerId);
+  // (it can refuse a pointer that's already gone; the grab still works without it)
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
   setHover(pick.name);
   // Caught in mid-air he swings from your hand (a juggle); lying down, he goes in the slingshot.
   if (toss.state === 'flying' && isAirborne()) startGrab(pick, e.pointerId, e.pointerType);
@@ -1945,6 +1982,7 @@ function toggleSound() {
   sfx.unlock();
   sfx.setMuted(!sfx.muted);
   btn.sound.setAttribute('aria-pressed', String(!sfx.muted));
+  toast(sfx.muted ? 'Sound off' : 'Sound on', 1000);
 }
 
 // Full screen through the page itself rather than the browser's F11: then the
@@ -2149,6 +2187,8 @@ function renderChallenge() {
 /** The list of all challenges to pick from: done ones ticked off, the current one marked. */
 function renderChallengeList() {
   const current = challenges.current;
+  $('ch-spots').textContent = spotsFound.size;
+  $('ch-spots-all').textContent = ALL_SPOTS.size;
   ui.chList.innerHTML = '';
   CHALLENGES.forEach((c, i) => {
     const li = document.createElement('li');
@@ -2377,6 +2417,10 @@ function showTurnCard() {
     ui.turnAlt.dataset.action = 'free';
     sfx.score(3);
     sfx.voice('cheer');
+    setTimeout(() => sfx.chime(), 450);
+    // confetti in the winner's colour (and gold), from both sides of the card
+    const party = [...winners.map((p) => p.color), ...winners.map((p) => p.color), '#ffc94a', '#ffe08a', '#ffffff'];
+    for (const side of [0.3, 0.7]) setTimeout(() => confettiFrom(innerWidth * side, innerHeight * 0.42, party, 40, true), side > 0.5 ? 180 : 0);
   } else {
     const p = match.players[match.turn];
     const first = match.players.every((q) => q.scores.length === 0);
@@ -2490,7 +2534,7 @@ function updateHud(dt, now) {
       const warn = aim.shot?.tooFar ? ' · <b>too far</b>' : aim.shot?.blocked ? ' · <b>something is in the way</b>' : '';
       status = document.body.classList.contains('touch')
         ? (aim.pin ? `<b>Aim</b>: tap the ring again to throw · tap elsewhere to aim again${warn}` : '<b>Aim</b>: tap where Lennie should go')
-        : `<b>Aim</b>: click where Lennie should go · scroll for a higher or lower arc${warn}`;
+        : `<b>Aim</b>: click where Lennie should go · scroll: arc${warn}`;
     }
   }
   if (ui.status.innerHTML !== status) ui.status.innerHTML = status;

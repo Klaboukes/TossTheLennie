@@ -239,6 +239,8 @@ kbd {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
 }
+.ch-spots { flex: none; margin: 6px 8px 2px; padding-top: 7px; font-size: 11.5px; color: var(--text-soft); border-top: 1px dashed rgba(255, 255, 255, 0.12); }
+.ch-spots b { color: var(--gold); }
 .ch-list button {
   display: flex;
   width: 100%;
@@ -490,9 +492,8 @@ kbd {
   font-size: 12px;
   text-align: center;
   color: var(--text-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* a long line (a busy toss, aiming on a tablet) wraps rather than being cut off */
+  text-wrap: balance;
 }
 .status b { color: var(--accent-soft); font-weight: 600; }
 
@@ -895,7 +896,6 @@ body:not(.touch) .touch-only { display: none !important; }
   #result.show { transform: none; }
   .r-total { font-size: 30px; }
   #toast { top: 66px; white-space: normal; text-align: center; max-width: calc(100vw - 32px); }
-  .status { white-space: normal; }
   #aim-pad { bottom: calc(var(--gap) + 118px); }
   #replay-badge { top: auto; bottom: calc(var(--gap) + 118px); }
 }
