@@ -801,7 +801,7 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
    * games), so it falls when that one is knocked away from under it.
    */
   function place(id, x, y, z, yaw, section, row = 0, opts = {}) {
-    const { slope = 0, tilt = null, lift = null, inside = null, on = null } = typeof opts === 'number' ? { slope: opts } : opts;
+    const { slope = 0, tilt = null, lift = null, inside = null, on = null, layer = 0 } = typeof opts === 'number' ? { slope: opts } : opts;
     const k = kind(id);
     const tint = catalogue[id].base ? catalogue[id].color : null;
     if (tint !== null) k.tinted = true;
@@ -809,8 +809,8 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
     if (slope) homeQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), slope));
     if (tilt) homeQ.multiply(tilt);
     const home = lift !== null
-      ? new THREE.Vector3(x, y + lift, z)
-      : new THREE.Vector3(x, y, z).addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(homeQ), k.half[1]);
+      ? new THREE.Vector3(x, y + lift + layer, z)
+      : new THREE.Vector3(x, y + layer, z).addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(homeQ), k.half[1]);
     const item = {
       k, idx: k.items.length, section: inside ? inside.section : section, row,
       home,
@@ -818,6 +818,9 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
       pos: new THREE.Vector3(), quat: new THREE.Quaternion(),
       vel: new THREE.Vector3(), spin: new THREE.Vector3(),
       state: 'home', restQ: null, t: 0, ground: floorY, contents: null, above: null, tint,
+      // `layer`: a few mm it always rests above whatever it lies on, so thin
+      // things lying on top of each other (clothes) don't flicker
+      layer,
     };
     if (on) (on.above ??= []).push(item);
     k.items.push(item);
@@ -1028,8 +1031,8 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
         // both judged from where it was before this step, so landing on a table top isn't hitting its side
         keepOutOfTables(item, low + item.vel.y * dt);
         const ground = groundUnder(item, low + item.vel.y * dt);
-        if (item.pos.y - low < ground) {
-          item.pos.y = ground + low;
+        if (item.pos.y - low < ground + item.layer) {
+          item.pos.y = ground + low + item.layer;
           item.ground = ground;
           if (item.vel.y < -1.4 && item.t < 3) {
             item.vel.y *= -0.3;
@@ -1064,10 +1067,10 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
           write(item);
           continue;
         }
-        item.pos.y = ground + low;
+        item.pos.y = ground + low + item.layer;
         if (item.t > 0.6 && item.vel.lengthSq() < 0.0004) {
           item.quat.copy(item.restQ);
-          item.pos.y = ground + lowest(item);
+          item.pos.y = ground + lowest(item) + item.layer;
           item.state = 'down';
           flying.delete(item);
         }

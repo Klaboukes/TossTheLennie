@@ -710,9 +710,11 @@ export function buildHouse(scene, world, physMats) {
     };
     const rug = (story, x0, z0, x1, z1, color, round = false) => {
       const geo = round ? new THREE.CircleGeometry(Math.min(x1 - x0, z1 - z0) / 2, 40) : new THREE.PlaneGeometry(x1 - x0, z1 - z0);
-      const mesh = new THREE.Mesh(geo, col(color, { roughness: 1 }));
+      // just above the floorboards (pulled in front of them, so they never
+      // flicker through) and below the 0.012 where loose things lie
+      const mesh = new THREE.Mesh(geo, col(color, { roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 }));
       mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set((x0 + x1) / 2, story * H + 0.018, (z0 + z1) / 2);
+      mesh.position.set((x0 + x1) / 2, story * H + 0.011, (z0 + z1) / 2);
       mesh.receiveShadow = true;
       groups[story].add(mesh);
     };
