@@ -4,11 +4,14 @@
 // sparks spitting out of the hole. Touching a cracked TV gives him a shock
 // (main.js does the zapping, zap.js the fireworks). "Fix everything" repairs it.
 import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
 
-// Where it stands: on the TV cabinet in the living room, its screen facing
-// the couch (towards -x). Ground floor, so world y is the room's y.
-const FRAME = { min: [0.55, 0.5, 2.45], max: [0.62, 1.25, 3.75] };
-const SCREEN = { x: 0.548, y0: 0.55, y1: 1.2, z0: 2.5, z1: 3.7 };
+// Where it stands: on the low cabinet in the living room's back left corner,
+// turned towards the couch, as in the floor plan. Ground floor, so world y is
+// the room's y. The TV is built facing local -x and turned by `yaw`.
+const PLACE = { x: -5.35, z: -3.9, yaw: Math.atan2(0.6, -0.8) };
+const FRAME = { min: [-0.035, 0.5, -0.65], max: [0.035, 1.25, 0.65] };
+const SCREEN = { x: -0.037, y0: 0.55, y1: 1.2, z0: -0.6, z1: 0.6 };
 const W = 256;
 const H = 144;
 
@@ -116,8 +119,23 @@ function drawCracked(g, cx, cy) {
   }
 }
 
-export function buildTV({ box, body, groups, std, physMats }) {
-  box(FRAME.min, FRAME.max, std({ color: 0x111114, roughness: 0.35 }), { story: 0, cast: true });
+export function buildTV({ groups, std, physMats, world }) {
+  const tvGroup = new THREE.Group();
+  tvGroup.position.set(PLACE.x, 0, PLACE.z);
+  tvGroup.rotation.y = PLACE.yaw;
+  groups[0].add(tvGroup);
+  tvGroup.updateMatrixWorld(true);
+  const size = FRAME.max.map((v, i) => v - FRAME.min[i]);
+  const mid = FRAME.max.map((v, i) => (v + FRAME.min[i]) / 2);
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(...size), std({ color: 0x111114, roughness: 0.35 }));
+  frame.position.set(...mid);
+  frame.castShadow = true;
+  frame.receiveShadow = true;
+  tvGroup.add(frame);
+  // a little foot on the cabinet
+  const foot = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.04, 0.4), frame.material);
+  foot.position.set(0.02, 0.52, 0);
+  tvGroup.add(foot);
 
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -132,10 +150,11 @@ export function buildTV({ box, body, groups, std, physMats }) {
   const sh = SCREEN.y1 - SCREEN.y0;
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), mat);
   screen.position.set(SCREEN.x, (SCREEN.y0 + SCREEN.y1) / 2, (SCREEN.z0 + SCREEN.z1) / 2);
-  screen.rotation.y = -Math.PI / 2; // faces -x; its left edge (u = 0) is at z0
-  groups[0].add(screen);
+  screen.rotation.y = -Math.PI / 2; // faces local -x; its left edge (u = 0) is at z0
+  tvGroup.add(screen);
 
-  // Sparks spitting out of the hole in a broken screen.
+  // Sparks spitting out of the hole in a broken screen, in the TV's own frame
+  // (local -x is out of the screen).
   const sparkGeo = new THREE.BoxGeometry(0.018, 0.018, 0.018);
   const sparkMat = new THREE.MeshBasicMaterial({ color: 0xfff3a0 });
   const sparks = [];
@@ -143,22 +162,29 @@ export function buildTV({ box, body, groups, std, physMats }) {
     const m = new THREE.Mesh(sparkGeo, sparkMat);
     m.visible = false;
     m.userData.noAim = true;
-    groups[0].add(m);
+    tvGroup.add(m);
     sparks.push({ m, vel: new THREE.Vector3(), t: 0 });
   }
   let nextSpark = 0;
+  const localHole = new THREE.Vector3();
 
   const tv = {
     cracked: false,
     crackedAt: 0,
     /** Where the screen broke, in the world. */
     hole: new THREE.Vector3(),
-    center: screen.position.clone(),
-    normal: new THREE.Vector3(-1, 0, 0),
+    center: tvGroup.localToWorld(screen.position.clone()),
+    normal: new THREE.Vector3(-1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), PLACE.yaw),
     screen,
     body: null,
   };
-  tv.body = body(FRAME.min, FRAME.max, physMats.hard, { kind: 'tv', sound: 'glass', piece: tv });
+  const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3(size[0] / 2, size[1] / 2, size[2] / 2)) });
+  const c = tvGroup.localToWorld(new THREE.Vector3(...mid));
+  b.position.set(c.x, c.y, c.z);
+  b.quaternion.setFromEuler(0, PLACE.yaw, 0);
+  b.surface = { kind: 'tv', sound: 'glass', piece: tv };
+  world.addBody(b);
+  tv.body = b;
 
   function spray(n, speed = 1) {
     for (const s of sparks) {
@@ -166,7 +192,7 @@ export function buildTV({ box, body, groups, std, physMats }) {
       if (s.m.visible) continue;
       n--;
       s.m.visible = true;
-      s.m.position.copy(tv.hole);
+      s.m.position.copy(localHole);
       s.vel.set(-(0.8 + Math.random() * 2) * speed, (Math.random() * 2.2) * speed, (Math.random() - 0.5) * 2.4 * speed);
       s.t = 0;
     }
@@ -177,9 +203,11 @@ export function buildTV({ box, body, groups, std, physMats }) {
     if (tv.cracked) return;
     tv.cracked = true;
     tv.crackedAt = performance.now();
-    const z = THREE.MathUtils.clamp(point.z, SCREEN.z0 + 0.1, SCREEN.z1 - 0.1);
-    const y = THREE.MathUtils.clamp(point.y, SCREEN.y0 + 0.08, SCREEN.y1 - 0.08);
-    tv.hole.set(SCREEN.x - 0.01, y, z);
+    const local = tvGroup.worldToLocal(point.clone());
+    const z = THREE.MathUtils.clamp(local.z, SCREEN.z0 + 0.1, SCREEN.z1 - 0.1);
+    const y = THREE.MathUtils.clamp(local.y, SCREEN.y0 + 0.08, SCREEN.y1 - 0.08);
+    localHole.set(SCREEN.x - 0.01, y, z);
+    tv.hole.copy(tvGroup.localToWorld(localHole.clone()));
     drawCracked(g, ((z - SCREEN.z0) / sw) * W, ((SCREEN.y1 - y) / sh) * H);
     tex.needsUpdate = true;
     spray(30, 1.4);

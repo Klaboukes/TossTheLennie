@@ -2,7 +2,7 @@
 
 Lennie lives in a typical Dutch rowhouse, with a supermarket across the street. Grab him, pull him back like a slingshot and let go to toss him around like a ragdoll: through the rooms, down the stairs, out of the windows, over the road and into the supermarket. Each toss scores points once he comes to rest, and the more contorted he ends up, the more it's worth.
 
-Lennie's house and the supermarket are where the game happens. The neighbours' houses, the street and the townhouses further along are there for decoration, so the neighbourhood looks like the real one.
+Lennie's house and the supermarket are where the game happens. The neighbours' houses and the street are there for decoration, so the neighbourhood looks like the real one.
 
 It's a just-for-laughs-and-giggles game, made for a friend and his kids to play, not for a broad online public.
 
@@ -24,17 +24,17 @@ Then open http://localhost:5173.
 
 Lennie's house is a brick rowhouse in a 1970s Dutch terrace, with two floors and an attic.
 
-- **Floor 1:** living room (couch, coffee table, TV, a tall closet full of board games) and kitchen (counter with a sink, fridge, dining table)
+- **Floor 1**, after the owner's floor plan ([docs/house-design.md](docs/house-design.md)): at the front a toilet, the hallway with the coat rack and the stairs, and an open kitchen with a U of counters, wall cupboards, a cooker hood and plants on the window sill; under the stairs a storage cupboard; across the back the living room, white with the kids' drawings on the walls (dark grey corner couch and comfy chair, the TV turned towards the couch in the corner, a tall closet full of board games, a dining table with six chairs and a piano), with one big window onto the garden and a heating trench in the floor under it; and built on at the back a utility room with the fridge and the cat's litter box. The inside doors are white, and the ones to the hallway, the utility room and the garden have glass panes
 - **Floor 2:** bedroom (bed, wardrobe, a chair buried under clothes) and kids room (bed, toy box, beanbag)
 - **Floor 3, the attic:** study (desk, bookshelf, armchair, moving boxes) and bathroom under the sloping roof, with a washing machine and a bathtub Lennie can land in tucked into the dormer
 - **It's a mess:** dirty dishes, pans and half-eaten breakfast on the kitchen counter and table; toys, crayons and drawings all over the living room and kids room floors; clothes everywhere in the bedrooms; and the usual household stuff (washing-up liquid, loo rolls, shampoo, a vacuum cleaner left out, trash bags, a thirsty plant). The loose things don't get in Lennie's way: land among them or crash into the table they're on and they go flying.
 - **The board game closet** in the living room is stuffed with Dutch games: Mens erger je niet, Ganzenbord, Dammen, Schaken, Zeeslag, Vier op een rij, Kwartet, Domino, Memo, Mikado, jigsaw puzzles and more, with a sjoelbak on top (plain names, no brands). Crash into it and it empties itself across the floor, and every box spills its pawns, dice, cards, puzzle pieces and play money.
-- A switchback staircase in the back hallway connects the floors, with open stairwells to fall down.
+- The stairs go up from the hallway along the left wall to a corridor on floor 2, and from the landing at the back on to the attic, with open stairwells to fall down.
 - Every window has glass that shatters when Lennie hits it hard enough, including the dormer window up in the attic.
 - The TV in the living room is on. Throw Lennie into it hard and the screen cracks where he hit it, flickers and spits sparks, and he gets electrocuted: he flashes between glowing blue and an X-ray of his skeleton while lightning crackles over him, then lies there sooty and smoking. Bump him into the cracked TV again and he gets another shock. R fixes the TV.
 - Every doorway has a closed door. Doors are a bit tougher than windows: a hard hit smashes one straight away, a lighter one only cracks it, and the next knock breaks it.
 - **Outside:** two brick storeys with a tall window column and dark panels, small high windows, a flat canopy over the front door beside a little brick screen with breeze blocks, and a steep dark tiled roof with a chimney and the dormer. Lennie can land on the canopy, the roof and the dormer, and slide down the roof into the front garden.
-- **The gardens:** an open front garden with a big dark shrub in front of the window column and a low hedge along the cycle path; a fenced back garden with trees and a trampoline.
+- **The gardens:** an open front garden with a big dark shrub in front of the window column and a low hedge along the cycle path; a fenced back garden after the floor plan, with bushes along one side and down the other the garage (stuffed full), a lounge set under a striped awning, a round trampoline and three wheelie bins by the gate.
 
 ## The supermarket
 
@@ -55,9 +55,8 @@ Across the road, after the real one: an orange building under a zigzag of grey g
 
 The rest of the neighbourhood is scenery, modelled on the real street so it's recognizable. You can't go inside any of it, but Lennie bounces off it and can land on it.
 
-- **The row:** neighbour houses continue the terrace on both sides of Lennie's house under one long roof, mirrored in pairs and each with its own colour of panels. Lennie can land on their roofs and canopies. Because they share its side walls, Lennie's house has windows only at the front and back.
+- **The row:** a block of five houses under one long roof, like the real one ([docs/house-design.md](docs/house-design.md)), with Lennie's house second from the left. The neighbours are mirrored in pairs, each with its own colour of panels. Lennie can land on their roofs and canopies. Because they share its side walls, Lennie's house has windows only at the front and back.
 - **The street:** a red cycle path, a grass verge with tall trees and street lamps, and a two-lane road with room to play.
-- **The townhouses:** newer gabled townhouses past the end of the row.
 
 The play area runs from the back garden, across the street, to the supermarket's back wall. If Lennie ever gets out of it, he's stood back on open ground just inside the edge, near where he left.
 
@@ -108,7 +107,7 @@ The game opens close up on Lennie with a "Grab me!" bubble over him, which stays
 - **Contortion**: every joint (neck, spine, shoulders, elbows, hips, knees) is measured against its relaxed pose. A bit of bend counts as relaxed and is free; past that, points grow with the square of the bend.
 - **Pose tricks**: Upside down, The splits, Pretzel legs, Straitjacket, Foot in face, and Human knot (any three of those at once). One crossed leg or one tangled arm is a small extra that doesn't count towards the knot.
 - **House feats**: Defenestrated! (thrown out of the house), Hanging out the window! (high up, or draped over a living room windowsill), Kicked out of the shop! (thrown out of the supermarket), Fell N floors (a modest bonus, so rolling him off the roof isn't the easy way to a big score), Stair tumble/Full flight, Stranded on the roof!, Went shopping! (landed in the supermarket), On the supermarket roof!, Knocked products off the shelves (5 or more, 10 points each, up to 400), Board game avalanche! (3 or more games out of the closet, 20 points each, up to 500), Made the mess even worse (5 or more things in the house sent flying, 6 points each, up to 300), Broke the TV! (300), Electrocuted! (250 a shock, up to 3), Trampoline bounces.
-- **Landing spots**: where he comes to rest can earn a bonus, with Lennie saying something about it: in the bath, on the loo, on the desk, in the armchair, on top of the wardrobe or the game closet, in the wash (on the washing machine), in either bed, on the beanbag or the toy box, on top of the fridge, on the dinner table or kitchen counter, on the couch; in the supermarket in a freezer or a drinks fridge (through a smashed door, half in counts), on top of the freezers, the drinks fridges, the shelves, the bread rack or the cheese cooler, in the trolleys, in the fruit and veg, in the bread baskets, in the smashed pastry case or meat counter, behind the butcher counter, in the pindakaas, in the snack freezer, in the tulips, or scanned at a checkout; outside stuck in a tree, in the bushes, or napping on the trampoline.
+- **Landing spots**: where he comes to rest can earn a bonus, with Lennie saying something about it: in the bath, on either loo, on the desk, in the armchair, on top of the wardrobe or the game closet, in the wash (on the washing machine), in either bed, on the beanbag or the toy box, on top of the fridge, on the dinner table, the kitchen counter or the piano, on the couch, in the cat litter; in the supermarket in a freezer or a drinks fridge (through a smashed door, half in counts), on top of the freezers, the drinks fridges, the shelves, the bread rack or the cheese cooler, in the trolleys, in the fruit and veg, in the bread baskets, in the smashed pastry case or meat counter, behind the butcher counter, in the pindakaas, in the snack freezer, in the tulips, or scanned at a checkout; outside stuck in a tree, in the bushes, or napping on the trampoline.
 - **Multiplier**: +0.1 per hard bounce, +0.25 per mid-air juggle (re-grabbing him while he's airborne), +0.3 per smashed window (the shop window and the freezer and fridge doors count too), +0.4 per smashed door, up to ×4.
 - A toss that's too gentle doesn't score.
 - **Spots found**: the first time Lennie comes to rest in a landing spot, the score card says *New spot found!* with how many of them have been found so far, and the challenge list shows the count at the bottom. Remembered in the browser.
@@ -139,19 +138,21 @@ The game is made to run smoothly on cheap tablets and older phones too. That's w
 - `index.html`, `style.css`: the page, toolbar, score panel, challenge, players board, turn card and help; the import map that loads three.js and cannon-es
 - `src/main.js`: scene, input (mouse and touch), camera, toss state machine, breaking glass and doors, landing spots, putting Lennie back when he leaves the play area, HUD, challenges, taking turns and the replay controls
 - `src/house.js`: the house (walls with windows and breakable doors, floors, stairs, the row's roof, furniture), plus cutaway and wall fading
-- `src/tv.js`: the living room TV, its screen cracking where Lennie hits it, flickering and sparking
+- `src/drawings.js`: the kids' drawings and paintings on the living room walls, all drawn on one canvas
+- `src/tv.js`: the living room TV in its corner, its screen cracking where Lennie hits it, flickering and sparking
 - `src/zap.js`: Lennie getting electrocuted: the X-ray skeleton, lightning, the blue flash, the spasms, soot and smoke
 - `src/clutter.js`: the mess in the house (dishes, toys, clothes, household stuff) and the board game closet, and sending it flying when Lennie lands in it
 - `src/street.js`: the neighbour houses, and the details every house in the row shares (porch, chimney, dormer, skylight, vents, downpipe)
-- `src/yard.js`: sky, lighting, lawn, back-garden fence, the play area's edges, garden trees, bushes, the hedge and the trampoline
-- `src/streetscape.js`: the street in front: cycle path, verge trees and lamps, road and the townhouses
+- `src/yard.js`: sky, lighting, lawn, the play area's edges and fence, the neighbours' garden trees, front-garden shrubs and the hedge
+- `src/garden.js`: Lennie's back garden: fences and gate, garage, lounge set and awning, trampoline, wheelie bins and bushes
+- `src/streetscape.js`: the street in front: cycle path, verge trees and lamps, and the road
 - `src/supermarket.js`: the supermarket across the road, inside and out (the breakable shop window, aisles, freezers and fridges, the bakery, the sloping veg stand, the cheese cooler, the pindakaas pyramid, the butcher's counter and the other displays), with its own fading walls and roof
 - `src/seethrough.js`: the see-through circle that keeps Lennie in view through whatever is between him and the camera
 - `src/batching.js`: once everything is built, glues the scenery that never moves into a few big meshes, so there's far less to draw
 - `src/blobshadow.js`: the soft dark spot under Lennie (the game has no real shadows, so it stays smooth on low-end tablets)
 - `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking (the house's mess uses the same tumbling)
 - `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, breeze blocks, wallpaper, wood, floor tiles, grass)
-- `src/ragdoll.js`: Lennie's bodies, joints and look (1.90 m and 100 kg, with a bit of a belly, a scruffy greying beard, a receding hairline and glasses, in a worn hoodie and joggers)
+- `src/ragdoll.js`: Lennie's bodies, joints and look (1.90 m and 100 kg, with a bit of a belly, in a worn hoodie and joggers; his face after the photo in docs: thinning dark hair receding at the temples, rectangular glasses and a short salt-and-pepper beard)
 - `src/scoring.js`: contortion measurement, trick detection and the multiplier
 - `src/challenges.js`: the list of challenges and the progress kept in the browser
 - `src/replay.js`: records each toss and plays it back in slow motion

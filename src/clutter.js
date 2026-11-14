@@ -23,10 +23,15 @@ const TAU = Math.PI * 2;
 const INK = '#2b2b2b';
 
 // The rooms, as their inner wall faces (x, z) on each floor (k).
+// The ground floor follows the floor plan (house.js): the living room all
+// across the back, the kitchen at the front right, the hallway at the front
+// left (the toilet in its corner is left out), the utility room behind.
 const ROOMS = {
-  living: { k: 0, x0: -5.875, x1: 0.91, z0: -2.31, z1: 4.875 },
-  kitchen: { k: 0, x0: 1.09, x1: 5.875, z0: -2.31, z1: 4.875 },
-  bedroom: { k: 1, x0: -5.875, x1: 0.91, z0: -2.31, z1: 4.875 },
+  living: { k: 0, x0: -5.875, x1: 5.875, z0: -4.875, z1: 1.01 },
+  kitchen: { k: 0, x0: -0.81, x1: 5.875, z0: 1.19, z1: 4.875 },
+  hall: { k: 0, x0: -4.65, x1: -0.99, z0: 1.19, z1: 4.875 },
+  utility: { k: 0, x0: 1.555, x1: 5.875, z0: -6.575, z1: -5.125 },
+  bedroom: { k: 1, x0: -4.47, x1: 0.91, z0: -2.31, z1: 4.875 },
   kids: { k: 1, x0: 1.09, x1: 5.875, z0: -2.31, z1: 4.875 },
   study: { k: 2, x0: -5.875, x1: 0.91, z0: -2.31, z1: 3.9 }, // the roof slopes down towards the front
   bath: { k: 2, x0: 1.09, x1: 5.875, z0: -2.31, z1: 3.8 },
@@ -36,6 +41,8 @@ const ROOMS = {
 // general shouts and never says the same thing twice in a row).
 const ROOM_MESS = {
   living: ['Who left their socks here?', 'Remote? What remote?', 'Movie night is cancelled!', 'Controller down!', 'Living room? Flying room!', 'Crisps for everyone!'],
+  hall: ['Shoes everywhere!', 'Welcome home!', 'Wipe your feet!', 'Coming through!'],
+  utility: ['Kitty litter!', 'Meow?!', 'The cat did it!', 'Cool down, Lennie!'],
   kitchen: ['Hagelslag avalanche!', "Who's doing the dishes?", 'Breakfast in the air!', 'Pan-demonium!', "Don't cry over spilt milk!", 'Plate-tectonics!'],
   bedroom: ['Laundry day!', 'Sock it to me!', 'Lost a slipper!', 'Wake-up call!', 'Bedtime? Not yet!', 'Bed head!'],
   kids: ['Teddy, nooo!', 'Clean your room, Lennie!', 'Art attack!', 'Playtime!', 'Ouch, building blocks!', 'Teddy takes flight!'],
@@ -45,9 +52,14 @@ const ROOM_MESS = {
 
 // Where the furniture stands in each room, so things strewn on the floor stay clear of it.
 const FURNITURE = {
-  living: [[-5.875, -4.85, 0.2, 3.2], [-4.2, -2.9, 0.9, 2.5], [0.25, 0.91, 2.2, 4.0], [-3.4, -1.2, -2.31, -1.6], [0.2, 0.91, -2.31, -1.4], [-5.875, -5.2, 4.1, 4.875]],
-  kitchen: [[5.1, 5.875, -2.31, 4.75], [1.7, 4.6, 1.3, 3.4], [4.2, 5.1, 4.1, 4.875]],
-  bedroom: [[-5.875, -3.6, 0.5, 3.1], [0.2, 0.91, 2.5, 4.5], [-3.35, -2.6, 3.9, 4.875], [-0.8, -0.1, -2.31, -1.5]],
+  living: [
+    [-5.875, -1.0, -2.4, -0.8], [-5.875, -4.95, -4.75, -2.75], [-2.9, -1.0, -0.75, -0.35], [-5.875, -3.31, -0.79, 1.01], // couch, TV cabinet, low cabinet, stairs and storage
+    [-0.4, 0.6, -4.875, -3.5], [2.38, 4.72, -2.2, -0.3], [2.95, 4.65, -0.05, 1.12], [3.5, 5.5, -4.875, -4.3], // comfy chair, dining table, piano, game closet
+  ],
+  kitchen: [[-0.81, 5.875, 4.2, 4.875], [5.2, 5.875, 1.85, 4.2], [0.78, 5.875, 1.19, 1.85]],
+  hall: [[-5.875, -3.31, 2.96, 4.875], [-4.65, -3.55, 2.7, 2.96]],
+  utility: [[5.15, 5.875, -5.85, -5.125], [2.6, 3.2, -6.55, -6.1]],
+  bedroom: [[-4.47, -2.18, 0.5, 3.1], [0.2, 0.91, 2.5, 4.5], [-3.35, -2.6, 3.9, 4.875], [-0.8, -0.1, -2.31, -1.5]],
   kids: [[3.9, 5.875, -2.31, -1.1], [1.9, 3.1, 4.1, 4.875], [3.0, 4.2, 2.4, 3.6]],
   study: [[-5.875, -5.0, -1.7, 0.3], [-4.95, -4.25, -1.05, -0.35], [-3.1, -1.3, -2.31, -1.85], [-1.3, 0.91, 2.1, 3.9]],
   bath: [[2.55, 4.6, 2.65, 3.8], [5.1, 5.875, -1.75, -0.95], [4.9, 5.875, 0.1, 1.5], [5.2, 5.875, -0.85, -0.05]],
@@ -577,14 +589,18 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
 
   // Furniture tops things land on (y = their top, from the floor of their storey).
   const TOPS = [
-    [0, -4.1, -3.0, 1.0, 2.4, 0.45], // coffee table
-    [0, 0.35, 0.88, 2.3, 3.9, 0.5], // TV cabinet
-    [0, -5.5, -4.95, 0.55, 2.85, 0.52], // couch seat
-    [0, 2.4, 3.9, 1.5, 3.2, 0.78], // dining table
-    [0, 5.2, 5.875, -2.25, 3.45, 0.9], // kitchen counter
-    [0, 5.1, 5.875, 3.6, 4.65, 1.95], // fridge
-    [1, -5.78, -3.7, 0.6, 2.4, 0.61], // bed
-    [1, -5.85, -5.4, 2.55, 3.0, 0.5], // nightstand
+    [0, -5.875, -4.95, -4.75, -2.75, 0.5], // TV cabinet
+    [0, -2.9, -1.0, -0.75, -0.35, 0.55], // low cabinet behind the couch
+    [0, -4.8, -1.25, -1.55, -1.12, 0.52], // couch seat
+    [0, -5.62, -4.9, -2.35, -1.15, 0.52], // the couch's chaise end
+    [0, 3.0, 4.1, -2.2, -0.3, 0.78], // dining table
+    [0, 2.95, 4.65, 0.55, 1.12, 1.25], // piano
+    [0, -0.81, 5.875, 4.2, 4.875, 0.9], // kitchen counter along the front
+    [0, 5.2, 5.875, 1.85, 4.2, 0.9], // ... along the right wall
+    [0, 0.78, 5.875, 1.18, 1.85, 0.9], // ... and across the back
+    [0, 5.15, 5.875, -5.85, -5.125, 1.95], // fridge
+    [1, -4.36, -2.28, 0.6, 2.4, 0.61], // bed
+    [1, -4.43, -3.98, 2.55, 3.0, 0.5], // nightstand
     [1, 0.3, 0.89, 2.6, 4.4, 2.0], // wardrobe
     [1, -3.3, -2.86, 4.18, 4.62, 0.46], // clothes chair
     [1, 4.0, 5.875, -2.25, -1.2, 0.52], // kids bed
@@ -650,87 +666,103 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
 
   // ---------------------------------------------------------------- living room
   const living = 'living';
-  // the coffee table: snacks, drinks and the remote
-  put(living, 'chipsPaprika', -3.75, 0.45, 1.35, { yaw: 0.4, ...onFace('chipsPaprika') });
-  put(living, 'cola', -3.3, 0.45, 2.15, { yaw: 1.2, ...tipped('cola') });
-  put(living, 'mugRed', -3.2, 0.45, 1.25);
-  put(living, 'mugBlue', -3.85, 0.45, 2.15);
-  put(living, 'plateC', -3.5, 0.45, 1.75);
-  put(living, 'remote', -3.25, 0.45, 1.7, { yaw: 0.3 });
-  put(living, 'magazine', -3.85, 0.45, 1.8, { yaw: 0.2 });
-  put(living, 'magazine', -3.82, 0.456, 1.78, { yaw: -0.3 });
+  // the low cabinet behind the couch: snacks, drinks and the remote
+  put(living, 'chipsPaprika', -2.55, 0.55, -0.55, { yaw: 0.4, ...onFace('chipsPaprika') });
+  put(living, 'cola', -1.3, 0.55, -0.5, { yaw: 1.2, ...tipped('cola') });
+  put(living, 'mugRed', -1.65, 0.55, -0.62);
+  put(living, 'mugBlue', -2.1, 0.55, -0.45);
+  put(living, 'remote', -1.9, 0.55, -0.6, { yaw: 0.3 });
+  put(living, 'magazine', -2.4, 0.55, -0.5, { yaw: 0.2 });
+  put(living, 'magazine', -2.37, 0.556, -0.52, { yaw: -0.3 });
   // the TV cabinet: the game console's controllers
-  put(living, 'controller', 0.62, 0.5, 2.55, { yaw: 1.4 });
-  put(living, 'controller', 0.7, 0.5, 3.6, { yaw: 2.0 });
-  // the couch: a blanket, a cushion on the floor, crisps
-  put(living, 'blanket', -5.25, 0.52, 2.2, { yaw: 0.3 });
-  put(living, 'cushion', -4.55, 0, 3.55, { yaw: 0.6 });
-  put(living, 'chipsNaturel', -5.2, 0.52, 1.0, { yaw: 1.2, ...onFace('chipsNaturel') });
+  put(living, 'controller', -5.1, 0.5, -2.95, { yaw: 1.4 });
+  put(living, 'controller', -5.6, 0.5, -3.05, { yaw: 2.0 });
+  // the couch: a blanket, a cushion on the floor, crisps, a plate on the arm of the comfy chair's side
+  put(living, 'blanket', -5.25, 0.52, -1.9, { yaw: 0.3 });
+  put(living, 'cushion', -4.3, 0, -2.6, { yaw: 0.6 });
+  put(living, 'chipsNaturel', -3.3, 0.52, -1.3, { yaw: 1.2, ...onFace('chipsNaturel') });
+  put(living, 'plateC', -4.1, 0.52, -1.35);
+  // the piano: sheet music and a forgotten mug
+  put(living, 'paper', 3.4, 1.25, 0.85, { yaw: 0.1 });
+  put(living, 'mugWhite', 4.35, 1.25, 0.8);
   // toys, toys, toys
   const toys = ['blockA', 'blockB', 'blockC', 'blockD', 'brickRed', 'brickBlue', 'brickYellow', 'brickWhite', 'carRed', 'carBlue', 'crayonRed', 'crayonGreen'];
   strew(living, toys, 34, { how: lying });
-  strew(living, ['blockA', 'blockB', 'brickRed', 'brickYellow', 'carYellow', 'teddy', 'drawing'], 10, { area: { x0: -4.9, x1: -2.2, z0: 0.3, z1: 3.2 }, how: lying });
-  put(living, 'beachBall', -1.0, 0, 3.6);
-  put(living, 'ball', -4.4, 0, -0.9);
-  put(living, 'teddy', -1.7, 0, 0.3, { yaw: 2.2 });
-  put(living, 'drawing', -2.6, 0, 2.6, { yaw: 0.3 });
+  strew(living, ['blockA', 'blockB', 'brickRed', 'brickYellow', 'carYellow', 'teddy', 'drawing'], 10, { area: { x0: -4.6, x1: -1.6, z0: -3.9, z1: -1.75 }, how: lying });
+  put(living, 'beachBall', 1.6, 0, -3.9);
+  put(living, 'ball', -1.6, 0, -4.3);
+  put(living, 'teddy', 1.2, 0, -1.2, { yaw: 2.2 });
+  put(living, 'drawing', -2.6, 0, -3.0, { yaw: 0.3 });
   // a tower of blocks somebody built
   const tower = ['blockA', 'blockC', 'blockB', 'blockD', 'blockA'];
   let below = null;
-  tower.forEach((id, i) => (below = put(living, id, -0.6, i * 0.07, 2.2, { yaw: 0.2 * i, on: below })));
+  tower.forEach((id, i) => (below = put(living, id, 0.4, i * 0.07, -2.0, { yaw: 0.2 * i, on: below })));
+  put(living, 'sockRed', -0.8, 0, 0.3);
+
+  // ---------------------------------------------------------------- hallway
   // shoes kicked off by the front door, and a pair of socks
-  put(living, 'sneaker', -1.75, 0, 4.45, { yaw: 1.3 });
-  put(living, 'sneaker', -1.35, 0, 4.2, { yaw: 2.4 });
-  put(living, 'shoeBlack', -2.5, 0, 4.5, { yaw: -0.4 });
-  put(living, 'sockBlack', -4.4, 0, 3.4);
-  put(living, 'sockRed', -0.8, 0, 1.1);
+  const hall = 'hall';
+  put(hall, 'sneaker', -1.75, 0, 3.9, { yaw: 1.3 });
+  put(hall, 'sneaker', -1.35, 0, 3.6, { yaw: 2.4 });
+  put(hall, 'shoeBlack', -2.6, 0, 4.1, { yaw: -0.4 });
+  put(hall, 'shoeBlack', -2.9, 0, 3.8, { yaw: 0.5 });
+  put(hall, 'sockBlack', -3.9, 0, 2.2);
+  put(hall, 'ball', -2.0, 0, 1.8);
 
   // ---------------------------------------------------------------- kitchen
   const kitchen = 'kitchen';
-  // the counter: piles of dirty dishes, pans, bottles and jars
-  pile(kitchen, 'plate', 5.55, 0.9, -1.8, 6);
-  pile(kitchen, 'plateB', 5.55, 0.9, -1.35, 4);
-  pile(kitchen, 'bowl', 5.5, 0.9, -0.9, 3, { jitter: 0.02 });
-  pile(kitchen, 'plateC', 5.6, 0.9, 1.35, 5);
-  put(kitchen, 'pot', 5.55, 0.9, 1.9);
-  put(kitchen, 'pan', 5.5, 0.9, 2.65, { yaw: Math.PI + 0.3 });
-  put(kitchen, 'afwas', 5.75, 0.9, 0.95);
-  put(kitchen, 'allesreiniger', 5.78, 0.9, -2.1);
-  for (const [id, z] of [['mugRed', -0.45], ['mugYellow', -0.3], ['mugWhite', 1.05], ['glass', -0.6], ['glass', 1.65], ['mugBlue', 3.2]]) put(kitchen, id, 5.32 + rnd() * 0.25, 0.9, z);
-  for (const z of [-1.1, 1.6, 2.3, 2.35, 3.0]) put(kitchen, 'cutlery', 5.4 + rnd() * 0.2, 0.9, z);
-  put(kitchen, 'pindakaas', 5.75, 0.9, 2.2);
-  put(kitchen, 'hagelslag', 5.78, 0.9, 3.05, { yaw: -Math.PI / 2 });
-  put(kitchen, 'witbrood', 5.6, 0.9, -2.1, { yaw: -Math.PI / 2 });
-  put(kitchen, 'melk', 5.35, 0.9, 3.3);
-  put(kitchen, 'stroopwafels', 5.38, 1.95, 4.2); // on top of the fridge
-  put(kitchen, 'chocolade', 5.5, 1.95, 3.9, { yaw: 0.6 });
-  // the dining table: breakfast nobody cleared away
-  for (const [id, x, z] of [['plate', 2.75, 1.8], ['plateB', 3.55, 2.9], ['plateC', 3.55, 1.85], ['bowl', 2.75, 2.85]]) put(kitchen, id, x, 0.78, z);
-  put(kitchen, 'glass', 3.1, 0.78, 2.3);
-  put(kitchen, 'mugWhite', 3.3, 0.78, 2.6);
-  put(kitchen, 'glass', 2.95, 0.78, 2.55, tipped('glass'));
-  put(kitchen, 'jam', 3.2, 0.78, 2.0);
-  put(kitchen, 'krentenbol', 3.25, 0.78, 3.05, { yaw: 0.4 });
-  put(kitchen, 'chocomelk', 2.6, 0.78, 2.35, tipped('chocomelk'));
-  for (const [x, z] of [[2.9, 1.75], [3.75, 2.75], [2.6, 2.95], [3.4, 1.9]]) put(kitchen, 'cutlery', x, 0.78, z);
+  // the counters: piles of dirty dishes, pans, bottles and jars
+  pile(kitchen, 'plate', 5.55, 0.9, 2.3, 6);
+  pile(kitchen, 'plateB', 5.55, 0.9, 2.75, 4);
+  pile(kitchen, 'bowl', 5.5, 0.9, 3.2, 3, { jitter: 0.02 });
+  pile(kitchen, 'plateC', 1.3, 0.9, 1.5, 5);
+  put(kitchen, 'pot', -0.35, 0.912, 4.43);
+  put(kitchen, 'pan', 0.05, 0.912, 4.67, { yaw: Math.PI + 0.3 });
+  put(kitchen, 'afwas', 2.6, 0.9, 4.75);
+  put(kitchen, 'allesreiniger', 2.8, 0.9, 4.72);
+  for (const [id, x, z] of [['mugRed', 3.0, 4.45], ['mugYellow', 3.3, 4.55], ['mugWhite', 4.9, 1.5], ['glass', 3.6, 4.4], ['glass', 2.2, 1.55], ['mugBlue', 5.5, 3.7]]) put(kitchen, id, x, 0.9, z);
+  for (const [x, z] of [[1.0, 4.5], [3.9, 4.6], [4.2, 1.55], [4.5, 1.45], [5.55, 3.95]]) put(kitchen, 'cutlery', x, 0.9, z);
+  put(kitchen, 'pindakaas', 3.2, 0.9, 1.6);
+  put(kitchen, 'hagelslag', 3.5, 0.9, 1.45, { yaw: -Math.PI / 2 });
+  put(kitchen, 'witbrood', 4.6, 0.9, 4.55, { yaw: -Math.PI / 2 });
+  put(kitchen, 'melk', 2.8, 0.9, 1.5);
   // the floor
-  put(kitchen, 'pizzaBox', 1.7, 0, 4.2, { yaw: 0.3 });
-  put(kitchen, 'pizzaBox', 1.75, 0.04, 4.18, { yaw: 0.6 });
-  put(kitchen, 'plateB', 4.4, 0, 0.2);
+  put(kitchen, 'pizzaBox', 1.7, 0, 3.4, { yaw: 0.3 });
+  put(kitchen, 'pizzaBox', 1.75, 0.04, 3.38, { yaw: 0.6 });
+  put(kitchen, 'plateB', 4.4, 0, 2.4);
   strew(kitchen, ['limo', 'icetea', 'cola', 'sockWhite', 'chipsNaturel', 'cutlery', 'krentenbol', 'mugBlue', 'drop', 'snoepmix'], 14, {
     how: (id) => (id.startsWith('chips') || id === 'drop' || id === 'snoepmix' ? onFace(id) : lying(id)),
   });
+
+  // ---------------------------------------------------------------- dining table (in the living room)
+  // breakfast nobody cleared away
+  for (const [id, x, z] of [['plate', 3.25, -1.85], ['plateB', 3.85, -0.65], ['plateC', 3.85, -1.85], ['bowl', 3.25, -0.65]]) put(living, id, x, 0.78, z);
+  put(living, 'glass', 3.5, 0.78, -1.3);
+  put(living, 'mugWhite', 3.7, 0.78, -1.0);
+  put(living, 'glass', 3.3, 0.78, -1.1, tipped('glass'));
+  put(living, 'jam', 3.55, 0.78, -1.6);
+  put(living, 'krentenbol', 3.75, 0.78, -0.4, { yaw: 0.4 });
+  put(living, 'chocomelk', 3.35, 0.78, -1.45, tipped('chocomelk'));
+  for (const [x, z] of [[3.15, -1.95], [3.95, -0.8], [3.15, -0.5], [3.9, -1.7]]) put(living, 'cutlery', x, 0.78, z);
+
+  // ---------------------------------------------------------------- utility room
+  const utility = 'utility';
+  put(utility, 'stroopwafels', 5.4, 1.95, -5.5); // on top of the fridge
+  put(utility, 'chocolade', 5.6, 1.95, -5.35, { yaw: 0.6 });
+  put(utility, 'waspoeder', 2.0, 0, -6.35, { yaw: 0.2 });
+  pile(utility, 'wcRol', 4.4, 0, -6.35, 3, { jitter: 0.01 });
+  strew(utility, ['sockWhite', 'sockBlack', 'heapGrey', 'cola', 'limo'], 5, { how: lying });
 
   // ---------------------------------------------------------------- bedroom
   const bedroom = 'bedroom';
   const clothes = ['shirtRed', 'shirtBlue', 'shirtWhite', 'shirtGreen', 'jeans', 'sockWhite', 'sockBlack', 'sockRed', 'underpants', 'boxers', 'heapGrey', 'heapRed', 'heapBlue'];
   strew(bedroom, clothes, 30);
-  strew(bedroom, ['shirtWhite', 'jeans', 'heapBlue', 'sockBlack', 'shirtRed'], 6, { area: { x0: -3.5, x1: -0.5, z0: 0.2, z1: 3.0 } });
+  strew(bedroom, ['shirtWhite', 'jeans', 'heapBlue', 'sockBlack', 'shirtRed'], 6, { area: { x0: -2.1, x1: 0.2, z0: 0.2, z1: 3.0 } });
   // on the bed
-  put(bedroom, 'shirtBlue', -4.3, 0.61, 1.1, { yaw: 0.4 });
-  put(bedroom, 'jeans', -4.6, 0.61, 1.9, { yaw: 1.8 });
-  put(bedroom, 'heapGrey', -5.1, 0.61, 1.5);
-  put(bedroom, 'phone', -5.35, 0.61, 2.05, { yaw: 0.2 });
+  put(bedroom, 'shirtBlue', -2.88, 0.61, 1.1, { yaw: 0.4 });
+  put(bedroom, 'jeans', -3.18, 0.61, 1.9, { yaw: 1.8 });
+  put(bedroom, 'heapGrey', -3.68, 0.61, 1.5);
+  put(bedroom, 'phone', -3.93, 0.61, 2.05, { yaw: 0.2 });
   // the chair everyone has: buried under clothes
   let chairPile = null;
   let chairTop = 0.46;
@@ -739,14 +771,14 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
     chairTop += entry(id).h * 0.8; // clothes squash a bit
   }
   // the nightstand
-  put(bedroom, 'mugYellow', -5.55, 0.5, 2.68);
-  put(bedroom, 'glass', -5.7, 0.5, 2.9);
-  put(bedroom, 'bookRed', -5.6, 0.5, 2.82, { yaw: 0.3 });
+  put(bedroom, 'mugYellow', -4.13, 0.5, 2.68);
+  put(bedroom, 'glass', -4.28, 0.5, 2.9);
+  put(bedroom, 'bookRed', -4.18, 0.5, 2.82, { yaw: 0.3 });
   // the laundry basket, overflowing (the basket itself is decoration)
   for (const [id, dx, dz, y] of [['heapGrey', 0, 0, 0.36], ['shirtRed', 0.05, 0.03, 0.47], ['sockWhite', -0.08, 0.06, 0.48], ['heapBlue', -0.05, -0.05, 0.42]]) put(bedroom, id, -0.45 + dx, y, -1.9 + dz);
   put(bedroom, 'waspoeder', -0.15, 0, -2.15, { yaw: 0.2 });
-  put(bedroom, 'slipper', -3.4, 0, 0.35, { yaw: 1.4 });
-  put(bedroom, 'slipper', -3.1, 0, 0.25, { yaw: 2.0 });
+  put(bedroom, 'slipper', -2.0, 0, 0.35, { yaw: 1.4 });
+  put(bedroom, 'slipper', -1.7, 0, 0.25, { yaw: 2.0 });
 
   // ---------------------------------------------------------------- kids room
   const kids = 'kids';
@@ -811,10 +843,11 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
 
   function buildCloset() {
     const k = 0;
-    const X0 = -3.3;
-    const X1 = -1.3;
-    const Z0 = -2.31;
-    const Z1 = -1.81;
+    // the high board game cabinet against the living room's back wall, as in the floor plan
+    const X0 = 3.5;
+    const X1 = 5.5;
+    const Z0 = -4.875;
+    const Z1 = -4.375;
     const TOP = 2.05;
     const T = 0.03;
     const oak = std({ color: 0xc9a06a, roughness: 0.6 });
@@ -915,15 +948,15 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
       o.position.set(x, y, z);
       return o;
     };
-    // the kitchen sink and tap in the counter, with a dish rack
+    // the kitchen sink and tap in the counter under the window
     const steelM = std({ color: 0xb8bec4, roughness: 0.25, metalness: 0.8 });
-    add(0, mesh(Box(0.48, 0.006, 0.6), steelM, 5.56, 0.903, 0.25), false);
-    add(0, mesh(Box(0.4, 0.004, 0.5), std({ color: 0x6d7378, roughness: 0.3, metalness: 0.6 }), 5.56, 0.907, 0.25), false);
-    add(0, mesh(Cyl(0.015, 0.015, 0.3, 10), steelM, 5.8, 1.05, 0.25));
-    add(0, mesh(Cyl(0.012, 0.012, 0.18, 10).rotateZ(Math.PI / 2), steelM, 5.72, 1.19, 0.25));
-    // two full trash bags by the fridge
+    add(0, mesh(Box(0.6, 0.006, 0.48), steelM, 2.0, 0.903, 4.52), false);
+    add(0, mesh(Box(0.5, 0.004, 0.4), std({ color: 0x6d7378, roughness: 0.3, metalness: 0.6 }), 2.0, 0.907, 4.52), false);
+    add(0, mesh(Cyl(0.015, 0.015, 0.3, 10), steelM, 2.0, 1.05, 4.78));
+    add(0, mesh(Cyl(0.012, 0.012, 0.18, 10).rotateX(Math.PI / 2), steelM, 2.0, 1.19, 4.7));
+    // two full trash bags by the door to the utility room
     const bagM = std({ color: 0x1b1b1e, roughness: 0.25 });
-    for (const [x, z, r, s] of [[4.75, 4.45, 0.3, 0], [4.35, 4.6, 0.25, 7]]) {
+    for (const [x, z, r, s] of [[1.2, -4.5, 0.3, 0], [0.85, -4.6, 0.25, 7]]) {
       add(0, mesh(heap(r, 1, 1.05, 1, s), bagM, x, r * 0.58, z));
       const knot = add(0, mesh(Cyl(0.02, 0.05, 0.1, 8), bagM, x, r * 1.65, z));
       knot.castShadow = false;
@@ -935,23 +968,23 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
       o.rotation.y = x * 3;
       add(k, o, false);
     };
-    spill(0, 3.1, 0.9, 0.25, 0x7b4a2a);
-    spill(0, 4.6, 2.0, 0.18, 0xb3241b);
-    spill(0, 2.1, 4.0, 0.3, 0x5a3a1c, 0.35);
-    spill(0, -3.6, 0.6, 0.22, 0xf59a23);
+    spill(0, 3.5, -2.6, 0.25, 0x7b4a2a);
+    spill(0, 4.0, 2.3, 0.18, 0xb3241b);
+    spill(0, 2.1, 3.4, 0.3, 0x5a3a1c, 0.35);
+    spill(0, -3.6, -2.2, 0.22, 0xf59a23);
     spill(1, 2.6, 1.4, 0.2, 0x2a5bd7, 0.45); // felt-tip on the carpet
-    // the vacuum cleaner, left in the living room
+    // the vacuum cleaner, in the storage cupboard under the stairs
     const red = std({ color: 0xd8312a, roughness: 0.4 });
     const black = std({ color: 0x222222, roughness: 0.5 });
-    add(0, mesh(Sph(0.18, 1.3, 0.85, 1), red, 0.5, 0.17, -2.0));
-    add(0, mesh(Cyl(0.012, 0.012, 1.0, 8), black, 0.55, 0.55, -1.55)).rotation.x = -0.45;
-    add(0, mesh(new THREE.TorusGeometry(0.22, 0.02, 6, 16, Math.PI * 1.3), black, 0.55, 0.22, -1.75)).rotation.y = Math.PI / 2;
-    add(0, mesh(Box(0.3, 0.04, 0.08), black, 0.55, 0.02, -1.12));
-    // a droopy plant in the corner (it needs water)
-    add(0, mesh(Cyl(0.16, 0.12, 0.3, 14), std({ color: 0xb5652f, roughness: 0.8 }), -5.55, 0.15, 4.5));
+    add(0, mesh(Sph(0.18, 1.3, 0.85, 1), red, -3.95, 0.17, -0.3));
+    add(0, mesh(Cyl(0.012, 0.012, 1.0, 8), black, -3.9, 0.55, 0.15)).rotation.x = -0.45;
+    add(0, mesh(new THREE.TorusGeometry(0.22, 0.02, 6, 16, Math.PI * 1.3), black, -3.9, 0.22, -0.05)).rotation.y = Math.PI / 2;
+    add(0, mesh(Box(0.3, 0.04, 0.08), black, -3.9, 0.02, 0.58));
+    // a droopy plant in the living room's corner (it needs water)
+    add(0, mesh(Cyl(0.16, 0.12, 0.3, 14), std({ color: 0xb5652f, roughness: 0.8 }), 5.55, 0.15, 0.3));
     const leaf = std({ color: 0x7a8a3a, roughness: 0.8, side: THREE.DoubleSide });
     for (let i = 0; i < 7; i++) {
-      const l = add(0, mesh(new THREE.PlaneGeometry(0.1, 0.4).translate(0, 0.2, 0), leaf, -5.55, 0.3, 4.5));
+      const l = add(0, mesh(new THREE.PlaneGeometry(0.1, 0.4).translate(0, 0.2, 0), leaf, 5.55, 0.3, 0.3));
       l.rotation.set(1.1 + (i % 3) * 0.25, (i / 7) * TAU, 0, 'YXZ');
     }
     // the laundry basket in the bedroom

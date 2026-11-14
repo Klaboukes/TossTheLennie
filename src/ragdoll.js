@@ -2,19 +2,21 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
-// Lennie: 50, 1.90 m tall, 100 kg with a bit of a belly, a scruffy greying
-// beard, a receding hairline and glasses, in a worn hoodie and old joggers.
+// Lennie: 50, 1.90 m tall, 100 kg with a bit of a belly, in a worn hoodie and
+// old joggers. His face follows the real Lennie (docs/lennie-face.jpg): short
+// dark brown hair receding at the temples, dark rectangular glasses, a short
+// salt-and-pepper beard that's greyest on the chin, and a big toothy smile.
 const COLORS = {
-  skin: 0xeab694,
+  skin: 0xf0bfa2,
   hoodie: '#b14a3e', // a faded brick-red, still easy to spot against the house
   hoodieRib: '#963d33',
   joggers: '#6c6f77', // grey marl, worn pale at the knees
   joggersRib: '#55585f',
   shoe: 0x30343f,
   sole: 0xe4ddd0,
-  hair: '#4b3527',
-  beard: '#5b4535',
-  frames: 0x3e434b,
+  hair: '#3a281d',
+  beard: '#4d3d33',
+  frames: 0x30343a,
   eye: 0xffffff,
   pupil: 0x1b1b22,
   lip: 0x9a4a46,
@@ -76,6 +78,23 @@ const JOINTS = [
 
 const vec = (a) => new CANNON.Vec3(a[0], a[1], a[2]);
 const material = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0, ...extra });
+
+/**
+ * Hair and beard: textures laid on by a slanted flat projection instead of
+ * the sphere's own UVs, which bunch up into a swirl where a shell closes.
+ */
+function hairUVs(geometry, scale = 8) {
+  const pos = geometry.attributes.position;
+  const uv = geometry.attributes.uv;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    uv.setXY(i, (x + 0.6 * z) * scale, (y + 0.8 * z) * scale);
+  }
+  uv.needsUpdate = true;
+  return geometry;
+}
 
 function mesh(geometry, mat, position) {
   const m = new THREE.Mesh(geometry, mat);
@@ -162,8 +181,28 @@ function hairTexture(base, seed, grey) {
     g.fillRect(0, 0, s, s);
     for (let i = 0; i < 2600; i++) {
       const v = r();
-      g.fillStyle = v < grey ? `rgba(215,210,200,${0.35 + r() * 0.4})` : v < 0.6 ? 'rgba(20,12,8,0.35)' : 'rgba(140,100,70,0.3)';
+      g.fillStyle = v < grey ? `rgba(215,212,206,${0.35 + r() * 0.4})` : v < 0.7 ? 'rgba(20,12,8,0.35)' : 'rgba(110,80,60,0.25)';
       g.fillRect(r() * s, r() * s, 1, 2 + r() * 3);
+    }
+  });
+}
+
+/**
+ * Thinning hair: strands on a see-through background, so his scalp shows
+ * between them. The material cuts the gaps out (alphaTest).
+ */
+function thinHairTexture(base, seed) {
+  const r = rng(seed);
+  return canvasTexture(128, (g, s) => {
+    g.clearRect(0, 0, s, s);
+    for (let i = 0; i < 3400; i++) {
+      const v = r();
+      g.fillStyle = v < 0.08 ? '#b9b3aa' : v < 0.6 ? base : '#24170f';
+      g.save();
+      g.translate(r() * s, r() * s);
+      g.rotate(-0.35 + r() * 0.7);
+      g.fillRect(0, 0, 1.2, 3 + r() * 3);
+      g.restore();
     }
   });
 }
@@ -226,8 +265,10 @@ export class Ragdoll {
       hoodieRib: ribTexture(COLORS.hoodieRib),
       joggers: fabricTexture(COLORS.joggers, 23, { worn: 9 }),
       joggersRib: ribTexture(COLORS.joggersRib),
-      hair: hairTexture(COLORS.hair, 31, 0.12),
-      beard: hairTexture(COLORS.beard, 37, 0.24),
+      hair: hairTexture(COLORS.hair, 31, 0.05),
+      thinHair: thinHairTexture(COLORS.hair, 33),
+      beard: hairTexture(COLORS.beard, 37, 0.42),
+      chin: hairTexture(COLORS.beard, 41, 0.62),
     };
 
     for (const def of PARTS) this.#buildPart(def, physicsMaterial);
@@ -414,32 +455,47 @@ export class Ragdoll {
     nose.scale.set(0.9, 1.1, 1);
     f.add(nose);
 
-    // Receding hair: a short crop over the back and sides, a narrower patch
-    // on top that leaves the temples bare, and a little tuft in the middle of
-    // the forehead.
+    // Short dark hair, thinning and well receded: a sparse crop over the top
+    // (his scalp shows between the strands), its front edge far back on his
+    // head and the temples bare, a few wisps left in the middle at the front,
+    // and fuller hair round the back down to his neck.
     const hairMat = material(0xffffff, { map: this.tex.hair, roughness: 1 });
-    const hair = mesh(new THREE.SphereGeometry(0.155, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.4), hairMat);
+    const thinMat = material(0xffffff, { map: this.tex.thinHair, roughness: 1, alphaTest: 0.5 });
+    const hair = mesh(hairUVs(new THREE.SphereGeometry(0.153, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.42), 7), thinMat);
     hair.rotation.x = -0.75;
+    hair.scale.set(1.0, 1.02, 1.0);
     f.add(hair);
-    const crown = mesh(new THREE.SphereGeometry(0.158, 28, 8, 0, Math.PI * 2, 0, Math.PI * 0.24), hairMat);
-    crown.rotation.x = 0.12;
-    f.add(crown);
-    const tuft = mesh(new THREE.SphereGeometry(0.035, 14, 8), hairMat, [0, 0.116, 0.097]);
-    tuft.rotation.x = 0.7;
-    tuft.scale.set(1.3, 0.3, 1.1);
-    f.add(tuft);
+    // the back, just inside the crop where they overlap
+    const nape = mesh(hairUVs(new THREE.SphereGeometry(0.152, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.3)), hairMat);
+    nape.rotation.x = -1.55;
+    nape.scale.set(1.0, 1.02, 1.0);
+    f.add(nape);
+    // and the sides, over and round his ears down to the sideburns (the temples stay bare)
+    for (const s of [-1, 1]) {
+      const side = mesh(hairUVs(new THREE.SphereGeometry(0.151, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.3)), hairMat);
+      side.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0.89 * s, 0.22, -0.4).normalize());
+      side.scale.set(1.0, 1.02, 1.0);
+      f.add(side);
+    }
+    const wisps = mesh(hairUVs(new THREE.SphereGeometry(0.035, 16, 8), 7), thinMat, [0, 0.128, 0.088]);
+    wisps.rotation.x = 0.95;
+    wisps.scale.set(1.4, 0.22, 0.9);
+    f.add(wisps);
 
-    // Scruffy beard: a shell over the jaw from ear to ear, cut on a slant
-    // from the sideburns down to the corners of his mouth, plus a moustache.
+    // Short salt-and-pepper beard: a close shell over the jaw from ear to ear,
+    // cut on a slant from the sideburns to the corners of his mouth, a greyer
+    // chin, and a neat moustache that runs into it.
     const beardMat = material(0xffffff, { map: this.tex.beard, roughness: 1 });
-    const beard = mesh(new THREE.SphereGeometry(0.157, 32, 12, 0, Math.PI, Math.PI * 0.56, Math.PI * 0.44), beardMat);
+    const chinMat = material(0xffffff, { map: this.tex.chin, roughness: 1 });
+    const beard = mesh(hairUVs(new THREE.SphereGeometry(0.155, 32, 12, 0, Math.PI, Math.PI * 0.56, Math.PI * 0.44)), beardMat);
     beard.rotation.x = 0.25;
     f.add(beard);
-    const chin = mesh(new THREE.SphereGeometry(0.055, 16, 12), beardMat, [0, -0.108, 0.082]);
-    chin.scale.set(1.25, 0.7, 0.9);
+    const chin = mesh(hairUVs(new THREE.SphereGeometry(0.055, 16, 12)), chinMat, [0, -0.106, 0.08]);
+    chin.scale.set(1.3, 0.72, 0.75);
     f.add(chin);
-    const tache = mesh(new THREE.TorusGeometry(0.044, 0.013, 8, 20, Math.PI), beardMat, [0, -0.052, 0.146]);
-    tache.scale.set(1, 0.45, 1);
+    // a gentle arch, its ends just reaching the corners of his mouth
+    const tache = mesh(hairUVs(new THREE.TorusGeometry(0.06, 0.009, 8, 16, Math.PI / 2).rotateZ(Math.PI / 4)), beardMat, [0, -0.072, 0.142]);
+    tache.scale.set(1, 0.5, 1);
     f.add(tache);
 
     // eyes, eyebrows and glasses
@@ -465,23 +521,25 @@ export class Ragdoll {
       f.add(x);
       this.face.xEyes.push(x);
 
-      const brow = mesh(new RoundedBoxGeometry(0.052, 0.014, 0.014, 2, 0.005), browMat, [0.058 * s, 0.079, 0.128]);
+      // dark eyebrows (setExpression moves them up and down from here)
+      const brow = mesh(new RoundedBoxGeometry(0.056, 0.011, 0.012, 2, 0.004), browMat, [0.058 * s, 0.079, 0.13]);
       brow.rotation.x = -0.4;
       brow.userData.side = s;
       f.add(brow);
       this.face.brows.push(brow);
 
-      const frame = mesh(frameGeometry(0.086, 0.06, 0.008, 0.014), frameMat, [0.058 * s, 0.032, 0.17]);
+      // rectangular frames, wider than they're tall
+      const frame = mesh(frameGeometry(0.09, 0.054, 0.0065, 0.011), frameMat, [0.058 * s, 0.032, 0.17]);
       f.add(frame);
       // the arm of the glasses, running back over the ear
-      const front = [0.1 * s, 0.04, 0.17];
+      const front = [0.102 * s, 0.045, 0.17];
       const back = [0.158 * s, 0.035, 0.0];
       const len = Math.hypot(front[0] - back[0], front[2] - back[2]);
-      const arm = mesh(new THREE.BoxGeometry(0.007, 0.008, len), frameMat, [(front[0] + back[0]) / 2, 0.038, (front[2] + back[2]) / 2]);
+      const arm = mesh(new THREE.BoxGeometry(0.006, 0.007, len), frameMat, [(front[0] + back[0]) / 2, 0.04, (front[2] + back[2]) / 2]);
       arm.rotation.y = Math.atan2(front[0] - back[0], front[2] - back[2]);
       f.add(arm);
     }
-    f.add(mesh(new THREE.BoxGeometry(0.032, 0.007, 0.007), frameMat, [0, 0.045, 0.174]));
+    f.add(mesh(new THREE.BoxGeometry(0.028, 0.006, 0.006), frameMat, [0, 0.042, 0.174]));
 
     // The mouth sits in the beard, tilted to follow the chin.
     const mouth = new THREE.Group();

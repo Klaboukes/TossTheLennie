@@ -3,7 +3,7 @@
 Guidance for Claude Code (and humans) working in this repository.
 
 ## Project
-**Toss the Lennie** is a browser game. Lennie lives in a typical Dutch rowhouse (two floors and an attic) with a supermarket across the street; you toss him around like a ragdoll in his house and in the supermarket, and score points for how contorted he lands. The neighbours' houses, the street and the townhouses are decoration, there to make the real neighbourhood recognizable: solid scenery Lennie bounces off, never places to go inside.
+**Toss the Lennie** is a browser game. Lennie lives in a typical Dutch rowhouse (two floors and an attic) with a supermarket across the street; you toss him around like a ragdoll in his house and in the supermarket, and score points for how contorted he lands. The neighbours' houses (a block of five, Lennie's second from the left) and the street are decoration, there to make the real neighbourhood recognizable: solid scenery Lennie bounces off, never places to go inside.
 
 It's a just-for-laughs-and-giggles game for a friend and his kids to play, not for a broad online public. Keep it fun and simple: no accounts, analytics, ads, leaderboards or other features for strangers. A public GitHub Pages link is just the easy way to share it.
 

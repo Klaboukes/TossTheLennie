@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 
-// The rest of the terrace: neighbour houses on both sides of Lennie's house,
-// built like the photo it's based on (a 1970s Dutch row), with the same front
-// layout, mirrored in pairs, and their own colour of panels. They're solid
+// The rest of the terrace: a block of five houses, built like the photo it's
+// based on (a 1970s Dutch row), with Lennie's house second from the left. The
+// four neighbours have the same front layout, mirrored in pairs, and their own
+// colour of panels. They're solid
 // blocks: Lennie bounces off them and can land on their roofs, porches and
 // dormers, but can't go inside. Also the shared details (porch, chimney,
 // dormer, skylight, vents, downpipe) that Lennie's own house uses too.
@@ -134,11 +135,13 @@ export const LAYOUT = {
 };
 
 const STYLES = {
-  // index along the row (0 is Lennie's house), mirrored in pairs like the photo
-  [-2]: { mirror: false, panel: 0x34465a, frame: 0xfbfaf6, door: 0x3a4a5e, roof: ['chimney', 'vents'] },
-  [-1]: { mirror: true, panel: 0x2e4a3b, frame: 0x2d2b2a, door: 0x2d2b2a, roof: ['chimney', 'skylight'] },
-  [1]: { mirror: true, panel: 0x4e3d50, frame: 0xfbfaf6, door: 0x6b4a33, noScreen: true, roof: ['chimney', 'skylight', 'vents'] },
-  [2]: { mirror: false, panel: 0xc8372d, frame: 0xc8372d, door: 0x2f2b29, roof: ['chimney', 'dormer'] },
+  // index along the row (0 is Lennie's house, the second from the left), mirrored
+  // in pairs like the photo: Lennie's window column sits next to its right-hand
+  // neighbour's, and its small windows next to its left-hand neighbour's.
+  [-1]: { mirror: true, panel: 0x2f3238, frame: 0xfbfaf6, door: 0x3a3735, roof: ['chimney', 'vents'] },
+  [1]: { mirror: true, panel: 0x2e3a54, frame: 0xfbfaf6, door: 0x6b4a33, noScreen: true, roof: ['chimney', 'skylight', 'vents'] },
+  [2]: { mirror: false, panel: 0xc8372d, frame: 0xc8372d, door: 0x2f2b29, roof: ['dormer', 'vents'] },
+  [3]: { mirror: true, panel: 0xeceae3, frame: 0xfbfaf6, door: 0x2d2b2a, roof: ['dormer'] },
 };
 
 export function buildNeighbours(kit, details) {
@@ -167,7 +170,7 @@ export function buildNeighbours(kit, details) {
       box([x0, 0, z[0]], [x1, HOUSE.eaveY - 0.4, z[1]], faces, { story: 0, line });
       box([x0, HOUSE.eaveY - 0.4, z[0]], [x1, HOUSE.eaveY, z[1]], M.trim, { story: 0, line });
     }
-    if (Math.abs(i) === ROW.perSide) {
+    if (i === -ROW.left || i === ROW.right) {
       // the far end of the row: a plain brick end wall
       const ex = i > 0 ? [x1 - EXT, x1] : [x0, x0 + EXT];
       box([ex[0], 0, OUT.z0 + EXT], [ex[1], HOUSE.eaveY, OUT.z1 - EXT], M.brick, { story: 0 });

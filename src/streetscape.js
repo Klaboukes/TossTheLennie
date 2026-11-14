@@ -7,8 +7,6 @@ import { buildSupermarket, canvasTexture } from './supermarket.js';
 // hedge a red cycle path, a grass verge with tall trees and street lamps, a
 // two-lane road, another verge, and across the road an orange supermarket with
 // a zigzag of grey gables (supermarket.js), which Lennie can be flung into.
-// Past the end of the row, across a side street, newer gabled townhouses
-// (scenery only).
 // Distances are z (metres) from the middle of the house; its front is at 5.1.
 export const STREET = {
   cycle: [12.6, 15.0], // red cycle path
@@ -78,8 +76,9 @@ export function buildStreet(scene, world, physMats, { std, tex }) {
     world.addBody(crown);
   }
   const treeZ = (STREET.verge[0] + STREET.verge[1]) / 2 - 0.2;
-  // one in line with each wall between two houses (every 12.25 m), so they frame Lennie's house instead of hiding it
-  for (let i = 0, x = -30.625; x <= 31; i++, x += 12.25) streetTree(x, treeZ, 0.9 + (i % 3) * 0.06);
+  // one in line with each wall between two houses (every 12.25 m) along the whole
+  // block of five, so they frame Lennie's house instead of hiding it
+  for (let i = 0, x = -30.625; x <= 43; i++, x += 12.25) streetTree(x, treeZ, 0.9 + (i % 3) * 0.06);
   // a couple across the road too
   for (const x of [-40, 18, 27]) streetTree(x, 27.2, 0.85);
 
@@ -132,25 +131,5 @@ export function buildStreet(scene, world, physMats, { std, tex }) {
   // ------------------------------------------------------------ the supermarket across the road (supermarket.js)
   const shop = buildSupermarket(scene, world, physMats, { std, tex });
 
-  // ------------------------------------------------------------ newer gabled townhouses past the end of the row (scenery)
-  const brickRed = std({ map: tex.brick, color: 0xffb7a4 });
-  const roofDark = std({ color: 0x3b3230, roughness: 0.8 });
-  const frameWhite = std({ color: 0xfbfaf6, roughness: 0.6 });
-  const glass = std({ map: tex.glassSky, roughness: 0.15 });
-  const T = { x0: 36, w: 5.2, z0: -4, z1: 5, h: 8.4, peak: 3.2 };
-  const peak = new THREE.Shape([new THREE.Vector2(-T.w / 2 - 0.2, 0), new THREE.Vector2(T.w / 2 + 0.2, 0), new THREE.Vector2(0, T.peak)]);
-  const peakGeo = new THREE.ExtrudeGeometry(peak, { depth: T.z1 - T.z0 + 0.4, bevelEnabled: false });
-  for (let i = 0; i < 5; i++) {
-    const x0 = T.x0 + i * T.w;
-    const cx = x0 + T.w / 2;
-    boxAt([x0, 0, T.z0], [x0 + T.w, T.h, T.z1], brickRed, true);
-    const roof = add(new THREE.Mesh(peakGeo, [brickRed, roofDark]), true);
-    roof.position.set(cx, T.h, T.z0 - 0.2);
-    for (const [y0, y1, a, b] of [[0.9, 2.3, 0.6, 2.6], [3.7, 5.1, 0.6, 4.6], [6.4, 7.8, 0.9, 4.3], [T.h + 0.6, T.h + 1.8, 1.9, 3.3]]) {
-      boxAt([x0 + a - 0.08, y0 - 0.08, T.z1], [x0 + b + 0.08, y1 + 0.08, T.z1 + 0.05], frameWhite);
-      boxAt([x0 + a, y0, T.z1 + 0.05], [x0 + b, y1, T.z1 + 0.06], glass);
-    }
-    boxAt([x0 + 3.2, 0, T.z1], [x0 + 4.4, 2.3, T.z1 + 0.06], std({ color: [0x2f4a3b, 0x6b2b2b, 0x2c3e5a][i % 3] }));
-  }
   return shop;
 }

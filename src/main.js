@@ -77,8 +77,10 @@ const SOFT = new Set(['cushion', 'leaves', 'trampoline']);
 // Scenery the camera mustn't end up inside. Walls, floors and roofs fade out of
 // the way instead, so they aren't on this list. (Things merely between the
 // camera and Lennie don't push the camera: they turn see-through, seethrough.js.)
-// A block is a neighbour's house, which is solid and doesn't fade.
-const CAM_BLOCKERS = new Set(['furniture', 'cushion', 'leaves', 'tree', 'trampoline', 'block']);
+// A block is a neighbour's house, which is solid and doesn't fade; a shed is
+// Lennie's (stuffed) garage, solid too.
+const CAM_BLOCKERS = new Set(['furniture', 'cushion', 'leaves', 'tree', 'trampoline', 'block', 'shed']);
+const SOLID_BLOCKS = new Set(['block', 'shed']);
 const AIM_TAP_PX = 44; // on a touch screen, a second tap this close to the first one throws
 // The slingshot: grab Lennie and pull back, away from where he should go.
 const SLING = {
@@ -626,6 +628,7 @@ const BUMP = {
   furniture: ['Not the furniture!', 'Stubbed toe!', 'Sit down, Lennie!', 'Table manners!'],
   roof: ['Up on the roof!', 'Hello, pigeons!', 'Tile trouble!'],
   block: ['Sorry, neighbours!', 'Knock knock!', 'Ding dong!'],
+  shed: ['Garage sale!', 'Full up!', 'Nobody parks in there!'],
   tree: ['Tree hugger!', 'Timber!', 'Branch manager!'],
   fence: ['De-fence-less!', 'Over the fence!'],
   window: ['Window shopping!', 'Nice view!'],
@@ -1722,7 +1725,7 @@ function lennieOnScreen(out) {
 }
 
 const controls = new OrbitControls(camera, canvas);
-controls.target.set(-2.4, 0.5, 1.6);
+controls.target.set(-0.6, 0.5, -2.5); // where Lennie starts (house.spawnPoint(0))
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.minDistance = 0.8;
@@ -1895,7 +1898,7 @@ function camBlockers() {
     const r = CAM_RADIUS;
     // [...grown box, then for a neighbour's house its true size]
     const box = [lo.x - r, lo.y - r, lo.z - r, hi.x + r, hi.y + r, hi.z + r];
-    if (b.surface.kind === 'block') box.push(lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
+    if (SOLID_BLOCKS.has(b.surface.kind)) box.push(lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
     camBoxes.push(box);
   }
   return camBoxes;

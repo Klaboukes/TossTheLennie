@@ -294,14 +294,20 @@ export function meterBoxUVs(geo, min, max) {
   uv.needsUpdate = true;
 }
 
-/** Horizontal floor quad from (x0,z0) to (x1,z1) with metre UVs. */
-export function floorGeometry(x0, z0, x1, z1) {
+/**
+ * Horizontal floor quad from (x0,z0) to (x1,z1) with metre UVs. `turned`
+ * turns the texture a quarter, so floorboards run front to back instead of across.
+ */
+export function floorGeometry(x0, z0, x1, z1, turned = false) {
   const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0);
   geo.rotateX(-Math.PI / 2);
   geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
   const pos = geo.attributes.position;
   const uv = geo.attributes.uv;
-  for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i), -pos.getZ(i));
+  for (let i = 0; i < pos.count; i++) {
+    if (turned) uv.setXY(i, -pos.getZ(i), -pos.getX(i));
+    else uv.setXY(i, pos.getX(i), -pos.getZ(i));
+  }
   uv.needsUpdate = true;
   return geo;
 }

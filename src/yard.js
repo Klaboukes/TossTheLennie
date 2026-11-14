@@ -3,6 +3,7 @@ import * as CANNON from 'cannon-es';
 import { textures, floorGeometry } from './textures.js';
 import { buildStreet, STREET } from './streetscape.js';
 import { SHOP } from './supermarket.js';
+import { buildGarden } from './garden.js';
 
 // The play area: x and the back garden reach ±half; at the front it runs
 // across the street and through the supermarket to its back wall (see
@@ -176,7 +177,7 @@ export function buildYard(scene, world, physMats) {
   // path, with a gap for the garden path.
   const HEDGE = { z: STREET.cycle[0] - 0.55, depth: 0.8, height: 0.75 };
   const hedgeR = rng(17);
-  for (const [x0, x1] of [[-h - 12, -2.6], [-0.7, h + 12]]) {
+  for (const [x0, x1] of [[-h - 12, -2.6], [-0.7, 46]]) {
     for (let x = x0 + 0.35; x < x1 - 0.2; x += 0.55) {
       const r = 0.42 + hedgeR() * 0.12;
       blob(x, HEDGE.height - r * 0.55, HEDGE.z + (hedgeR() - 0.5) * 0.12, r, hedgeR() < 0.5 ? 0x9cba4a : 0x8db843, 0.95);
@@ -187,39 +188,7 @@ export function buildYard(scene, world, physMats) {
     world.addBody(hb);
   }
 
-  // ------------------------------------------------------------ trampoline (in the back garden)
-  const T = { x: 5, z: -12.5, half: 1.6, y: 0.85 };
-  const mat = new THREE.Mesh(new THREE.BoxGeometry(T.half * 2, 0.04, T.half * 2), std({ color: 0x1d1d22, roughness: 0.6 }));
-  mat.position.set(T.x, T.y, T.z);
-  mat.receiveShadow = true;
-  scene.add(mat);
-  const tramp = new CANNON.Body({ mass: 0, material: physMats.trampoline, shape: new CANNON.Box(new CANNON.Vec3(T.half, 0.08, T.half)) });
-  tramp.position.set(T.x, T.y - 0.06, T.z);
-  tramp.surface = { kind: 'trampoline' };
-  world.addBody(tramp);
-  const padMat = std({ color: 0x2f7de1, roughness: 0.6 });
-  const pw = 0.32;
-  for (const [cx, cz, sx, sz] of [
-    [0, T.half + pw / 2, T.half * 2 + pw * 2, pw],
-    [0, -T.half - pw / 2, T.half * 2 + pw * 2, pw],
-    [T.half + pw / 2, 0, pw, T.half * 2],
-    [-T.half - pw / 2, 0, pw, T.half * 2],
-  ]) {
-    const pad = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.1, sz), padMat);
-    pad.position.set(T.x + cx, T.y + 0.02, T.z + cz);
-    pad.castShadow = true;
-    scene.add(pad);
-    const pb = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Box(new CANNON.Vec3(sx / 2, 0.06, sz / 2)) });
-    pb.position.set(T.x + cx, T.y + 0.02, T.z + cz);
-    pb.surface = { kind: 'cushion' };
-    world.addBody(pb);
-  }
-  const legMat = std({ color: 0x8a9099, metalness: 0.6, roughness: 0.4 });
-  for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, T.y, 8), legMat);
-    leg.position.set(T.x + sx * (T.half + 0.15), T.y / 2, T.z + sz * (T.half + 0.15));
-    leg.castShadow = true;
-    scene.add(leg);
-  }
+  // ------------------------------------------------------------ Lennie's own back garden (garden.js)
+  buildGarden(scene, world, physMats, { std, tex });
   return { shop };
 }
