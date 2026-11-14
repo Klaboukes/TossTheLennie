@@ -610,19 +610,57 @@ function regroup({ geo, material }) {
 }
 
 /**
- * Every material of a mesh is a separate draw call, and there are a hundred
- * kinds of product. So a product's materials (its label, plain sides, lid...)
- * are painted under each other on one picture, and each face is pointed at its
- * own strip of it: every kind of product is drawn in one go.
+ * Every material of a mesh is a separate draw call, and there are a few
+ * hundred kinds of product and clutter. So a model's materials (a label,
+ * plain sides, a lid...) are painted under each other on one picture, and
+ * each face is pointed at its own strip of it: the whole model is drawn in one
+ * go. Models where that would change how they look (glass, shiny metal next
+ * to something matt, pictures that repeat) are only regrouped.
  */
-function oneMaterial({ geo, material }) {
-  if (!Array.isArray(material) || !geo.index || !geo.groups.length) return { geo, material };
-  const unique = [...new Set(material)];
+const painted = new WeakMap(); // geometry → its look (catalogue models can share a geometry)
+
+/** The material of every corner of the model, or null when it can't be painted onto one picture. */
+function paintPlan(geo, material, unique) {
+  const first = unique[0];
+  const uv = geo.attributes.uv;
+  if (!uv) return null;
+  for (const m of unique) {
+    if (!m || !m.isMeshStandardMaterial || m.isMeshPhysicalMaterial || m.transparent || m.alphaTest || m.vertexColors) return null;
+    if (m.side !== first.side || m.flatShading !== first.flatShading || Math.abs(m.metalness - first.metalness) > 0.2) return null;
+    if (m.emissive.getHex() !== 0 || ['normalMap', 'roughnessMap', 'metalnessMap', 'alphaMap', 'aoMap', 'emissiveMap', 'bumpMap', 'lightMap'].some((k) => m[k])) return null;
+    const t = m.map;
+    if (t && (!t.image?.width || t.repeat.x !== 1 || t.repeat.y !== 1 || t.offset.x || t.offset.y || t.rotation)) return null;
+  }
+  const index = geo.index?.array;
+  const owner = new Map(); // corner → material
+  for (const grp of geo.groups) {
+    const m = material[grp.materialIndex];
+    for (let j = grp.start; j < grp.start + grp.count; j++) {
+      const v = index ? index[j] : j;
+      if (owner.has(v) && owner.get(v) !== m) return null; // a corner shared by two materials
+      owner.set(v, m);
+      if (m.map && (uv.getX(v) < -0.001 || uv.getX(v) > 1.001 || uv.getY(v) < -0.001 || uv.getY(v) > 1.001)) return null;
+    }
+  }
+  return owner;
+}
+
+function oneMaterial(look) {
+  const { geo, material } = look;
+  if (!Array.isArray(material) || !geo.groups.length) return look;
+  if (painted.has(geo)) return painted.get(geo);
+  const unique = [...new Set(geo.groups.map((g) => material[g.materialIndex]))];
+  const owner = unique.length > 1 ? paintPlan(geo, material, unique) : null;
+  if (!owner) {
+    const regrouped = regroup(look);
+    painted.set(geo, regrouped);
+    return regrouped;
+  }
   const PAD = 4; // pixels between strips, so they don't bleed into each other
-  const slots = unique.map((m) => ({ m, img: m.map?.image ?? null, h: m.map?.image?.height ?? 8 }));
-  const W = Math.max(16, ...slots.map((s) => s.img?.width ?? 0));
+  const slots = new Map(unique.map((m) => [m, { m, img: m.map?.image ?? null, h: m.map?.image?.height ?? 8 }]));
+  const W = Math.max(16, ...[...slots.values()].map((s) => s.img?.width ?? 0));
   let H = 0;
-  for (const s of slots) {
+  for (const s of slots.values()) {
     s.y = H + PAD;
     H += s.h + 2 * PAD;
   }
@@ -630,7 +668,7 @@ function oneMaterial({ geo, material }) {
   c.width = W;
   c.height = H;
   const g = c.getContext('2d');
-  for (const s of slots) {
+  for (const s of slots.values()) {
     const colour = s.m.color.getStyle();
     if (s.img) {
       // the picture, with its top and bottom rows stretched into the padding
@@ -648,42 +686,27 @@ function oneMaterial({ geo, material }) {
       g.fillRect(0, s.y - PAD, W, s.h + 2 * PAD);
     }
   }
-  // point every face's corners at its material's strip
+  // point every corner at its material's strip
   const uv = geo.attributes.uv;
-  const index = geo.index.array;
-  const done = new Map(); // vertex → strip
-  for (const grp of geo.groups) {
-    const s = slots[unique.indexOf(material[grp.materialIndex])];
-    for (let j = grp.start; j < grp.start + grp.count; j++) {
-      const v = index[j];
-      if (done.has(v)) {
-        if (done.get(v) !== s) throw new Error('product faces share corners'); // not the case for boxes, cylinders or lathes
-        continue;
-      }
-      done.set(v, s);
-      const u = s.img ? uv.getX(v) : 0.5;
-      const t = s.img ? uv.getY(v) : 0.5;
-      uv.setXY(v, u, 1 - (s.y + s.h) / H + (t * s.h) / H);
-    }
+  for (const [v, m] of owner) {
+    const s = slots.get(m);
+    const u = s.img ? uv.getX(v) : 0.5;
+    const t = s.img ? uv.getY(v) : 0.5;
+    uv.setXY(v, u, 1 - (s.y + s.h) / H + (t * s.h) / H);
   }
+  uv.needsUpdate = true;
   geo.clearGroups();
   const map = new THREE.CanvasTexture(c);
   map.colorSpace = THREE.SRGBColorSpace;
   map.anisotropy = 4;
-  const label = unique.find((m) => m.map) ?? unique[0];
-  for (const m of unique) {
-    m.map?.dispose();
-    m.dispose();
-  }
-  return { geo, material: mat({ map, roughness: label.roughness }) };
+  const first = unique[0];
+  const label = unique.find((m) => m.map) ?? first;
+  const result = { geo, material: mat({ map, roughness: label.roughness, metalness: first.metalness, side: first.side, flatShading: first.flatShading }) };
+  painted.set(geo, result);
+  return result;
 }
 
-/**
- * The supermarket's own products are boxes, cylinders and lathes with plain
- * materials, so they get one material. Models a catalogue brings itself (the
- * house's clutter: glass, two-sided bowls, shared geometries) are regrouped.
- */
-const lookOf = (p) => (p.look ? regroup(buildLook(p)) : oneMaterial(buildLook(p)));
+const lookOf = (p) => oneMaterial(buildLook(p));
 
 // ---------------------------------------------------------------- the stock: placing, knocking off, restocking
 const GRAVITY = 9.8;
