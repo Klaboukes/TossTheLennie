@@ -494,19 +494,19 @@ function buildLook(p) {
       return { geo: new THREE.BoxGeometry(p.w, p.h, p.d), material: [side, side, top, bottom, front, front] };
     }
     case 'bun': {
-      const geo = new THREE.SphereGeometry(p.r, 14, 10);
+      const geo = new THREE.SphereGeometry(p.r, 10, 7);
       geo.scale(1, 0.65, 1);
       return { geo, material: mat({ color: p.color, roughness: 0.85 }) };
     }
     case 'stick': {
-      const geo = new THREE.CapsuleGeometry(p.r, p.len, 4, 10);
+      const geo = new THREE.CapsuleGeometry(p.r, p.len, 3, 8);
       geo.rotateZ(Math.PI / 2);
       return { geo, material: mat({ color: p.color, roughness: 0.7 }) };
     }
     case 'can': {
       const label = mat({ map: wrapTex(p.r, p.h, f, (g, w, h) => { g.fillStyle = '#c9ced3'; g.fillRect(0, 0, w, h * 0.07); g.fillRect(0, h * 0.93, w, h * 0.07); }) });
       const metal = mat({ color: 0xc9ced3, metalness: 0.6, roughness: 0.35 });
-      return { geo: new THREE.CylinderGeometry(p.r, p.r, p.h, 16), material: [label, metal, metal] };
+      return { geo: new THREE.CylinderGeometry(p.r, p.r, p.h, 12), material: [label, metal, metal] };
     }
     case 'jar': {
       const label = mat({
@@ -516,11 +516,11 @@ function buildLook(p) {
         }),
         roughness: 0.3,
       });
-      return { geo: new THREE.CylinderGeometry(p.r, p.r, p.h, 16), material: [label, mat({ color: p.lid }), mat({ color: p.fill })] };
+      return { geo: new THREE.CylinderGeometry(p.r, p.r, p.h, 12), material: [label, mat({ color: p.lid }), mat({ color: p.fill })] };
     }
     case 'tub': {
       const label = mat({ map: wrapTex(p.r, p.h, f) });
-      return { geo: new THREE.CylinderGeometry(p.r, p.r * 0.85, p.h, 18), material: [label, mat({ color: p.lid }), mat({ color: f.bg })] };
+      return { geo: new THREE.CylinderGeometry(p.r, p.r * 0.85, p.h, 12), material: [label, mat({ color: p.lid }), mat({ color: f.bg })] };
     }
     case 'wheel': {
       const side = mat({ map: wrapTex(p.r, p.h, f) });
@@ -548,18 +548,18 @@ function buildLook(p) {
         }),
         roughness: 0.45,
       });
-      return { geo: new THREE.CylinderGeometry(p.r, p.r, p.h, 24), material: [side, cap, cap] };
+      return { geo: new THREE.CylinderGeometry(p.r, p.r, p.h, 16), material: [side, cap, cap] };
     }
     case 'ball': {
       if (p.veg) return { geo: new THREE.IcosahedronGeometry(p.r, 1), material: mat({ color: f.bg, flatShading: true }) };
-      return { geo: new THREE.SphereGeometry(p.r, 14, 10), material: mat({ color: f.bg, roughness: 0.35 }) };
+      return { geo: new THREE.SphereGeometry(p.r, 10, 7), material: mat({ color: f.bg, roughness: 0.35 }) };
     }
     case 'bottle': {
       // even steps up the profile, so a height on the bottle is a height on the texture
       const r = p.r;
       const prof = [1, 1, 1, 1, 1, 1, 0.95, 0.75, 0.45, 0.36, 0.36];
       const pts = [new THREE.Vector2(0.001, 0), ...prof.map((k, i) => new THREE.Vector2(r * k, (p.h * i) / 10)), new THREE.Vector2(0.001, p.h)];
-      const geo = new THREE.LatheGeometry(pts, 16);
+      const geo = new THREE.LatheGeometry(pts, 12);
       geo.translate(0, -p.h / 2, 0);
       const vOf = (frac) => (frac * 10 + 1) / (pts.length - 1); // height fraction → texture v
       const map = canvas(256, 256, (g, w, h) => {
@@ -608,6 +608,82 @@ function regroup({ geo, material }) {
   regrouped.set(geo, look);
   return look;
 }
+
+/**
+ * Every material of a mesh is a separate draw call, and there are a hundred
+ * kinds of product. So a product's materials (its label, plain sides, lid...)
+ * are painted under each other on one picture, and each face is pointed at its
+ * own strip of it: every kind of product is drawn in one go.
+ */
+function oneMaterial({ geo, material }) {
+  if (!Array.isArray(material) || !geo.index || !geo.groups.length) return { geo, material };
+  const unique = [...new Set(material)];
+  const PAD = 4; // pixels between strips, so they don't bleed into each other
+  const slots = unique.map((m) => ({ m, img: m.map?.image ?? null, h: m.map?.image?.height ?? 8 }));
+  const W = Math.max(16, ...slots.map((s) => s.img?.width ?? 0));
+  let H = 0;
+  for (const s of slots) {
+    s.y = H + PAD;
+    H += s.h + 2 * PAD;
+  }
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d');
+  for (const s of slots) {
+    const colour = s.m.color.getStyle();
+    if (s.img) {
+      // the picture, with its top and bottom rows stretched into the padding
+      g.drawImage(s.img, 0, 0, s.img.width, 1, 0, s.y - PAD, W, PAD);
+      g.drawImage(s.img, 0, s.img.height - 1, s.img.width, 1, 0, s.y + s.h, W, PAD);
+      g.drawImage(s.img, 0, s.y, W, s.h);
+      if (s.m.color.getHex() !== 0xffffff) {
+        g.globalCompositeOperation = 'multiply';
+        g.fillStyle = colour;
+        g.fillRect(0, s.y - PAD, W, s.h + 2 * PAD);
+        g.globalCompositeOperation = 'source-over';
+      }
+    } else {
+      g.fillStyle = colour;
+      g.fillRect(0, s.y - PAD, W, s.h + 2 * PAD);
+    }
+  }
+  // point every face's corners at its material's strip
+  const uv = geo.attributes.uv;
+  const index = geo.index.array;
+  const done = new Map(); // vertex → strip
+  for (const grp of geo.groups) {
+    const s = slots[unique.indexOf(material[grp.materialIndex])];
+    for (let j = grp.start; j < grp.start + grp.count; j++) {
+      const v = index[j];
+      if (done.has(v)) {
+        if (done.get(v) !== s) throw new Error('product faces share corners'); // not the case for boxes, cylinders or lathes
+        continue;
+      }
+      done.set(v, s);
+      const u = s.img ? uv.getX(v) : 0.5;
+      const t = s.img ? uv.getY(v) : 0.5;
+      uv.setXY(v, u, 1 - (s.y + s.h) / H + (t * s.h) / H);
+    }
+  }
+  geo.clearGroups();
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  const label = unique.find((m) => m.map) ?? unique[0];
+  for (const m of unique) {
+    m.map?.dispose();
+    m.dispose();
+  }
+  return { geo, material: mat({ map, roughness: label.roughness }) };
+}
+
+/**
+ * The supermarket's own products are boxes, cylinders and lathes with plain
+ * materials, so they get one material. Models a catalogue brings itself (the
+ * house's clutter: glass, two-sided bowls, shared geometries) are regrouped.
+ */
+const lookOf = (p) => (p.look ? regroup(buildLook(p)) : oneMaterial(buildLook(p)));
 
 // ---------------------------------------------------------------- the stock: placing, knocking off, restocking
 const GRAVITY = 9.8;
@@ -695,7 +771,7 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
   const floorOf = (item) => item.section?.floorY ?? floorY;
 
   /** Fills a row of shelf from `a` to `b` along its length with runs of products. */
-  function fillRow(ids, { along, a, b, y, depthAt, yaw, maxH, section, rows = 2, room = 0.45 }) {
+  function fillRow(ids, { along, a, b, y, depthAt, yaw, maxH, section, rows = 1, room = 0.45 }) {
     let u = a;
     let n = Math.floor(rnd() * ids.length);
     while (u < b) {
@@ -720,17 +796,28 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
     }
   }
 
+  // Products move around, but only inside their room (or the shop) and not far
+  // above where they stand. A sphere around that area does as a kind's bounds,
+  // so it's only drawn when that area is in view.
+  function areaOf(k) {
+    const box = new THREE.Box3();
+    for (const item of k.items) {
+      const b = boundsOf(item);
+      box.expandByPoint(_v.set(b.x0, item.home.y - 1, b.z0));
+      box.expandByPoint(_v.set(b.x1, item.home.y + 3, b.z1));
+    }
+    return box.getBoundingSphere(new THREE.Sphere());
+  }
+
   function build() {
     for (const k of kinds.values()) {
-      const look = regroup(buildLook(k.p));
+      const look = lookOf(k.p);
       const mesh = new THREE.InstancedMesh(look.geo, look.material, k.items.length);
-      mesh.frustumCulled = false; // its products move around, so the precomputed bounds would be wrong
-      mesh.castShadow = k.p.shadow !== false;
+      mesh.boundingSphere = areaOf(k);
       if (k.tinted) {
         for (const item of k.items) mesh.setColorAt(item.idx, _color.set(item.tint ?? 0xffffff));
         mesh.instanceColor.needsUpdate = true;
       }
-      mesh.receiveShadow = true;
       mesh.userData.products = true;
       k.mesh = mesh;
       scene.add(mesh);

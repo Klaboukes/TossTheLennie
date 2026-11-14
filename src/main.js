@@ -11,6 +11,8 @@ import { StuckGuard } from './guard.js';
 import { Replay } from './replay.js';
 import { Challenges, CHALLENGE_BONUS } from './challenges.js';
 import { createSeeThrough } from './seethrough.js';
+import { combineScenery } from './batching.js';
+import { createBlobShadow } from './blobshadow.js';
 
 const FIXED_DT = 1 / 120;
 // Scales with Lennie's weight (100 kg), so he swings the same however heavy he is.
@@ -82,10 +84,36 @@ const fmt = (n) => Math.round(n).toLocaleString('en-US');
 // ---------------------------------------------------------------- renderer
 const canvas = $('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// Sharpness: phones and tablets have 2-3 screen pixels per CSS pixel. 1.5
+// looks nearly as sharp and is far less work. If the game still runs slowly,
+// watchSpeed() steps it down further.
+const SHARPNESS = [1.5, 1.25, 1, 0.75];
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, SHARPNESS[0]));
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const SLOW_FRAME = 1 / 28; // seconds: slower than about 28 frames a second on average is too slow
+const speed = { wait: 3, frames: 0, time: 0 }; // wait: seconds before measuring (the first frames are slow anyway)
+
+/** On a device that can't keep up, draws the picture a bit less sharp (it never goes back up). */
+function watchSpeed(seconds) {
+  if (document.hidden || seconds > 0.25) return; // a tab switch or a hiccup, not the game being slow
+  if (speed.wait > 0) {
+    speed.wait -= seconds;
+    return;
+  }
+  speed.frames++;
+  speed.time += seconds;
+  if (speed.frames < 90) return;
+  const slow = speed.time / speed.frames > SLOW_FRAME;
+  speed.frames = speed.time = 0;
+  if (!slow) return;
+  const next = SHARPNESS.find((s) => s < renderer.getPixelRatio() - 0.01);
+  if (next === undefined) return;
+  renderer.setPixelRatio(next);
+  renderer.setSize(innerWidth, innerHeight);
+  speed.wait = 1;
+}
+// No real shadows: they made every frame several times more work, too much
+// for low-end tablets. Lennie gets a soft spot under him instead (blobshadow.js).
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
 const scene = new THREE.Scene();
@@ -1504,11 +1532,17 @@ function toggleAim() {
 // ---------------------------------------------------------------- camera
 // Whatever is between the camera and Lennie turns see-through (not Lennie
 // himself, his dizzy stars or the aiming and grabbing marks).
-const seeThrough = createSeeThrough(scene, renderer, (o) => {
+const notScenery = (o) => {
   if (o.userData.part || o.userData.noAim) return true;
   for (let p = o; p; p = p.parent) if (p === lennie.stars) return true;
   return false;
-});
+};
+// Everything is built: glue the scenery that never moves into a few big
+// meshes, so weak tablets and phones have far less to draw (batching.js).
+combineScenery(scene, notScenery);
+const seeThrough = createSeeThrough(scene, renderer, notScenery);
+const blobShadow = createBlobShadow(scene, world, SCENERY_ONLY);
+const _blobCenter = new THREE.Vector3();
 const _seeCenter = new THREE.Vector3();
 /** Lennie's middle as drawn (during a replay that's not where his physics bodies are). */
 function lennieOnScreen(out) {
@@ -2374,8 +2408,10 @@ function rescueLost() {
 
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min((now - last) / 1000, 0.1);
+  const seconds = (now - last) / 1000;
+  const dt = Math.min(seconds, 0.1);
   last = now;
+  watchSpeed(seconds);
   tick(dt, now);
 }
 
@@ -2406,6 +2442,7 @@ function tick(dt, now) {
   house.updateView(camera, controls.target, dt, cutaway);
   shop.updateView(camera, controls.target, dt);
   seeThrough.update(camera, lennieOnScreen(_seeCenter), dt);
+  blobShadow.update(lennieOnScreen(_blobCenter));
   updateShards(dt * timeScale);
   if (!replay.playing) {
     shop.update(dt * timeScale);

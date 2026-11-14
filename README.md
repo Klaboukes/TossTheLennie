@@ -126,6 +126,10 @@ A big toss (1,500 or more) gets a burst of confetti where Lennie lands and a blu
 
 Lennie reacts: a grin and a "wheee!" or "wa-hoo!" when he's flung, "ow!", "oof", "eek!" or "ouch" when he hits something hard, a groan when he lands, and after a good toss he lies there with crossed-out eyes, his tongue out and stars circling his head until he's picked up again. All sounds are synthesized; there are no audio files. To keep them from getting old, each surface sounds like what it's made of (wooden furniture knocks, the shop's shelves clang, hedges rustle, cushions puff), every sound has a few variations that never come twice in a row, and a sound that keeps repeating gets quieter.
 
+## Low-end devices
+
+The game is made to run smoothly on cheap tablets and older phones too. That's why there are no real shadows (Lennie has a soft spot under him instead, which grows and fades as he flies higher), why the shelves hold one row of products, and why the picture is drawn a little less sharp than a phone's screen could show. If a device still can't keep up, the game makes the picture a bit less sharp by itself, a step at a time.
+
 ## Files
 
 - `index.html`, `style.css`: the page, toolbar, score panel, challenge, players board, turn card and help; the import map that loads three.js and cannon-es
@@ -137,6 +141,8 @@ Lennie reacts: a grin and a "wheee!" or "wa-hoo!" when he's flung, "ow!", "oof",
 - `src/streetscape.js`: the street in front: cycle path, verge trees and lamps, road and the townhouses
 - `src/supermarket.js`: the supermarket across the road, inside and out (the breakable shop window, aisles, freezers and fridges, the bakery, the sloping veg stand, the cheese cooler, the pindakaas pyramid and the other displays), with its own fading walls and roof
 - `src/seethrough.js`: the see-through circle that keeps Lennie in view through whatever is between him and the camera
+- `src/batching.js`: once everything is built, glues the scenery that never moves into a few big meshes, so there's far less to draw
+- `src/blobshadow.js`: the soft dark spot under Lennie (the game has no real shadows, so it stays smooth on low-end tablets)
 - `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking (the house's mess uses the same tumbling)
 - `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, breeze blocks, wallpaper, wood, floor tiles, grass)
 - `src/ragdoll.js`: Lennie's bodies, joints and look (1.90 m and 100 kg, with a bit of a belly, a scruffy greying beard, a receding hairline and glasses, in a worn hoodie and joggers)

@@ -41,13 +41,7 @@ export function buildYard(scene, world, physMats) {
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.6);
   sun.position.set(14, 26, 12);
   sun.target.position.set(0, 2, 0);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  const sc = sun.shadow.camera;
-  sc.left = -26; sc.right = 26; sc.top = 26; sc.bottom = -26; sc.near = 1; sc.far = 70;
-  sun.shadow.bias = -0.0005;
-  sun.shadow.normalBias = 0.03;
-  scene.add(sun, sun.target);
+  scene.add(sun, sun.target); // no shadows (too slow on low-end tablets, see main.js)
 
   // ------------------------------------------------------------ ground
   // The grass is nudged back in the depth test, so anything lying exactly at
