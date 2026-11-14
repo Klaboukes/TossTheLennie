@@ -22,26 +22,43 @@
 <body>
   <canvas id="scene"></canvas>
 
-  <!-- Score: one compact pill, top left -->
-  <div id="scorebox" class="glass">
-    <h1 class="brand">Toss <span>the</span> Lennie</h1>
-    <div class="score">
-      <div class="score-main"><span id="stat-total">0</span><small>pts</small></div>
-      <div class="score-sub">
-        Best <b id="stat-best">0</b><i>·</i>Last <b id="stat-last">–</b><i>·</i><b id="stat-tosses">0</b> tosses
+  <!-- Top left: the score, and under it the current challenge (free play) or the players' scores (taking turns) -->
+  <div id="hud-left">
+    <div id="scorebox" class="glass">
+      <h1 class="brand">Toss <span>the</span> Lennie</h1>
+      <div class="score">
+        <div class="score-main"><span id="stat-total">0</span><small>pts</small></div>
+        <div class="score-sub">
+          Best <b id="stat-best">0</b><i>·</i>Last <b id="stat-last">–</b><i>·</i><b id="stat-tosses">0</b> tosses
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- The current challenge (free play) or the players' scores (taking turns), under the score -->
-  <div id="challenge" class="glass side-pill" hidden>
-    <span class="ch-tag">Challenge <b id="ch-num">1</b>/<span id="ch-count">20</span></span>
-    <span id="ch-text" class="ch-text"></span>
-    <button id="ch-skip" class="ch-skip" aria-label="Skip this challenge" title="Skip this challenge">Skip</button>
-  </div>
-  <div id="board" class="glass side-pill" hidden>
-    <div class="board-head"><span id="board-round">Toss 1 of 5</span><button id="board-end" class="ch-skip">End game</button></div>
-    <ol id="board-list" class="board-list"></ol>
+    <div id="challenge" class="glass" hidden>
+      <button id="ch-open" class="ch-open" aria-haspopup="dialog" aria-expanded="false" aria-controls="ch-menu" title="Pick a challenge">
+        <span class="ch-tag" aria-label="Challenge">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.3" class="fill"/></svg>
+          <b id="ch-num">1</b>
+        </span>
+        <span id="ch-text" class="ch-text"></span>
+        <svg class="ch-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+      </button>
+      <button id="ch-skip" class="ch-skip" aria-label="Skip this challenge" title="Skip this challenge">Skip</button>
+
+      <div id="ch-menu" class="ch-menu" role="dialog" aria-label="Pick a challenge" hidden>
+        <div class="ch-menu-head">
+          <span class="ch-menu-title">Pick a challenge</span>
+          <span class="ch-menu-count"><b id="ch-done">0</b>/<span id="ch-count">25</span> done</span>
+        </div>
+        <div class="ch-progress"><i id="ch-progress-fill"></i></div>
+        <ol id="ch-list" class="ch-list"></ol>
+      </div>
+    </div>
+
+    <div id="board" class="glass" hidden>
+      <div class="board-head"><span id="board-round">Toss 1 of 5</span><button id="board-end" class="ch-skip">End game</button></div>
+      <ol id="board-list" class="board-list"></ol>
+    </div>
   </div>
 
   <!-- All controls: one icon toolbar, top right -->
@@ -183,7 +200,7 @@
       <dt><kbd>P</kbd></dt><dd>watch the last toss again in slow motion</dd>
       <dt><kbd>F</kbd> <kbd>G</kbd> <kbd>C</kbd> <kbd>Z</kbd> <kbd>M</kbd></dt><dd>focus · follow · cutaway · slow-mo · sound</dd>
     </dl>
-    <p class="help-lede help-extra">Stuck for ideas? Try the <b>challenge</b> under the score. Playing together? The <b>people button</b> starts a game of turns.</p>
+    <p class="help-lede help-extra">Stuck for ideas? Try the <b>challenge</b> under the score, or tap it to pick another one. Playing together? The <b>people button</b> starts a game of turns.</p>
     <button id="help-close" class="help-close">Let's toss!</button>
   </div>
 

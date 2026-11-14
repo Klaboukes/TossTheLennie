@@ -40,19 +40,27 @@ export class Challenges {
   constructor() {
     this.done = new Set();
     this.skipped = [];
+    this.chosen = null; // a challenge picked from the list, which goes before the usual order
     try {
       const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
       for (const id of saved.done ?? []) this.done.add(id);
       this.skipped = (saved.skipped ?? []).filter((id) => !this.done.has(id));
+      if (CHALLENGES.some((c) => c.id === saved.chosen)) this.chosen = saved.chosen;
     } catch { /* storage unavailable */ }
   }
 
   #save() {
-    try { localStorage.setItem(KEY, JSON.stringify({ done: [...this.done], skipped: this.skipped })); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(KEY, JSON.stringify({ done: [...this.done], skipped: this.skipped, chosen: this.chosen }));
+    } catch { /* ignore */ }
   }
 
-  /** The challenge to show now: the first not done and not skipped, then the skipped ones again. */
+  /**
+   * The challenge to show now: the one picked from the list (done ones can be
+   * picked again), else the first not done and not skipped, then the skipped ones again.
+   */
   get current() {
+    if (this.chosen) return CHALLENGES.find((c) => c.id === this.chosen);
     const open = CHALLENGES.filter((c) => !this.done.has(c.id));
     const fresh = open.find((c) => !this.skipped.includes(c.id));
     if (fresh) return fresh;
@@ -60,12 +68,30 @@ export class Challenges {
     return open.find((c) => c.id === this.skipped[0]) ?? open[0] ?? null;
   }
 
+  /** The current challenge's place in the list, from 1. */
   get number() {
-    return this.done.size + 1;
+    const c = this.current;
+    return c ? CHALLENGES.indexOf(c) + 1 : CHALLENGES.length;
   }
 
   get count() {
     return CHALLENGES.length;
+  }
+
+  get doneCount() {
+    return this.done.size;
+  }
+
+  isDone(id) {
+    return this.done.has(id);
+  }
+
+  /** Makes this challenge the current one, whatever the order. */
+  select(id) {
+    if (!CHALLENGES.some((c) => c.id === id)) return;
+    this.chosen = id;
+    this.skipped = this.skipped.filter((s) => s !== id);
+    this.#save();
   }
 
   /** Checks a scored toss against the current challenge; returns it if it was just completed. */
@@ -74,6 +100,7 @@ export class Challenges {
     if (!c || !c.test(result)) return null;
     this.done.add(c.id);
     this.skipped = this.skipped.filter((id) => id !== c.id);
+    this.chosen = null;
     this.#save();
     return c;
   }
@@ -81,13 +108,15 @@ export class Challenges {
   skip() {
     const c = this.current;
     if (!c) return;
-    this.skipped = [...this.skipped.filter((id) => id !== c.id), c.id];
+    this.chosen = null;
+    if (!this.done.has(c.id)) this.skipped = [...this.skipped.filter((id) => id !== c.id), c.id];
     this.#save();
   }
 
   restart() {
     this.done.clear();
     this.skipped = [];
+    this.chosen = null;
     this.#save();
   }
 }

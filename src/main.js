@@ -9,7 +9,7 @@ import { measureContortion, evaluateToss, chainMultiplier } from './scoring.js';
 import { Sfx } from './audio.js';
 import { StuckGuard } from './guard.js';
 import { Replay } from './replay.js';
-import { Challenges, CHALLENGE_BONUS } from './challenges.js';
+import { Challenges, CHALLENGES, CHALLENGE_BONUS } from './challenges.js';
 import { createSeeThrough } from './seethrough.js';
 import { combineScenery } from './batching.js';
 import { createBlobShadow } from './blobshadow.js';
@@ -215,6 +215,11 @@ const ui = {
   chCount: $('ch-count'),
   chText: $('ch-text'),
   chSkip: $('ch-skip'),
+  chOpen: $('ch-open'),
+  chMenu: $('ch-menu'),
+  chList: $('ch-list'),
+  chDone: $('ch-done'),
+  chProgress: $('ch-progress-fill'),
   board: $('board'),
   boardRound: $('board-round'),
   boardList: $('board-list'),
@@ -262,6 +267,13 @@ function bump(el) {
   el.classList.remove('bump');
   void el.offsetWidth;
   el.classList.add('bump');
+}
+
+/** Replays a one-off CSS animation class on an element. */
+function flash(el, cls) {
+  el.classList.remove('done', 'picked');
+  void el.offsetWidth;
+  el.classList.add(cls);
 }
 
 let toastTimer = 0;
@@ -1873,6 +1885,7 @@ ui.dropMenu.querySelectorAll('[data-drop]').forEach((b) => {
   b.addEventListener('click', () => {
     const level = Number(b.dataset.drop);
     setDropMenu(false);
+    setChallengeMenu(false);
     dropLennie(level);
     toast(`Lennie dropped on ${LEVEL_NAMES[level]}`, 1200);
   });
@@ -1915,6 +1928,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Escape') {
     endSling(false);
     setDropMenu(false);
+    setChallengeMenu(false);
     if (!ui.help.hidden) setHelp(false);
     if (!ui.setup.hidden) setSetup(false);
     stopReplay();
@@ -1988,7 +2002,7 @@ ui.replayBtn.addEventListener('click', () => {
 const _hintPos = new THREE.Vector3();
 function updateHint() {
   const show = hint.on && toss.state === 'idle' && !grab && !sling && !replay.playing
-    && ui.help.hidden && ui.turnCard.hidden && ui.setup.hidden;
+    && ui.help.hidden && ui.turnCard.hidden && ui.setup.hidden && ui.chMenu.hidden;
   if (show) {
     const head = lennie.parts.head.body.position;
     const v = _hintPos.set(head.x, head.y + 0.35, head.z).project(camera);
@@ -2005,34 +2019,110 @@ function updateHint() {
 // ---------------------------------------------------------------- challenges
 function renderChallenge() {
   ui.challenge.hidden = !!match;
+  if (match) setChallengeMenu(false);
   const c = challenges.current;
   ui.chCount.textContent = challenges.count;
+  ui.chDone.textContent = challenges.doneCount;
+  ui.chProgress.style.width = `${(100 * challenges.doneCount) / challenges.count}%`;
   if (c) {
     ui.chNum.textContent = challenges.number;
     ui.chText.textContent = c.text;
     ui.chSkip.textContent = 'Skip';
     ui.chSkip.title = ui.chSkip.ariaLabel = 'Skip this challenge';
   } else {
-    ui.chNum.textContent = challenges.count;
+    ui.chNum.textContent = '★';
     ui.chText.textContent = 'All challenges done. Lennie legend!';
     ui.chSkip.textContent = 'Again';
     ui.chSkip.title = ui.chSkip.ariaLabel = 'Start the challenges over';
   }
+  if (!ui.chMenu.hidden) renderChallengeList();
 }
+
+/** The list of all challenges to pick from: done ones ticked off, the current one marked. */
+function renderChallengeList() {
+  const current = challenges.current;
+  ui.chList.innerHTML = '';
+  CHALLENGES.forEach((c, i) => {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.id = c.id;
+    const done = challenges.isDone(c.id);
+    if (done) b.classList.add('done');
+    if (c === current) {
+      b.classList.add('now');
+      b.setAttribute('aria-current', 'true');
+    }
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = done ? '✓' : i + 1;
+    const t = document.createElement('span');
+    t.className = 't';
+    t.textContent = c.text;
+    b.append(n, t);
+    if (c === current) {
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = 'Now';
+      b.append(tag);
+    }
+    b.setAttribute('aria-label', `${i + 1}. ${c.text}${done ? ' (done)' : ''}`);
+    li.append(b);
+    ui.chList.append(li);
+  });
+}
+
+function setChallengeMenu(open) {
+  if (open === !ui.chMenu.hidden) return;
+  ui.chMenu.hidden = !open;
+  ui.chOpen.setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  setDropMenu(false);
+  renderChallengeList();
+  const now = ui.chList.querySelector('.now') ?? ui.chList.querySelector('button');
+  now?.scrollIntoView({ block: 'center' });
+  now?.focus({ preventScroll: true });
+}
+
+ui.chOpen.addEventListener('click', () => {
+  ui.chOpen.blur();
+  setChallengeMenu(ui.chMenu.hidden);
+});
+ui.chList.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-id]');
+  if (!b) return;
+  challenges.select(b.dataset.id);
+  setChallengeMenu(false);
+  renderChallenge();
+  flash(ui.challenge, 'picked');
+});
+// Arrow keys move through the list instead of flying the camera.
+ui.chMenu.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') return;
+  e.stopPropagation();
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  const items = [...ui.chList.querySelectorAll('button')];
+  const at = items.indexOf(document.activeElement);
+  items[Math.max(0, Math.min(items.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))]?.focus();
+});
+document.addEventListener('pointerdown', (e) => {
+  if (!ui.chMenu.hidden && !ui.chMenu.contains(e.target) && !ui.chOpen.contains(e.target)) setChallengeMenu(false);
+});
 
 function challengeDone(c) {
   sfx.chime();
   sfx.voice('cheer');
   toast(`Challenge done: ${c.text}! +${CHALLENGE_BONUS}`, 2600);
   ui.chText.textContent = `✔ ${c.text}`;
-  ui.challenge.classList.remove('done');
-  void ui.challenge.offsetWidth;
-  ui.challenge.classList.add('done');
+  flash(ui.challenge, 'done');
   setTimeout(renderChallenge, 1600);
 }
 
 ui.chSkip.addEventListener('click', () => {
   ui.chSkip.blur();
+  setChallengeMenu(false);
+  flash(ui.challenge, 'picked');
   if (challenges.current) challenges.skip();
   else challenges.restart();
   renderChallenge();
@@ -2080,6 +2170,7 @@ function setSetup(open) {
   if (open) {
     setHelp(false);
     setDropMenu(false);
+    setChallengeMenu(false);
     hideResult();
     renderSetup();
     ui.setupNames.querySelector('input')?.focus({ preventScroll: true });

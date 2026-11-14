@@ -113,7 +113,7 @@ The game opens close up on Lennie with a "Grab me!" bubble over him, which stays
 
 ## Challenges
 
-Under the score there's always one challenge to go for, from easy ("Smash a window") to hard ("Put Lennie in the freezer", "Score 2,500 points in one toss"): 25 in all, including sending him behind the butcher counter and knocking the board games out of the closet. Doing one adds 300 points to that toss and brings up the next. *Skip* moves on and comes back to it later. Progress is remembered in the browser. Challenges pause during a game of turns.
+Under the score there's always one challenge to go for, from easy ("Smash a window") to hard ("Put Lennie in the freezer", "Score 2,500 points in one toss"): 25 in all, including sending him behind the butcher counter and knocking the board games out of the closet. Doing one adds 300 points to that toss and brings up the next. *Skip* moves on and comes back to it later. Tap the challenge to see the whole list, with the ones already done ticked off, and pick any of them to go for next, done ones too. Progress is remembered in the browser. Challenges pause during a game of turns.
 
 ## Taking turns
 
