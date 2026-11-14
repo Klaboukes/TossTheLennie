@@ -250,8 +250,11 @@ function popAt(position, text, cls = '') {
   el.style.left = `${(v.x * 0.5 + 0.5) * innerWidth}px`;
   el.style.top = `${(-v.y * 0.5 + 0.5) * innerHeight}px`;
   el.style.setProperty('--rot', `${(Math.random() * 16 - 8).toFixed(1)}deg`);
+  // Short shouts ("BOING!") flash by; longer lines ("Pindakaas everywhere!") stay up long enough to read.
+  const ms = Math.min(4000, 1400 + 120 * Math.max(0, text.length - 6));
+  el.style.setProperty('--dur', `${ms}ms`);
   ui.pops.appendChild(el);
-  setTimeout(() => el.remove(), 1200);
+  setTimeout(() => el.remove(), ms + 100);
 }
 
 const CONFETTI = ['#ff6b4a', '#3f5fd6', '#22a06b', '#ffd166', '#d63384', '#4cc9f0'];
