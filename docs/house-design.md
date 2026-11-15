@@ -29,7 +29,7 @@ The game's house and street are based on the real ones, and Lennie on the real L
 
 *[floorplan-floor1.png](floorplan-floor1.png): the owner's rough sketch. The street is at the bottom, the back garden at the top.*
 
-The game's house is wider than the real one (12 m instead of about 5.5 m) to make room for tossing Lennie about, so the sketch is stretched sideways. Seen from the street:
+The game's house is wider than the real one (about 8 m instead of about 5.5 m) to make room for tossing Lennie about, so the sketch is stretched sideways. Seen from the street:
 
 - **The front garden:** open to the street, with low bushes all down the left side, a big bush on the right out by the low hedge along the cycle path, and a small path to the front door.
 - **Front left:** the toilet (the loo against its front wall, a small hand basin, framed photos of friends on the walls). It sticks out of the front of the house beside the front door, under the canopy, with its small high window in front; the neighbours' toilets do the same, except on the dark blue house to the right. Next to it the hallway with the front door, the doormat, the coat rack and the stairs going up along the left wall.

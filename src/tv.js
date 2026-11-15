@@ -9,7 +9,7 @@ import * as CANNON from 'cannon-es';
 // Where it stands: on the low cabinet in the living room's back left corner,
 // turned towards the couch, as in the floor plan. Ground floor, so world y is
 // the room's y. The TV is built facing local -x and turned by `yaw`.
-const PLACE = { x: -5.35, z: -3.9, yaw: Math.atan2(0.6, -0.8) };
+const PLACE = { x: -3.35, z: -3.9, yaw: Math.atan2(0.6, -0.8) };
 const FRAME = { min: [-0.035, 0.5, -0.65], max: [0.035, 1.25, 0.65] };
 const SCREEN = { x: -0.037, y0: 0.55, y1: 1.2, z0: -0.6, z1: 0.6 };
 const W = 256;

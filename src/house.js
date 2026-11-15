@@ -9,13 +9,13 @@ import { createLoose } from './loose.js';
 import { parkBikes } from './bikes.js';
 
 // A Dutch terraced house: two brick storeys and an attic under a steep roof,
-// with a dormer. Footprint x ∈ [-6, 6], z ∈ [-5, 5]; the front door faces +z.
+// with a dormer. Footprint x ∈ [-4, 4], z ∈ [-5, 5]; the front door faces +z.
 // The ground floor follows the owner's floor plan (GF below, and
 // docs/house-design.md), with a utility room built on at the back. Floor 2
 // and the attic: a landing along the back with the stairs up, and two rooms
-// at the front split by a wall at x = 1. It's the second house in a block of
+// at the front split by a wall at x = 0.6. It's the second house in a block of
 // five; the neighbours (solid, no rooms; see street.js) share one long roof.
-export const HOUSE = { x0: -6, x1: 6, z0: -5, z1: 5, H: 3, T: 0.4, stories: 3, brickStories: 2, eaveY: 6, ridgeY: 11 };
+export const HOUSE = { x0: -4, x1: 4, z0: -5, z1: 5, H: 3, T: 0.4, stories: 3, brickStories: 2, eaveY: 6, ridgeY: 11 };
 // The roof's underside runs from the wall tops (eaveY at z = ±5) up to the ridge.
 const PITCH = (HOUSE.ridgeY - HOUSE.eaveY) / HOUSE.z1;
 const underside = (z) => HOUSE.ridgeY - PITCH * Math.abs(z);
@@ -25,16 +25,16 @@ const EXT = 0.25; // exterior wall thickness (visual)
 const EXT_PHYS = 0.6; // physics walls are thicker (extending outwards) so fast throws don't tunnel
 const INT = 0.18;
 const INT_PHYS = 0.3;
-const IN = { x0: -5.875, x1: 5.875, z0: -4.875, z1: 4.875 }; // inner wall faces
-const OUT = { x0: -6.125, x1: 6.125, z0: -5.125, z1: 5.125 }; // outer wall faces
+const IN = { x0: -3.875, x1: 3.875, z0: -4.875, z1: 4.875 }; // inner wall faces
+const OUT = { x0: -4.125, x1: 4.125, z0: -5.125, z1: 5.125 }; // outer wall faces
 const HALL_Z = -2.4; // wall between the hallway (back) and the rooms (front)
-const MID_X = 1; // wall between the left and right rooms
+const MID_X = 0.6; // wall between the left and right rooms
 const WIN = { sill: 0.9, top: 2.2 };
 // The dormer on the front slope, above the window column: a real bit of the
 // attic (the bathroom), with a window Lennie can be thrown out of. Its left
 // side is the attic's middle wall; `back` is where its flat roof meets the
 // roof's underside, `front` the middle of its front wall.
-export const DORMER = { x0: 1.0, x1: 4.7, back: HOUSE.ridgeY - 8.4, front: 4.0, top: 8.4, wallT: 0.2 };
+export const DORMER = { x0: MID_X, x1: 3.2, back: HOUSE.ridgeY - 8.4, front: 4.0, top: 8.4, wallT: 0.2 };
 const DOOR_TOP = 2.15;
 const DOOR_COLORS = { inside: 0xf4f2ee, front: 0x3b3735 }; // the inside doors are white
 // A wall faded out of the camera's way keeps this faint ghost of itself, but
@@ -53,15 +53,15 @@ export const CLEAR_FAR = 5;
 // and the living room all across the back. These are the walls' centre lines.
 const GF = {
   toiletZ: 3.05, // between the toilet and the hallway
-  toiletX: -3.4, // the toilet's and the storage cupboard's right-hand walls
-  hallX: -0.9, // between the hallway and the kitchen
+  toiletX: -1.75, // the toilet's and the storage cupboard's right-hand walls
+  hallX: -0.4, // between the hallway and the kitchen
   hallZ: 1.1, // the back of the hallway, with the door to the living room
-  stairX: -4.56, // beside the stairs (the storage cupboard's left wall, and on floor 2 the corridor's wall)
+  stairX: -2.86, // beside the stairs (the storage cupboard's left wall, and on floor 2 the corridor's wall)
   storeZ: -0.7, // the back of the storage cupboard, where the stairs reach floor 2
 };
 // The utility room: a little flat-roofed extension behind the kitchen side,
 // between the house and the garage (walls' centre lines; z1 is the house's back wall).
-export const UTILITY = { x0: 1.43, x1: 6, z0: -6.7, z1: -5, top: 2.6 };
+export const UTILITY = { x0: 0.75, x1: 4, z0: -6.7, z1: -5, top: 2.6 };
 // The garage behind it, after the sketch: the same width, its door near the
 // utility room in the side facing the garden (walls' centre lines; z1 is the
 // utility room's back wall). Lennie can be thrown in through the open door.
@@ -73,7 +73,7 @@ export const GARAGE = { x0: UTILITY.x0, x1: UTILITY.x1, z0: -9.675, z1: UTILITY.
 // the back of the storage cupboard (the couch is right behind it), so its
 // shorter steps leave room in the hallway to walk onto its bottom step,
 // instead of that step butting against the toilet wall.
-const STAIR = { steps: 12, rise: 0.25, run: 0.3, xLow: -1.8, xHigh: 1.8, stripB: [-3.7, HALL_Z - INT / 2], a: { x0: IN.x0, x1: -4.65, zHigh: GF.storeZ, run: 0.23 } };
+const STAIR = { steps: 12, rise: 0.25, run: 0.3, xLow: -1.8, xHigh: 1.8, stripB: [-3.7, HALL_Z - INT / 2], a: { x0: IN.x0, x1: -2.95, zHigh: GF.storeZ, run: 0.23 } };
 STAIR.a.zLow = STAIR.a.zHigh + STAIR.steps * STAIR.a.run;
 const HOLES = {
   1: { x0: STAIR.a.x0, x1: STAIR.a.x1, z0: STAIR.a.zHigh, z1: STAIR.a.zLow },
@@ -126,7 +126,7 @@ function roomOf(k, x, z) {
 // panels between them) and small high windows top left. Openings are [a, b]
 // along the wall plus optional sill/top heights and glazing bars (fractions).
 // The side walls are party walls with the neighbours, so they have no windows.
-const COLUMN = [1.2, 4.5];
+const COLUMN = [0.8, 3.0];
 // The low windows (the bedroom's small high ones and the dormer's) look as
 // small as the real ones, but give Lennie some slack to get through (see `wall`).
 const SLACK = { side: 0.15, below: 0.35, above: 0.2 };
@@ -139,24 +139,25 @@ const FRONT = [
   // (the kitchen's sill is 5 mm above the 0.9 m worktop it reaches over, not level with it: that flickered)
   [{ a: COLUMN[0], b: COLUMN[1], sill: KITCHEN_SILL, bars: { v: [1 / 3, 2 / 3], h: [0.7] } }],
   // the first small one lights the corridor from the stairs, clear of its wall
-  [{ a: -5.65, b: -4.8, ...SMALL }, { a: -4.0, b: -2.6, ...SMALL }, { a: COLUMN[0], b: COLUMN[1], sill: 0.6, top: 2.5, bars: { v: [0.32], h: [] } }],
+  [{ a: -3.75, b: -3.05, ...SMALL }, { a: -2.45, b: -1.25, ...SMALL }, { a: COLUMN[0], b: COLUMN[1], sill: 0.6, top: 2.5, bars: { v: [0.32], h: [] } }],
 ];
-const BACK = [{ a: -5.2, b: -3.8 }, { a: 3.6, b: 5.0 }];
+const BACK = [{ a: -3.5, b: -2.4 }, { a: 2.3, b: 3.4 }];
 // The living room's back wall: one big window frame onto the garden, a wide
 // pane with a side window on its left (seen from inside, by the TV), and the door to the utility room.
 // The convector heating trench runs in the floor under it.
-const BACK_GROUND = [{ a: -4.75, b: 0.95, sill: 0.55, bars: { v: [0.16], h: [] } }];
-const UTILITY_DOOR = [1.7, 2.8];
-const FRONT_DOOR = [-2.2, -1.1];
+const BACK_GROUND = [{ a: -3.0, b: 0.65, sill: 0.55, bars: { v: [0.16], h: [] } }];
+const UTILITY_DOOR = [0.95, 2.0];
+const FRONT_DOOR = [-1.5, -0.5];
 // The toilet sticks out of the front, as in the floor plan: a little brick
-// bump-out beside the front door, under the canopy, from the party wall to just
-// past the toilet's own wall (outer faces; the shared layout is in street.js).
-const TOILET_OUT = { x0: -6.125 + LAYOUT.toilet[0], x1: -6.125 + LAYOUT.toilet[1], z1: LAYOUT.toiletFront, top: PORCH_Y };
+// bump-out beside the front door, under the canopy, from the party wall to a
+// little short of the toilet's own wall, so the front door keeps a strip of
+// brick beside it (outer faces; the shared layout is in street.js).
+const TOILET_OUT = { x0: OUT.x0 + LAYOUT.toilet[0], x1: OUT.x0 + LAYOUT.toilet[1], z1: LAYOUT.toiletFront, top: PORCH_Y };
 // The row: a block of five, Lennie's house second from the left, so one
 // neighbour on the left and three on the right. x0 / x1 are the row's two ends.
-export const ROW = { width: 12.25, left: 1, right: 3 };
-ROW.x0 = -6.125 - ROW.left * ROW.width;
-ROW.x1 = 6.125 + ROW.right * ROW.width;
+export const ROW = { width: OUT.x1 - OUT.x0, left: 1, right: 3 };
+ROW.x0 = OUT.x0 - ROW.left * ROW.width;
+ROW.x1 = OUT.x1 + ROW.right * ROW.width;
 
 /** The convector trench's grille: wooden slats across it, 3 per 10 cm, over the dark trench. */
 function grilleTexture(length) {
@@ -579,8 +580,8 @@ export function buildHouse(scene, world, physMats) {
     else {
     wall({
       ...common, run: 'x', at: HOUSE.z1, from: OUT.x0, to: OUT.x1, physOffset: off, outward: 1, line: `south-${k}`,
-      // on the ground floor the toilet carries on into its bump-out, through an open gap
-      openings: [...FRONT[k].map(win), ...(k === 0 ? [door(FRONT_DOOR, true), { a: OUT.x0, b: GF.toiletX - INT / 2, bottom: y0, top: TOILET_OUT.top, open: true }] : [])],
+      // on the ground floor the toilet carries on into its bump-out, through an open gap as wide as the bump-out inside
+      openings: [...FRONT[k].map(win), ...(k === 0 ? [door(FRONT_DOOR, true), { a: OUT.x0, b: TOILET_OUT.x1 - EXT, bottom: y0, top: TOILET_OUT.top, open: true }] : [])],
       splits: k === 0 ? [GF.toiletX, GF.hallX] : [GF.stairX, MID_X],
       mats: { pos: M.brick, neg: (x) => wallpaper(roomAt(x, IN.z1 - 0.1)), ends: M.brick },
     });
@@ -606,9 +607,12 @@ export function buildHouse(scene, world, physMats) {
     if (k === 0) buildGroundWalls(inner, R, door);
     else {
       // On floor 2 the hall wall starts at the corridor from the stairs, which is open to the landing.
+      // Its doors stay clear of the stairs to the attic (x ±1.8 along this wall on the landing side):
+      // the bedroom's between them and the corridor; the kids room's opens onto their bottom steps, clear
+      // of the kids' bed; the attic bathroom's past their foot, not over the stairwell.
       wall({
         ...inner, run: 'x', at: HALL_Z, from: k === 1 ? GF.stairX - INT / 2 : IN.x0, to: IN.x1, line: `hall-${k}`,
-        openings: [door(k === 1 ? [-3.9, -2.8] : [-4.6, -3.4]), door([3.2, 4.4])],
+        openings: [door(k === 1 ? [-2.72, -1.82] : [-3.6, -2.5]), door(k === 1 ? [0.9, 2.0] : [2.2, 3.2])],
         mats: { pos: (x) => wallpaper(roomAt(x, 0)), neg: wallpaper(R.hall) },
       });
     }
@@ -735,15 +739,16 @@ export function buildHouse(scene, world, physMats) {
   hangDrawings(kit, [
     { pic: 0, face: '+x', x: wx, y: 1.45, z: -2.2, w: 0.56, tilt: 0.04, line: 'west-0' }, // above the couch
     { pic: 3, face: '+x', x: wx, y: 1.78, z: -1.45, w: 0.46, tilt: -0.06, line: 'west-0' },
-    { pic: 5, face: '-z', x: -3.98, y: 1.6, z: GF.storeZ - INT / 2 - 0.006, w: 0.7, line: 'storeback-0' },
-    { pic: 1, face: '-z', x: -3.0, y: 1.5, z: GF.hallZ - INT / 2 - 0.006, w: 0.44, tilt: -0.05, line: 'hallback-0' }, // either side of the hallway door
-    { pic: 4, face: '-z', x: -1.2, y: 1.42, z: GF.hallZ - INT / 2 - 0.006, w: 0.36, tilt: 0.05, line: 'hallback-0' },
+    { pic: 5, face: '-z', x: -2.3, y: 1.6, z: GF.storeZ - INT / 2 - 0.006, w: 0.7, line: 'storeback-0' }, // behind the couch
     { pic: 2, face: '-x', x: ex, y: 1.5, z: -3.4, w: 0.55, tilt: -0.05, line: 'east-0' }, // by the dining table
     { pic: 6, face: '-x', x: ex, y: 1.82, z: -2.6, w: 0.45, tilt: 0.07, line: 'east-0' },
+    // (the hallway door fills the hallway's back wall, so these two hang past the painting, by the piano)
+    { pic: 1, face: '-x', x: ex, y: 1.5, z: -0.1, w: 0.44, tilt: -0.05, line: 'east-0' },
+    { pic: 4, face: '-x', x: ex, y: 1.42, z: 0.55, w: 0.36, tilt: 0.05, line: 'east-0' },
     { pic: 7, face: '+x', x: wx, y: 1.88, z: -3.05, w: 0.5, tilt: -0.03, line: 'west-0' }, // above the TV's corner
     // framed snapshots of friends in the toilet: on its back wall, its side, and in its bump-out by the loo
-    { pic: 8, face: '+z', x: -4.95, y: 1.62, z: GF.toiletZ + INT / 2 + 0.006, w: 0.42, tilt: 0.02, line: 'toilet-0' },
-    { pic: 9, face: '+z', x: -4.15, y: 1.48, z: GF.toiletZ + INT / 2 + 0.006, w: 0.36, tilt: -0.02, line: 'toilet-0' },
+    { pic: 8, face: '+z', x: -2.95, y: 1.62, z: GF.toiletZ + INT / 2 + 0.006, w: 0.42, tilt: 0.02, line: 'toilet-0' },
+    { pic: 9, face: '+z', x: -2.15, y: 1.48, z: GF.toiletZ + INT / 2 + 0.006, w: 0.36, tilt: -0.02, line: 'toilet-0' },
     { pic: 10, face: '+x', x: wx, y: 1.55, z: 4.3, w: 0.42, line: 'west-0' },
     { pic: 11, face: '+x', x: wx, y: 1.6, z: 5.4, w: 0.36, tilt: 0.02, line: 'toiletoutw-0' },
   ]);
@@ -865,7 +870,7 @@ export function buildHouse(scene, world, physMats) {
     box(rMin, rMax, [M.trim, M.trim, M.darkRoof, M.ceiling, M.trim, M.trim], { story: 1, cast: true, line: 'garage-roof' });
     body([rMin[0], G.top - 0.1, rMin[2]], rMax, physMats.hard, { kind: 'roof' });
     // a fluorescent tube on the ceiling (with the roof, so it goes when the cutaway lifts that off)
-    box([3.2, G.top - 0.06, -8.3], [4.4, G.top - 0.005, -8.22], std({ color: 0xffffff, emissive: 0xf4f6ff, emissiveIntensity: 0.9 }), { story: 1 });
+    box([1.8, G.top - 0.06, -8.3], [3.0, G.top - 0.005, -8.22], std({ color: 0xffffff, emissive: 0xf4f6ff, emissiveIntensity: 0.9 }), { story: 1 });
   }
 
   // ------------------------------------------------------------ the toilet's bump-out
@@ -945,7 +950,7 @@ export function buildHouse(scene, world, physMats) {
     wall({
       run: 'x', at: DORMER.front, from: MID_X + INT / 2, to: DORMER.x1 - DORMER.wallT / 2, y0, y1: DORMER.top,
       thick: DORMER.wallT, physThick: 0.5, physOffset: 0.15, outward: 1, story: k, line: `dormer-${k}`,
-      openings: [{ a: 1.5, b: 4.2, bottom: underside(zf) + 0.45, top: DORMER.top - 0.25, glass: true, bars: { v: [0.5], h: [] }, slack: SLACK }],
+      openings: [{ a: 1.1, b: 2.7, bottom: underside(zf) + 0.45, top: DORMER.top - 0.25, glass: true, bars: { v: [0.5], h: [] }, slack: SLACK }],
       mats: { pos: M.cladding, neg: bath, ends: M.cladding },
     });
   }
@@ -1066,7 +1071,7 @@ export function buildHouse(scene, world, physMats) {
 
     // Lennie's own roof: chimney and a few vents, as in the photo.
     details.chimney(...ux(LAYOUT.chimney), 3, LINES[1]);
-    for (const [x, z] of [[-1.2, 2.6], [0.0, 1.2], [-2.0, -2.8]]) details.vent(x, z, 3, LINES[z > 0 ? 1 : -1]);
+    for (const [x, z] of [[-0.8, 2.6], [0.0, 1.2], [-1.35, -2.8]]) details.vent(x, z, 3, LINES[z > 0 ? 1 : -1]);
   }
 
   // ------------------------------------------------------------ furniture
@@ -1137,7 +1142,7 @@ export function buildHouse(scene, world, physMats) {
       const pot = new THREE.CylinderGeometry(0.052, 0.04, 0.09, 12);
       const leafy = new THREE.SphereGeometry(0.075, 12, 8);
       const cactus = col(0x5e9a4a);
-      for (const [x, kind] of [[1.42, 'round'], [1.66, 'cactus'], [2.55, 'spiky'], [3.05, 'flower'], [3.75, 'round'], [4.22, 'spiky']]) {
+      for (const [x, kind] of [[0.95, 'round'], [1.11, 'cactus'], [1.7, 'spiky'], [2.03, 'flower'], [2.5, 'round'], [2.81, 'spiky']]) {
         add(pot, col(kind === 'spiky' ? 0xe9e4da : 0xc0643c), x, y + 0.045, z);
         const top = y + 0.09;
         if (kind === 'round' || kind === 'flower') {
@@ -1174,80 +1179,80 @@ export function buildHouse(scene, world, physMats) {
     piece(0, [
       // living room: the corner couch with its back to the storage cupboard,
       // facing the garden, as long as the low white cabinet behind it
-      [[-5.875, 0, -1.6], [-1.0, 0.45, -0.8], SOFA, { soft: true }],
-      [[-5.875, 0, -2.4], [-4.85, 0.45, -1.6], SOFA, { soft: true }],
-      [[-5.875, 0.45, -1.1], [-1.0, 0.88, -0.8], SOFA, { soft: true }],
+      [[-3.875, 0, -1.6], [-0.6, 0.45, -0.8], SOFA, { soft: true }],
+      [[-3.875, 0, -2.4], [-2.85, 0.45, -1.6], SOFA, { soft: true }],
+      [[-3.875, 0.45, -1.1], [-0.6, 0.88, -0.8], SOFA, { soft: true }],
       // the arms end against the back cushion, so their ends don't flicker against its ends
-      [[-5.875, 0.45, -2.4], [-5.65, 0.66, -1.1], SOFA_ARM, { soft: true }],
-      [[-1.22, 0.45, -1.6], [-1.0, 0.66, -1.1], SOFA_ARM, { soft: true }],
-      [[-5.62, 0.45, -2.35], [-4.9, 0.52, -1.15], SOFA_CUSHION, { soft: true, phys: false }],
-      [[-4.8, 0.45, -1.55], [-3.65, 0.52, -1.12], SOFA_CUSHION, { soft: true, phys: false }],
-      [[-3.6, 0.45, -1.55], [-2.45, 0.52, -1.12], SOFA_CUSHION, { soft: true, phys: false }],
-      [[-2.4, 0.45, -1.55], [-1.25, 0.52, -1.12], SOFA_CUSHION, { soft: true, phys: false }],
+      [[-3.875, 0.45, -2.4], [-3.65, 0.66, -1.1], SOFA_ARM, { soft: true }],
+      [[-0.82, 0.45, -1.6], [-0.6, 0.66, -1.1], SOFA_ARM, { soft: true }],
+      [[-3.62, 0.45, -2.35], [-2.9, 0.52, -1.15], SOFA_CUSHION, { soft: true, phys: false }],
+      [[-2.8, 0.45, -1.55], [-2.18, 0.52, -1.12], SOFA_CUSHION, { soft: true, phys: false }],
+      [[-2.13, 0.45, -1.55], [-1.52, 0.52, -1.12], SOFA_CUSHION, { soft: true, phys: false }],
+      [[-1.47, 0.45, -1.55], [-0.85, 0.52, -1.12], SOFA_CUSHION, { soft: true, phys: false }],
       // the low cabinet behind the couch (the TV's painted cabinet is in clutter.js, full of toys)
-      [[-2.9, 0, -0.75], [-1.0, 0.55, -0.35], WHITE],
+      [[-1.55, 0, -0.75], [-0.6, 0.55, -0.35], WHITE],
       // the comfy chair by the back window, just in front of the heating trench
-      [[-0.4, 0, -4.6], [0.6, 0.42, -3.5], SOFA, { soft: true }],
-      [[-0.4, 0.42, -4.6], [0.6, 1.05, -4.3], SOFA, { soft: true }],
-      [[-0.4, 0.42, -4.3], [-0.2, 0.65, -3.5], SOFA_ARM, { soft: true }],
-      [[0.4, 0.42, -4.3], [0.6, 0.65, -3.5], SOFA_ARM, { soft: true }],
+      [[-0.25, 0, -4.6], [0.75, 0.42, -3.5], SOFA, { soft: true }],
+      [[-0.25, 0.42, -4.6], [0.75, 1.05, -4.3], SOFA, { soft: true }],
+      [[-0.25, 0.42, -4.3], [-0.05, 0.65, -3.5], SOFA_ARM, { soft: true }],
+      [[0.55, 0.42, -4.3], [0.75, 0.65, -3.5], SOFA_ARM, { soft: true }],
       // the dining table (its six chairs and the piano stool are loose, below)
-      ...table(3.0, -2.2, 4.1, -0.3, 0.78, 0xc9a06a),
+      ...table(1.9, -2.2, 3.0, -0.3, 0.78, 0xc9a06a),
       // the piano, its back to the kitchen counter
-      [[2.95, 0, 0.55], [4.65, 1.25, 1.12], PIANO],
-      [[3.0, 0.68, 0.33], [4.6, 0.76, 0.55], PIANO],
-      [[3.03, 0.76, 0.36], [4.57, 0.775, 0.5], WHITE, { phys: false }],
-      [[3.0, 0, 0.38], [3.08, 0.68, 0.46], PIANO],
-      [[4.52, 0, 0.38], [4.6, 0.68, 0.46], PIANO],
+      [[1.85, 0, 0.55], [3.55, 1.25, 1.12], PIANO],
+      [[1.9, 0.68, 0.33], [3.5, 0.76, 0.55], PIANO],
+      [[1.93, 0.76, 0.36], [3.47, 0.775, 0.5], WHITE, { phys: false }],
+      [[1.9, 0, 0.38], [1.98, 0.68, 0.46], PIANO],
+      [[3.42, 0, 0.38], [3.5, 0.68, 0.46], PIANO],
       // kitchen: a U of counters, along the front under the window, along the right wall, and across the back
-      [[KITCHEN_FRONT, 0, 4.225], [5.875, 0.85, 4.875], CABINET],
-      [[KITCHEN_FRONT, 0.85, 4.2], [5.875, 0.9, 4.875], WORKTOP],
-      [[5.225, 0, 1.85], [5.875, 0.85, 4.225], CABINET],
-      [[5.2, 0.85, 1.85], [5.875, 0.9, 4.2], WORKTOP],
-      [[0.8, 0, 1.2], [5.875, 0.85, 1.85], CABINET],
-      [[0.78, 0.85, 1.18], [5.875, 0.9, 1.85], WORKTOP],
+      [[KITCHEN_FRONT, 0, 4.225], [IN.x1, 0.85, 4.875], CABINET],
+      [[KITCHEN_FRONT, 0.85, 4.2], [IN.x1, 0.9, 4.875], WORKTOP],
+      [[3.225, 0, 1.85], [IN.x1, 0.85, 4.225], CABINET],
+      [[3.2, 0.85, 1.85], [IN.x1, 0.9, 4.2], WORKTOP],
+      [[0.95, 0, 1.2], [IN.x1, 0.85, 1.85], CABINET],
+      [[0.93, 0.85, 1.18], [IN.x1, 0.9, 1.85], WORKTOP],
       // (the hanging cupboard on the side wall, above the counter, is in clutter.js: Lennie smashes its doors)
       // the cooker: a black hob on the counter and the oven under it
-      [[-0.55, 0.9, 4.3], [0.25, 0.912, 4.8], 0x18181a, { phys: false }],
-      [[-0.5, 0.1, 4.205], [0.2, 0.75, 4.225], 0x2b2b2e, { phys: false }],
+      [[-0.2, 0.9, 4.3], [0.6, 0.912, 4.8], 0x18181a, { phys: false }],
+      [[-0.15, 0.1, 4.205], [0.55, 0.75, 4.225], 0x2b2b2e, { phys: false }],
       // the steel extractor hood above it, its chimney up to the ceiling
-      [[-0.62, 1.58, 4.28], [0.32, 1.7, 4.875], null, STEEL],
-      [[-0.58, 1.575, 4.32], [0.28, 1.58, 4.84], 0x3a3c40, { phys: false }],
-      [[-0.28, 1.7, 4.6], [-0.02, H - T, 4.875], null, STEEL],
+      [[-0.27, 1.58, 4.28], [0.67, 1.7, 4.875], null, STEEL],
+      [[-0.23, 1.575, 4.32], [0.63, 1.58, 4.84], 0x3a3c40, { phys: false }],
+      [[0.07, 1.7, 4.6], [0.33, H - T, 4.875], null, STEEL],
       // toilet: the loo against the front of its bump-out, and the little hand basin in the corner
-      [[-4.93, 0, 5.725], [-4.43, 0.85, 5.95], WHITE],
-      [[-4.88, 0, 5.225], [-4.48, 0.42, 5.725], WHITE],
-      [[-4.9, 0.42, 5.195], [-4.46, 0.45, 5.695], 0xe6e1d8, { phys: false }],
-      [[-5.875, 0.75, 3.2], [-5.5, 0.85, 3.6], WHITE],
-      [[-5.75, 0, 3.33], [-5.63, 0.75, 3.47], WHITE],
+      [[-3.45, 0, 5.725], [-2.95, 0.85, 5.95], WHITE],
+      [[-3.4, 0, 5.225], [-3.0, 0.42, 5.725], WHITE],
+      [[-3.42, 0.42, 5.195], [-2.98, 0.45, 5.695], 0xe6e1d8, { phys: false }],
+      [[-3.875, 0.75, 3.2], [-3.5, 0.85, 3.6], WHITE],
+      [[-3.75, 0, 3.33], [-3.63, 0.75, 3.47], WHITE],
       // hallway: the coat rack on the toilet wall, with the family's coats on it
-      [[-4.5, 1.62, 2.92], [-3.55, 1.72, 2.96], WOOD, { phys: false }],
-      [[-4.45, 0.85, 2.74], [-4.15, 1.62, 2.92], 0xd95d39, { phys: false }],
-      [[-4.13, 0.95, 2.76], [-3.87, 1.62, 2.92], 0x2c3e5a, { phys: false }],
-      [[-3.85, 1.15, 2.78], [-3.62, 1.62, 2.92], 0xf2c14e, { phys: false }],
+      [[-2.75, 1.62, 2.92], [-1.95, 1.72, 2.96], WOOD, { phys: false }],
+      [[-2.72, 0.85, 2.74], [-2.46, 1.62, 2.92], 0xd95d39, { phys: false }],
+      [[-2.44, 0.95, 2.76], [-2.21, 1.62, 2.92], 0x2c3e5a, { phys: false }],
+      [[-2.19, 1.15, 2.78], [-1.99, 1.62, 2.92], 0xf2c14e, { phys: false }],
       // storage cupboard: a crate of empties
-      [[-4.4, 0, 0.45], [-3.95, 0.3, 0.85], 0xf2c14e],
+      [[-2.65, 0, 0.45], [-2.2, 0.3, 0.85], 0xf2c14e],
       // utility room: the fridge, and the cat's litter box
-      [[5.15, 0, -5.85], [5.875, 1.95, -5.125], WHITE],
-      [[5.13, 1.1, -5.78], [5.15, 1.7, -5.72], 0x9aa3ad, { phys: false }],
+      [[3.15, 0, -5.85], [IN.x1, 1.95, -5.125], WHITE],
+      [[3.13, 1.1, -5.78], [3.15, 1.7, -5.72], 0x9aa3ad, { phys: false }],
       // a big litter tray, drawn only: a solid rim made Lennie bounce right out
       // of it again, so now he lands on the floor inside it (its spot is generous too)
-      [[2.3, 0.012, -6.55], [3.3, 0.03, -5.9], 0x4a7fa8, { phys: false }],
-      [[2.3, 0.03, -6.55], [2.33, 0.17, -5.9], 0x4a7fa8, { phys: false }],
-      [[3.27, 0.03, -6.55], [3.3, 0.17, -5.9], 0x4a7fa8, { phys: false }],
-      [[2.33, 0.03, -6.55], [3.27, 0.17, -6.52], 0x4a7fa8, { phys: false }],
-      [[2.33, 0.03, -5.93], [3.27, 0.17, -5.9], 0x4a7fa8, { phys: false }],
-      [[2.33, 0.03, -6.52], [3.27, 0.1, -5.93], 0xd8c9a3, { phys: false }],
+      [[1.3, 0.012, -6.55], [2.3, 0.03, -5.9], 0x4a7fa8, { phys: false }],
+      [[1.3, 0.03, -6.55], [1.33, 0.17, -5.9], 0x4a7fa8, { phys: false }],
+      [[2.27, 0.03, -6.55], [2.3, 0.17, -5.9], 0x4a7fa8, { phys: false }],
+      [[1.33, 0.03, -6.55], [2.27, 0.17, -6.52], 0x4a7fa8, { phys: false }],
+      [[1.33, 0.03, -5.93], [2.27, 0.17, -5.9], 0x4a7fa8, { phys: false }],
+      [[1.33, 0.03, -6.52], [2.27, 0.1, -5.93], 0xd8c9a3, { phys: false }],
     ]);
-    clothesRack(3.65, 4.95, -6.3);
+    clothesRack(2.35, 3.65, -6.3); // (just clear of the litter tray)
     // the six dining chairs and the piano stool, loose so Lennie knocks them
     // over instead of getting stuck between them (loose.js); on the ground floor, so y is as built
     const knockable = (parts, mass) => loose.add(groups[0], parts.map(([min, max, color]) => [min, max, col(color)]), { mass, surface: { kind: 'furniture' } });
     for (const z of [-1.85, -1.25, -0.65]) {
-      knockable(chair(2.6, z, 1, 0xd95d39), 5);
-      knockable(chair(4.5, z, -1, 0xd95d39), 5);
+      knockable(chair(1.5, z, 1, 0xd95d39), 5);
+      knockable(chair(3.4, z, -1, 0xd95d39), 5);
     }
-    knockable([[[3.4, 0, -0.05], [4.2, 0.5, 0.3], PIANO]], 9);
+    knockable([[[2.3, 0, -0.05], [3.1, 0.5, 0.3], PIANO]], 9);
 
     // The clothes rack in the utility room: a chrome rail on two feet, from x0
     // to x1 along the back wall (centred on z), full of coats and jackets on
@@ -1294,16 +1299,16 @@ export function buildHouse(scene, world, physMats) {
       loose.add(groups[0], parts, { mass: 8, surface: { kind: 'furniture' }, look });
     }
     // burners on the hob
-    for (const [x, z] of [[-0.35, 4.43], [0.05, 4.43], [-0.35, 4.67], [0.05, 4.67]]) {
+    for (const [x, z] of [[0.0, 4.43], [0.4, 4.43], [0.0, 4.67], [0.4, 4.67]]) {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.012, 6, 20).rotateX(Math.PI / 2), col(0x55555a));
       ring.position.set(x, 0.915, z);
       groups[0].add(ring);
     }
-    rug(0, -2.25, 4.2, -1.05, 4.8, 0x6b5a45); // the doormat
+    rug(0, -1.55, 4.2, -0.5, 4.8, 0x6b5a45); // the doormat
 
     // the convector heating trench in the floor along the back window, from the
     // TV's corner to the comfy chair: a long wooden grille, a little way out from the wall
-    const trench = { a: BACK_GROUND[0].a + 0.15, b: -0.5, z0: IN.z0 + 0.15 };
+    const trench = { a: BACK_GROUND[0].a + 0.15, b: -0.35, z0: IN.z0 + 0.15 };
     const grille = rug(0, trench.a, trench.z0, trench.b, trench.z0 + 0.26, 0xffffff);
     grille.material = std({ map: grilleTexture(trench.b - trench.a), roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
 
@@ -1311,10 +1316,10 @@ export function buildHouse(scene, world, physMats) {
     windowPlants();
 
     // the small round side table in front of the couch: an oak top on three black legs
-    roundTable(-2.5, -2.3, 0.3, 0.45, 0xc8a172, 0x26262a);
+    roundTable(-1.7, -2.3, 0.3, 0.45, 0xc8a172, 0x26262a);
     // and the low round table at the lounge set in the garden (garden.js), on a rattan stand
     {
-      const [x, z, r, h] = [3.3, -11.25, 0.42, 0.42];
+      const [x, z, r, h] = [2.0, -11.25, 0.42, 0.42];
       loose.add(groups[0], [
         [[x - r, h - 0.04, z - r], [x + r, h, z + r], col(0xd8d2c4), { round: true }],
         [[x - r * 0.65, 0, z - r * 0.65], [x + r * 0.65, h - 0.04, z + r * 0.65], col(0x7d7368), { round: true }],
@@ -1343,14 +1348,14 @@ export function buildHouse(scene, world, physMats) {
     const GX0 = GARAGE.x0 + EXT / 2;
     piece(0, [
       ...shelving(GX0, GZ0 + 0.05, GX0 + 0.5, -8.05, [0.08, 0.6, 1.12, 1.64, 2.1], SHELF, 'camping'),
-      ...table(5.05, GZ0 + 0.05, IN.x1 - 0.02, -8.2, 0.85, 0x8a6a48).map((part) => [...part.slice(0, 3), NO]),
-      ...shelving(2.7, GZ1 - 0.4, IN.x1, GZ1, [0.1, 0.5, 0.9], SHELF, 'tools'),
-      [[2.75, 0.93, GZ1 - 0.02], [IN.x1 - 0.02, 1.85, GZ1 - 0.005], 0xc9b48f, NO], // the pegboard
+      ...table(3.05, GZ0 + 0.05, IN.x1 - 0.02, -8.2, 0.85, 0x8a6a48).map((part) => [...part.slice(0, 3), NO]),
+      ...shelving(1.7, GZ1 - 0.4, IN.x1, GZ1, [0.1, 0.5, 0.9], SHELF, 'tools'),
+      [[1.75, 0.93, GZ1 - 0.02], [IN.x1 - 0.02, 1.85, GZ1 - 0.005], 0xc9b48f, NO], // the pegboard
     ]);
     // one solid block for the table and what's under it, and the pegboard (so a knock on it brings the tools down)
-    garage.table = body([5.05, 0, GZ0], [IN.x1, 0.85, -8.2], physMats.hard, { kind: 'furniture' });
-    garage.pegboard = body([2.75, 0.96, GZ1 - 0.06], [IN.x1, 1.85, GZ1], physMats.hard, { kind: 'furniture' });
-    // a bike against the back wall, between the shelves and the table
+    garage.table = body([3.05, 0, GZ0], [IN.x1, 0.85, -8.2], physMats.hard, { kind: 'furniture' });
+    garage.pegboard = body([1.75, 0.96, GZ1 - 0.06], [IN.x1, 1.85, GZ1], physMats.hard, { kind: 'furniture' });
+    // a bike against the back wall, between the shelves and the table (a size smaller, to fit in between)
     {
       const bike = new THREE.Group();
       const tyre = col(0x1b1b1b);
@@ -1371,48 +1376,49 @@ export function buildHouse(scene, world, physMats) {
       const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.5, 6).rotateX(Math.PI / 2), col(0x55595f));
       bar.position.set(0.42, 1.0, 0);
       bike.add(saddle, bar);
-      bike.position.set(3.6, 0, GZ0 + 0.22);
+      bike.position.set(2.21, 0, GZ0 + 0.22);
       bike.rotation.x = -0.06;
+      bike.scale.setScalar(0.9);
       groups[0].add(bike);
-      body([2.7, 0, GZ0], [4.5, 1.05, GZ0 + 0.4], physMats.hard, { kind: 'furniture' });
+      body([1.42, 0, GZ0], [3.0, 0.95, GZ0 + 0.4], physMats.hard, { kind: 'furniture' });
     }
 
     // --- Storey 1: bedroom + kids room
     piece(1, [
       // the bed, its head against the wall of the corridor from the stairs
-      [[-4.455, 0, 0.6], [-4.36, 0.86, 2.4], WOOD],
-      [[-4.36, 0, 0.6], [-2.28, 0.32, 2.4], WOOD],
-      [[-4.33, 0.32, 0.65], [-2.33, 0.58, 2.35], WHITE, { soft: true }],
-      [[-3.48, 0.58, 0.62], [-2.3, 0.61, 2.38], 0x7c6bc4, { phys: false }],
-      [[-4.28, 0.58, 0.8], [-3.83, 0.68, 2.2], 0xffffff, { phys: false }],
-      [[-4.43, 0, 2.55], [-3.98, 0.5, 3.0], WOOD],
-      [[0.3, 0, 2.6], [0.89, 2.0, 4.4], 0xb48a5c],
+      [[-2.765, 0, 0.6], [-2.67, 0.86, 2.4], WOOD],
+      [[-2.67, 0, 0.6], [-0.59, 0.32, 2.4], WOOD],
+      [[-2.64, 0.32, 0.65], [-0.64, 0.58, 2.35], WHITE, { soft: true }],
+      [[-1.79, 0.58, 0.62], [-0.61, 0.61, 2.38], 0x7c6bc4, { phys: false }],
+      [[-2.59, 0.58, 0.8], [-2.14, 0.68, 2.2], 0xffffff, { phys: false }],
+      [[-2.74, 0, 2.55], [-2.29, 0.5, 3.0], WOOD],
+      [[-0.1, 0, 2.6], [0.49, 2.0, 4.4], 0xb48a5c],
       // kids room
-      [[4.0, 0, -2.25], [5.875, 0.3, -1.2], 0xf2c14e],
-      [[4.05, 0.3, -2.2], [5.85, 0.52, -1.25], 0x5b8def, { soft: true }],
-      [[2.0, 0, 4.2], [3.0, 0.5, 4.85], 0xe24a4a],
+      [[2.0, 0, -2.25], [IN.x1, 0.3, -1.2], 0xf2c14e],
+      [[2.05, 0.3, -2.2], [3.85, 0.52, -1.25], 0x5b8def, { soft: true }],
+      [[1.2, 0, 4.2], [2.2, 0.5, 4.85], 0xe24a4a],
     ]);
-    rug(1, -2.18, 0.6, 0.0, 2.6, 0xe8d6f5);
-    rug(1, 2.2, 1.6, 4.4, 3.8, 0xffe08a, true);
+    rug(1, -0.55, 0.6, 0.4, 2.6, 0xe8d6f5);
+    rug(1, 1.2, 1.6, 3.4, 3.8, 0xffe08a, true);
     const beanbag = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 16), col(0xff7f50));
     beanbag.scale.set(1, 0.7, 1);
-    beanbag.position.set(3.6, H + 0.35, 3.0);
+    beanbag.position.set(2.6, H + 0.35, 3.0);
     beanbag.castShadow = true;
     groups[1].add(beanbag);
     const bb = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Sphere(0.42) });
-    bb.position.set(3.6, H + 0.3, 3.0);
+    bb.position.set(2.6, H + 0.3, 3.0);
     bb.surface = { kind: 'cushion' };
     world.addBody(bb);
 
     // --- Storey 2: the attic study + bathroom, kept clear of the sloping roof
-    const tub = { x0: 2.65, x1: 4.5, z0: 2.75, z1: 3.75 };
+    const tub = { x0: 1.0, x1: 2.85, z0: 2.75, z1: 3.75 };
     piece(2, [
-      ...table(-5.875, -1.6, -5.1, 0.2, 0.76, WOOD),
-      [[-5.8, 0.76, -1.0], [-5.74, 1.2, -0.3], 0x111114],
-      ...chair(-4.6, -0.7, -1, 0x2f3e57),
-      [[-3.0, 0, -2.3], [-1.4, 1.9, -1.95], WOOD],
-      [[-1.2, 0, 2.2], [0.85, 0.45, 3.4], 0xc75b7a, { soft: true }],
-      [[-1.2, 0.45, 3.1], [0.85, 1.0, 3.4], 0xc75b7a, { soft: true }],
+      ...table(-3.875, -1.6, -3.1, 0.2, 0.76, WOOD),
+      [[-3.8, 0.76, -1.0], [-3.74, 1.2, -0.3], 0x111114],
+      ...chair(-2.6, -0.7, -1, 0x2f3e57),
+      [[-2.3, 0, -2.3], [-0.7, 1.9, -1.95], WOOD],
+      [[-1.58, 0, 2.2], [0.47, 0.45, 3.4], 0xc75b7a, { soft: true }],
+      [[-1.58, 0.45, 3.1], [0.47, 1.0, 3.4], 0xc75b7a, { soft: true }],
       // bathroom: a hollow tub Lennie can land in, in the dormer under its window
       [[tub.x0, 0, tub.z0], [tub.x1, 0.12, tub.z1], WHITE],
       [[tub.x0, 0.12, tub.z0], [tub.x0 + 0.08, 0.55, tub.z1], WHITE],
@@ -1420,16 +1426,16 @@ export function buildHouse(scene, world, physMats) {
       [[tub.x0 + 0.08, 0.12, tub.z0], [tub.x1 - 0.08, 0.55, tub.z0 + 0.08], WHITE],
       [[tub.x0 + 0.08, 0.12, tub.z1 - 0.08], [tub.x1 - 0.08, 0.55, tub.z1], WHITE],
       [[tub.x0 + 0.08, 0.12, tub.z0 + 0.08], [tub.x1 - 0.08, 0.14, tub.z1 - 0.08], 0x8fd3f0, { phys: false }],
-      [[5.2, 0, -1.6], [5.75, 0.42, -1.1], WHITE],
-      [[5.65, 0.42, -1.65], [5.875, 0.85, -1.05], WHITE],
-      [[5.0, 0, 0.2], [5.875, 0.85, 1.4], 0x6a9fb5],
+      [[3.2, 0, -1.6], [3.75, 0.42, -1.1], WHITE],
+      [[3.65, 0.42, -1.65], [IN.x1, 0.85, -1.05], WHITE],
+      [[3.0, 0, 0.2], [IN.x1, 0.85, 1.4], 0x6a9fb5],
     ]);
     // books on the shelf
     const bookColors = [0xd95d39, 0x3f5fd6, 0xf2c14e, 0x22a06b, 0x8e44ad];
     for (let shelf = 0; shelf < 3; shelf++) {
-      let x = -2.95;
+      let x = -2.25;
       let i = shelf * 2;
-      while (x < -1.5) {
+      while (x < -0.8) {
         const w = 0.06 + ((i * 37) % 5) * 0.012;
         const h = 0.3 + ((i * 53) % 4) * 0.04;
         box([x, 2 * H + 0.3 + shelf * 0.55, -2.28], [x + w, 2 * H + 0.3 + shelf * 0.55 + h, -1.97], col(bookColors[i % 5]), { story: 2 });
@@ -1437,7 +1443,7 @@ export function buildHouse(scene, world, physMats) {
         i++;
       }
     }
-    rug(2, 1.5, 1.2, 3.4, 2.3, 0x9ad0e6);
+    rug(2, 0.8, 1.2, 2.7, 2.3, 0x9ad0e6);
   }
 
   // ------------------------------------------------------------ queries
@@ -1464,35 +1470,35 @@ export function buildHouse(scene, world, physMats) {
   // Boxes are [min, max] in world space, just above each piece of furniture.
   const S = (id, label, value, say, min, max) => ({ id, label, value, say, min, max });
   const spots = [
-    S('bath', 'In the bath!', 500, 'SPLASH!', [2.65, 2 * H, 2.75], [4.5, 2 * H + 1.0, 3.75]),
-    S('loo', 'On the loo!', 500, 'OOPS!', [5.05, 2 * H + 0.3, -1.8], [5.9, 2 * H + 1.1, -0.95]),
-    S('desk', 'Asleep on the desk', 200, 'ZZZ', [-5.9, 2 * H + 0.7, -1.65], [-5.05, 2 * H + 1.4, 0.25]),
-    S('armchair', 'Comfy in the armchair', 150, 'AHH!', [-1.25, 2 * H + 0.3, 2.15], [0.9, 2 * H + 1.2, 3.45]),
-    S('wardrobe', 'On top of the wardrobe!', 500, 'HELP!', [0.25, H + 1.95, 2.55], [0.95, H + 2.7, 4.45]),
-    S('bed', 'Tucked into bed', 250, 'NIGHT!', [-4.43, H + 0.3, 0.55], [-2.23, H + 1.1, 2.45]),
-    S('bed', 'Tucked into bed', 250, 'NIGHT!', [3.95, H + 0.25, -2.3], [5.9, H + 1.05, -1.15]),
-    S('beanbag', 'Beanbag flop!', 250, 'FLUMP!', [3.0, H + 0.4, 2.4], [4.2, H + 1.2, 3.6]),
-    S('toybox', 'On the toy box!', 250, 'TOYS!', [1.95, H + 0.45, 4.15], [3.05, H + 1.2, 4.9]),
-    S('fridge', 'On top of the fridge!', 450, 'CHILLY!', [5.05, 1.9, -5.95], [5.9, 2.6, -5.1]),
-    S('table', 'On the dinner table!', 200, 'DINNER!', [2.95, 0.75, -2.25], [4.15, 1.45, -0.25]),
-    S('counter', 'On the kitchen counter', 200, 'CHEF!', [-0.85, 0.88, 4.15], [5.9, 1.55, 4.9]),
-    S('counter', 'On the kitchen counter', 200, 'CHEF!', [5.15, 0.88, 1.8], [5.9, 1.55, 4.2]),
-    S('counter', 'On the kitchen counter', 200, 'CHEF!', [0.75, 0.88, 1.15], [5.9, 1.55, 1.9]),
-    S('couch', 'Couch potato', 150, 'AHH!', [-5.9, 0.3, -2.45], [-0.95, 1.2, -0.75]),
-    S('armchair', 'Comfy in the armchair', 150, 'AHH!', [-0.45, 0.3, -4.65], [0.65, 1.2, -3.45]),
-    S('piano', 'On the piano!', 350, 'PLINK!', [2.9, 1.2, 0.5], [4.7, 2.0, 1.17]),
-    S('loo', 'On the loo!', 500, 'OOPS!', [-4.98, 0.3, 5.12], [-4.38, 1.1, 5.95]),
-    S('litter', 'In the cat litter!', 400, 'EWW!', [2.0, 0, -6.6], [3.6, 0.75, -5.6]),
-    S('junk', 'On the junk pile!', 300, 'CLATTER!', [5.0, 0.8, -9.6], [5.9, 1.9, -8.15]),
-    S('camping', 'Up on the camping shelf!', 450, 'CAMPING!', [1.5, 2.05, -9.6], [2.1, 2.6, -8.0]),
-    S('lounge', 'Chilling on the lounge set', 200, 'AHH!', [1.55, 0.25, -12.05], [5.98, 1.1, -9.8]),
+    S('bath', 'In the bath!', 500, 'SPLASH!', [1.0, 2 * H, 2.75], [2.85, 2 * H + 1.0, 3.75]),
+    S('loo', 'On the loo!', 500, 'OOPS!', [3.05, 2 * H + 0.3, -1.8], [3.9, 2 * H + 1.1, -0.95]),
+    S('desk', 'Asleep on the desk', 200, 'ZZZ', [-3.9, 2 * H + 0.7, -1.65], [-3.05, 2 * H + 1.4, 0.25]),
+    S('armchair', 'Comfy in the armchair', 150, 'AHH!', [-1.63, 2 * H + 0.3, 2.15], [0.52, 2 * H + 1.2, 3.45]),
+    S('wardrobe', 'On top of the wardrobe!', 500, 'HELP!', [-0.13, H + 1.95, 2.55], [0.56, H + 2.7, 4.45]),
+    S('bed', 'Tucked into bed', 250, 'NIGHT!', [-2.74, H + 0.3, 0.55], [-0.54, H + 1.1, 2.45]),
+    S('bed', 'Tucked into bed', 250, 'NIGHT!', [1.95, H + 0.25, -2.3], [3.9, H + 1.05, -1.15]),
+    S('beanbag', 'Beanbag flop!', 250, 'FLUMP!', [2.0, H + 0.4, 2.4], [3.2, H + 1.2, 3.6]),
+    S('toybox', 'On the toy box!', 250, 'TOYS!', [1.15, H + 0.45, 4.15], [2.25, H + 1.2, 4.9]),
+    S('fridge', 'On top of the fridge!', 450, 'CHILLY!', [3.05, 1.9, -5.95], [3.9, 2.6, -5.1]),
+    S('table', 'On the dinner table!', 200, 'DINNER!', [1.85, 0.75, -2.25], [3.05, 1.45, -0.25]),
+    S('counter', 'On the kitchen counter', 200, 'CHEF!', [-0.35, 0.88, 4.15], [3.9, 1.55, 4.9]),
+    S('counter', 'On the kitchen counter', 200, 'CHEF!', [3.15, 0.88, 1.8], [3.9, 1.55, 4.2]),
+    S('counter', 'On the kitchen counter', 200, 'CHEF!', [0.9, 0.88, 1.15], [3.9, 1.55, 1.9]),
+    S('couch', 'Couch potato', 150, 'AHH!', [-3.9, 0.3, -2.45], [-0.55, 1.2, -0.75]),
+    S('armchair', 'Comfy in the armchair', 150, 'AHH!', [-0.3, 0.3, -4.65], [0.8, 1.2, -3.45]),
+    S('piano', 'On the piano!', 350, 'PLINK!', [1.8, 1.2, 0.5], [3.6, 2.0, 1.17]),
+    S('loo', 'On the loo!', 500, 'OOPS!', [-3.5, 0.3, 5.12], [-2.9, 1.1, 5.95]),
+    S('litter', 'In the cat litter!', 400, 'EWW!', [1.0, 0, -6.6], [2.6, 0.75, -5.6]),
+    S('junk', 'On the junk pile!', 300, 'CLATTER!', [3.0, 0.8, -9.6], [3.9, 1.9, -8.15]),
+    S('camping', 'Up on the camping shelf!', 450, 'CAMPING!', [GARAGE.x0 + 0.07, 2.05, -9.6], [GARAGE.x0 + 0.67, 2.6, -8.0]),
+    S('lounge', 'Chilling on the lounge set', 200, 'AHH!', [0.85, 0.25, -12.05], [3.98, 1.1, -9.8]),
     ...clutter.spots,
   ];
 
   // a clear bit of floor on each storey: the living room, the bedroom, the attic study
-  const SPAWN = [{ x: -0.6, z: -2.5 }, { x: -1.2, z: 1.0 }, { x: -2.4, z: 1.6 }];
+  const SPAWN = [{ x: 0.2, z: -2.6 }, { x: 0.0, z: -0.8 }, { x: -1.8, z: 0.8 }];
   function spawnPoint(level) {
-    if (level >= 3) return { x: -1.5, z: 0.2, height: HOUSE.ridgeY + 0.3 };
+    if (level >= 3) return { x: -1.0, z: 0.2, height: HOUSE.ridgeY + 0.3 };
     return { ...SPAWN[level], height: level * H + 0.05 };
   }
 

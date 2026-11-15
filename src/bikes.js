@@ -14,7 +14,7 @@ import * as THREE from 'three';
 // the handlebars, the saddle, and the kickstand's foot, which is what lets a
 // leaning bike stand.
 
-const LINE = -3.85; // the wheels' line, just in front of the bushes: the handlebars reach into the leaves, clear of their body (garden.js)
+const LINE = -1.85; // the wheels' line, just in front of the bushes (2.15 m in from the fence at x −4): the handlebars reach into the leaves, clear of their body (garden.js)
 const Y = new THREE.Vector3(0, 1, 0);
 
 export function parkBikes(loose, parent, std) {
@@ -72,7 +72,7 @@ export function parkBikes(loose, parent, std) {
   // (+ turns its front out from the bushes), out from the line by out, and
   // leaning a little to its left (its own −z, the kickstand side: away from
   // the bushes, into the garden). Turned ones keep clear of the bushes' body:
-  // their nearest handlebar end or back stays at x > −4.3.
+  // their nearest handlebar end or back stays at x > −2.3.
   let tip = -8.7; // the first one's front
   const place = (front, back, { lean = 0, yaw = 0, out = 0, gap = 0.25 } = {}) => {
     const at = new THREE.Vector3(LINE + out, 0, tip - front * Math.cos(yaw));

@@ -148,8 +148,8 @@ const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.2, 40
 // floor with the garden window behind him, so a pull straight down sends him
 // out into the garden. The game starts here, and R and each new turn come back
 // to it, so every player starts the same way.
-const HOME_CAM = new THREE.Vector3(0.6, 1.8, 1.2);
-const HOME_TARGET = new THREE.Vector3(-0.6, 0.5, -2.5); // where Lennie starts (house.spawnPoint(0))
+const HOME_CAM = new THREE.Vector3(0.3, 1.8, 0.9);
+const HOME_TARGET = new THREE.Vector3(0.2, 0.5, -2.6); // where Lennie starts (house.spawnPoint(0))
 camera.position.copy(HOME_CAM);
 
 // ---------------------------------------------------------------- physics

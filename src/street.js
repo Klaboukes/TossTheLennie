@@ -199,21 +199,24 @@ export const HOUSE_NUMBERS = { [-1]: 12, 0: 10, 1: 8, 2: 6, 3: 4 };
 // Front layout of every house in the row, in u (see top). Lennie's house uses
 // the same numbers (house.js), so the row lines up.
 export const LAYOUT = {
-  porch: [0, 5.55], // over the toilet's bump-out and the front door
-  porchNoToilet: [1.1, 5.55],
+  porch: [0, 3.75], // over the toilet's bump-out and the front door
+  porchNoToilet: [1.3, 3.75],
   // The ground-floor toilet sticks out of the front beside the front door, in
-  // the owner's floor plan: from the party wall to just past the toilet's own
-  // wall, out to `toiletFront` (z), under the canopy.
-  toilet: [0, 2.885],
+  // the owner's floor plan: from the party wall to a little short of the
+  // toilet's own wall (leaving some brick beside the door), out to
+  // `toiletFront` (z), under the canopy.
+  toilet: [0, 2.2],
   toiletFront: 6.2,
-  door: [3.925, 5.025],
-  number: 5.3, // the house number's plaque, on the wall just past the door's frame, away from the toilet
-  column: [7.325, 10.625],
-  small: [[0.425, 1.525], [2.125, 3.525]],
-  pipe: 1.825,
-  chimney: [1.825, 3.325],
-  dormer: [7.125, 10.825],
-  back: [[0.925, 2.325], [9.725, 11.125]],
+  door: [2.625, 3.625],
+  number: 3.8, // the house number's plaque, on the wall just past the door's frame, away from the toilet
+  column: [4.925, 7.125],
+  small: [[0.375, 1.075], [1.675, 2.875]],
+  pipe: 1.375,
+  chimney: [1.3, 2.3],
+  dormer: [4.725, 7.325],
+  back: [[0.625, 1.725], [6.425, 7.525]],
+  skylight: [5.1, 6.9], // the roof window of the house on Lennie's right, above its window column
+  vents: [[3.35, 2.6], [4.3, 1.4], [2.7, -2.6]], // [u, z], clear of the chimney and the dormer
 };
 
 const STYLES = {
@@ -315,8 +318,8 @@ export function buildNeighbours(kit, details) {
     for (const what of style.roof) {
       if (what === 'chimney') details.chimney(...span(LAYOUT.chimney), 0);
       if (what === 'dormer') details.dormer(...span(LAYOUT.dormer), 0, frameMat);
-      if (what === 'skylight') details.skylight(...span([7.8, 9.6]), 2.6, 0);
-      if (what === 'vents') for (const [u, z] of [[5.0, 2.6], [6.4, 1.4], [4.0, -2.6]]) details.vent(X(u), z, 0);
+      if (what === 'skylight') details.skylight(...span(LAYOUT.skylight), 2.6, 0);
+      if (what === 'vents') for (const [u, z] of LAYOUT.vents) details.vent(X(u), z, 0);
     }
   }
 }

@@ -14,7 +14,9 @@ import { GARAGE as GARAGE_WALLS } from './house.js';
 // The bikes and the moped parked along the left-hand bushes are loose (bikes.js, built with house.js's loose furniture).
 // Lennie bounces off all of it; the bushes, the lounge set, the canopy and the
 // trampoline are bouncy.
-export const GARDEN = { x0: -6, x1: 6, back: -19.5 }; // the back fence, 3.5 m of lawn behind the bins
+// x0 / x1: the fences on the party-wall lines (8 m apart); back: the back
+// fence, a stretch of lawn behind the bins.
+export const GARDEN = { x0: -4, x1: 4, back: -19.5 };
 const GARAGE = { x0: GARAGE_WALLS.x0 - 0.125, z0: GARAGE_WALLS.z0 - 0.125, top: GARAGE_WALLS.top }; // its outer faces
 
 export function buildGarden(scene, world, physMats, { std, tex }) {
@@ -67,7 +69,7 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
   }
   const { x0: gx0, x1: gx1, back } = GARDEN;
   const G0 = GARAGE;
-  const gate = [2.0, 3.4];
+  const gate = [2.1, 3.1]; // a 1 m garden gate, behind the bins
   fence(gx0, -5.125, gx0, back);
   fence(gx1, G0.z0, gx1, back);
   fence(gx0, back, gate[0], back);
@@ -83,7 +85,7 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
   const G = GARAGE;
   // the canopy: a flat roof of ribbed see-through plastic on a wooden frame,
   // fixed to the garage wall and the fence, on one wooden post at the corner that hangs out
-  const C = { x0: G.x0, x1: 5.97, z0: -11.95, z1: G.z0, y: 2.35 }; // x1: the fence; z1: the garage wall
+  const C = { x0: G.x0, x1: 3.97, z0: -11.95, z1: G.z0, y: 2.35 }; // x1: the fence; z1: the garage wall
   const wood = std({ color: 0x8a6440, roughness: 0.85 });
   const ribs = canvasTexture(64, 16, (g, w, h) => {
     g.fillStyle = '#eef3f2';
@@ -106,7 +108,7 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
   both([C.x0, 0, C.z0], [C.x0 + 0.1, C.y - B, C.z0 + 0.1], wood, 'tree');
   const rattan = std({ color: 0x7d7368, roughness: 0.9 });
   const cushion = std({ color: 0xece4d2, roughness: 1 });
-  const L = { x0: 1.65, x1: 5.9, z1: G.z0, seat: 0.75, end: -11.85 }; // x1: against the fence
+  const L = { x0: 0.95, x1: 3.9, z1: G.z0, seat: 0.75, end: -11.85 }; // x1: against the fence
   const front = L.z1 - L.seat; // the long side's front edge
   const side = L.x1 - L.seat; // the short side's front edge
   // the long side, with the corner seat
@@ -117,13 +119,14 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
   both([side, 0, L.end], [L.x1, 0.35, front], rattan, 'cushion', physMats.soft);
   both([L.x1 - 0.25, 0.35, L.end], [L.x1, 0.8, L.z1 - 0.25], rattan, 'cushion', physMats.soft);
   both([side, 0.35, L.end], [L.x1 - 0.25, 0.58, L.end + 0.18], rattan, 'cushion', physMats.soft); // its arm
-  for (const [a, b] of [[1.88, 3.08], [3.13, 4.33], [4.38, 5.64]]) boxMesh([a, 0.35, front + 0.05], [b, 0.47, L.z1 - 0.28], cushion);
+  for (const [a, b] of [[1.18, 2.38], [2.43, 3.64]]) boxMesh([a, 0.35, front + 0.05], [b, 0.47, L.z1 - 0.28], cushion);
   for (const [a, b] of [[front - 0.6, front - 0.05], [L.end + 0.23, front - 0.65]]) boxMesh([side + 0.05, 0.35, a], [L.x1 - 0.28, 0.47, b], cushion);
   // (the low round table in front of it can be knocked over, so house.js builds it with the other loose furniture)
 
   // ------------------------------------------------------------ the trampoline (round, behind the lounge set)
+  // (out on the lawn, clear of the brambles along the fence and of the bikes along the bushes)
   const pole = std({ color: 0x8a9099, metalness: 0.6, roughness: 0.4 });
-  const T = { x: 2.9, z: -13.55, r: 1.35, y: 0.85 };
+  const T = { x: 1.2, z: -13.55, r: 1.35, y: 0.85 };
   const mat = add(new THREE.Mesh(new THREE.CylinderGeometry(T.r, T.r, 0.04, 40), std({ color: 0x1d1d22, roughness: 0.6 })), false);
   mat.position.set(T.x, T.y, T.z);
   const tramp = new CANNON.Body({ mass: 0, material: physMats.trampoline, shape: new CANNON.Cylinder(T.r, T.r, 0.16, 20) });
@@ -150,7 +153,7 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
   // ------------------------------------------------------------ the three wheelie bins by the gate: rest, GFT and paper
   const binBody = std({ color: 0x3c3f43, roughness: 0.6 });
   const tyre = std({ color: 0x1b1b1b, roughness: 0.8 });
-  [[1.6, 0x3c3f43], [2.9, 0x3c8a3a], [4.2, 0x2f5fbf]].forEach(([x, lid]) => {
+  [[1.7, 0x3c3f43], [2.6, 0x3c8a3a], [3.5, 0x2f5fbf]].forEach(([x, lid]) => {
     const z0 = -16.0;
     const z1 = -15.3;
     both([x - 0.3, 0.06, z0], [x + 0.3, 1.0, z1], binBody, 'furniture');
@@ -164,7 +167,7 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
 
   // ------------------------------------------------------------ the tree beside the bins, its crown over them and the trampoline
   {
-    const [x, z, s] = [0.7, -15.3, 0.8];
+    const [x, z, s] = [0.85, -15.75, 0.8];
     const trunk = add(new THREE.Mesh(new THREE.CylinderGeometry(0.22 * s, 0.32 * s, 3 * s, 10), std({ color: 0x7a5232 })));
     trunk.position.set(x, 1.5 * s, z);
     const leafMats = [0x4f9a3c, 0x5fae47, 0x46893a].map((c) => std({ color: c, flatShading: true }));
@@ -184,9 +187,9 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
   }
 
   // ------------------------------------------------------------ junk against the back fence
-  // Old plywood boards leaning on the fence (between two of its posts), black
-  // bin bags heaped by the bushes, a couple of cardboard boxes by the gate, and
-  // old tyres on the other side of it. Lennie bounces off all of it; the bags are soft.
+  // Black bin bags heaped by the bushes, old plywood boards leaning on the
+  // fence, a couple of cardboard boxes by the gate, and old tyres on the other
+  // side of it, in the corner. Lennie bounces off all of it; the bags are soft.
   {
     const face = back + 0.07; // just in front of the planks (back + 0.03) and posts (back + 0.06)
     // weathered: wood grain, grey-brown water stains, and dark damp where they stand in the grass
@@ -226,7 +229,7 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
     // further than the last, so their bottoms stand apart. surface(y): the z of
     // the face behind, at height y.
     let surface = () => face;
-    for (const [x0, x1, h, a, mi] of [[-1.9, -0.7, 1.7, 0.13, 0], [-1.5, -0.35, 1.45, 0.2, 1], [-0.95, -0.15, 1.05, 0.3, 2]]) {
+    for (const [x0, x1, h, a, mi] of [[-0.2, 1.0, 1.7, 0.13, 0], [0.1, 1.25, 1.45, 0.2, 1], [0.55, 1.35, 1.05, 0.3, 2]]) {
       const top = surface(h * Math.cos(a)) + 0.004;
       const zb = top + h * Math.sin(a); // the back face's bottom edge
       const centre = new THREE.Vector3((x0 + x1) / 2, 0, zb)
@@ -243,21 +246,21 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
       surface = (y) => zb + T / Math.cos(a) - y * Math.tan(a);
     }
 
-    // cardboard boxes between the boards and the gate, one knocked askew
+    // cardboard boxes between the boards and the gate, one knocked askew in front
     const card = std({ color: 0xb08a5a, roughness: 1 });
-    both([0.25, 0, face + 0.01], [0.85, 0.45, face + 0.51], card, 'junk');
+    both([1.45, 0, face + 0.01], [2.05, 0.45, face + 0.51], card, 'junk');
     const askew = add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.4), card));
-    askew.position.set(1.35, 0.175, -19.05);
+    askew.position.set(1.6, 0.175, -18.55);
     askew.rotation.y = 0.35;
     const ab = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3(0.25, 0.175, 0.2)) });
-    ab.position.set(1.35, 0.175, -19.05);
+    ab.position.set(1.6, 0.175, -18.55);
     ab.quaternion.setFromEuler(0, 0.35, 0);
     ab.surface = { kind: 'junk' };
     world.addBody(ab);
 
     // black bin bags heaped in the corner by the bushes, each tied at the top
     const bag = std({ color: 0x1f1f22, roughness: 0.6, metalness: 0.1, flatShading: true });
-    for (const [x, y, z, r] of [[-3.45, 0, -18.95, 0.36], [-2.85, 0, -19.02, 0.33], [-2.38, 0, -18.92, 0.29], [-3.05, 0, -18.5, 0.3], [-3.15, 0.5, -19.0, 0.27]]) {
+    for (const [x, y, z, r] of [[-1.65, 0, -18.95, 0.36], [-1.05, 0, -19.02, 0.33], [-0.58, 0, -18.92, 0.29], [-1.25, 0, -18.5, 0.3], [-1.35, 0.5, -19.0, 0.27]]) {
       const yc = y + r * 0.78;
       const m = add(new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), bag));
       m.scale.set(1, 0.82, 0.92);
@@ -271,20 +274,20 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
       world.addBody(b);
     }
 
-    // old tyres right of the gate: two lying stacked, one leaning on the fence
+    // old tyres right of the gate: two lying stacked, one leaning on the fence behind them
     for (const y of [0.11, 0.33]) {
       const m = add(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.11, 6, 18).rotateX(Math.PI / 2), tyre));
-      m.position.set(4.7, y, -18.75);
+      m.position.set(3.45, y, -18.6);
     }
     const tb = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Cylinder(0.41, 0.41, 0.44, 12) });
-    tb.position.set(4.7, 0.22, -18.75);
+    tb.position.set(3.45, 0.22, -18.6);
     tb.surface = { kind: 'junk' };
     world.addBody(tb);
     const lean = add(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.11, 6, 18), tyre));
-    lean.position.set(5.45, 0.4, -19.2);
+    lean.position.set(3.45, 0.4, -19.2);
     lean.rotation.x = -0.25;
     const lb = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3(0.41, 0.41, 0.11)) });
-    lb.position.set(5.45, 0.4, -19.2);
+    lb.position.set(3.45, 0.4, -19.2);
     lb.quaternion.setFromEuler(-0.25, 0, 0);
     lb.surface = { kind: 'junk' };
     world.addBody(lb);
@@ -292,6 +295,7 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
 
   // ------------------------------------------------------------ the bushes along the left-hand fence
   const greens = [0x3b7d3a, 0x2f6b34, 0x4f9a3c, 0x46893a].map((c) => std({ color: c, flatShading: true }));
+  const BX = GARDEN.x0 + 1.05; // their middle line, a metre in from the fence
   let seed = 23;
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   for (const [zc, half, r] of [[-6.6, 1.0, 0.75], [-9.6, 1.1, 0.8], [-13.2, 1.6, 0.9], [-17.1, 1.6, 0.75]]) {
@@ -299,12 +303,12 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
       const rr = r * (0.75 + rnd() * 0.35);
       const blob = add(new THREE.Mesh(new THREE.IcosahedronGeometry(rr, 1), greens[Math.floor(rnd() * greens.length)]));
       blob.scale.set(0.9, 1.1, 1);
-      blob.position.set(-4.95 + (rnd() - 0.5) * 0.3, rr * 0.95, z);
+      blob.position.set(BX + (rnd() - 0.5) * 0.3, rr * 0.95, z);
       const top = add(new THREE.Mesh(new THREE.IcosahedronGeometry(rr * 0.7, 1), greens[Math.floor(rnd() * greens.length)]));
-      top.position.set(-4.95 + (rnd() - 0.5) * 0.3, rr * 1.75, z + (rnd() - 0.5) * 0.3);
+      top.position.set(BX + (rnd() - 0.5) * 0.3, rr * 1.75, z + (rnd() - 0.5) * 0.3);
     }
     const b = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Box(new CANNON.Vec3(0.6, r * 1.1, half + r * 0.6)) });
-    b.position.set(-4.95, r * 1.1, zc);
+    b.position.set(BX, r * 1.1, zc);
     b.surface = { kind: 'leaves' };
     world.addBody(b);
   }
@@ -314,7 +318,7 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
   // dark leaves, arching red-brown canes with thorns, and berries. They don't
   // bounce him like the other bushes: they grab him and scratch him (effects.js).
   {
-    const R = { x: 5.38, z0: -14.95, z1: -12.5 };
+    const R = { x: 3.38, z0: -14.95, z1: -12.5 };
     let bs = 41;
     const r = () => ((bs = (bs * 1664525 + 1013904223) >>> 0) / 4294967296);
     const leaves = [0x2f4f26, 0x3a5a2a, 0x45662f, 0x34502a].map((c) => std({ color: c, flatShading: true }));
@@ -360,9 +364,9 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
       const berry = add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.022, 1), berries[Math.floor(r() * berries.length)]), false);
       berry.position.set(R.x - 0.42 - r() * 0.08 + Math.abs(y - 0.55) * 0.25, y, z);
     }
-    // (stops short of the fence's thicker physics at x 5.85)
+    // (stops short of the fence's thicker physics at x 3.85)
     const b = new CANNON.Body({ mass: 0, material: physMats.branches ?? physMats.soft, shape: new CANNON.Box(new CANNON.Vec3(0.42, 0.62, (R.z1 - R.z0) / 2)) });
-    b.position.set(5.42, 0.62, (R.z0 + R.z1) / 2);
+    b.position.set(R.x + 0.04, 0.62, (R.z0 + R.z1) / 2);
     b.surface = { kind: 'bramble', sound: 'leaves' };
     world.addBody(b);
   }

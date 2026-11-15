@@ -78,9 +78,10 @@ export function buildStreet(scene, world, physMats, { std, tex }) {
     world.addBody(crown);
   }
   const treeZ = (STREET.verge[0] + STREET.verge[1]) / 2 - 0.2;
-  // one in line with each wall between two houses (every 12.25 m) along the whole
-  // block of five, so they frame Lennie's house instead of hiding it
-  for (let i = 0, x = -30.625; x <= 43; i++, x += 12.25) streetTree(x, treeZ, 0.9 + (i % 3) * 0.06);
+  // one in line with each wall between two houses (every 8.25 m: house.js ROW,
+  // x −12.375 … 28.875) along the whole block of five, and one past its left
+  // end, so they frame Lennie's house (x −4.125 … 4.125) instead of hiding it
+  for (let i = 0, x = -20.625; x <= 29; i++, x += 8.25) streetTree(x, treeZ, 0.9 + (i % 3) * 0.06);
   // a couple across the road too
   for (const x of [-40, 18, 27]) streetTree(x, 27.2, 0.85);
 
