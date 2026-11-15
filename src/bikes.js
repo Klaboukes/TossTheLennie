@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 
-// The family's bikes and a moped, parked one behind the other along the
-// bushes on the left-hand side of the garden, fronts towards the house: a
+// The family's bikes and a moped, parked any old how along the bushes on the
+// left-hand side of the garden, roughly one behind the other, fronts towards
+// the house, each at its own angle and its own distance from the next: a
 // black omafiets with a crate on the front, a blue city bike, a pink kid's
 // bike and a little green one, and a dark blue scooter-style
 // moped with a windscreen and a top box.
@@ -14,7 +15,6 @@ import * as THREE from 'three';
 // leaning bike stand.
 
 const LINE = -3.85; // the wheels' line, just in front of the bushes: the handlebars reach into the leaves, clear of their body (garden.js)
-const GAP = 0.25; // between one piece's back and the next one's front
 const Y = new THREE.Vector3(0, 1, 0);
 
 export function parkBikes(loose, parent, std) {
@@ -68,17 +68,20 @@ export function parkBikes(loose, parent, std) {
     g.add(m);
   };
   // The next piece's place in the row: its front where the last one's back
-  // ended (plus a gap), facing the house (+z), leaning a little to its left
-  // (its own −z, the kickstand side: away from the bushes, into the garden).
-  let tip = -9.0; // the first one's front
-  const place = (front, back, lean = 0) => {
-    const at = new THREE.Vector3(LINE, 0, tip - front);
-    tip -= front + back + GAP;
-    return { at, turn: new THREE.Quaternion().setFromEuler(new THREE.Euler(lean, -Math.PI / 2, 0, 'YXZ')) };
+  // ended (plus a gap to the next), facing the house (+z) but turned by yaw
+  // (+ turns its front out from the bushes), out from the line by out, and
+  // leaning a little to its left (its own −z, the kickstand side: away from
+  // the bushes, into the garden). Turned ones keep clear of the bushes' body:
+  // their nearest handlebar end or back stays at x > −4.3.
+  let tip = -8.7; // the first one's front
+  const place = (front, back, { lean = 0, yaw = 0, out = 0, gap = 0.25 } = {}) => {
+    const at = new THREE.Vector3(LINE + out, 0, tip - front * Math.cos(yaw));
+    tip -= (front + back) * Math.cos(yaw) + gap;
+    return { at, turn: new THREE.Quaternion().setFromEuler(new THREE.Euler(lean, -Math.PI / 2 + yaw, 0, 'YXZ')) };
   };
 
   /** A bicycle `s` times the size of a grown-up's. */
-  function bicycle({ s, color, saddle = black, lean = -0.1, crate = false }) {
+  function bicycle({ s, color, saddle = black, crate = false, spot }) {
     const g = new THREE.Group();
     const frame = std({ color, roughness: 0.45, metalness: 0.2 });
     const P = (px, py, pz = 0) => [px * s, py * s, pz * s];
@@ -145,12 +148,12 @@ export function parkBikes(loose, parent, std) {
     // the kickstand, out to its left; leaning on it brings its foot down to the ground
     tube(g, P(-0.12, 0.28, -0.03), P(-0.3, 0.03, -0.13), 0.012 * s, steel);
     parts.push([P(-0.34, 0.015, -0.16), P(-0.26, 0.06, -0.1)]);
-    const { at, turn } = place(0.96 * s, 0.95 * s, lean);
+    const { at, turn } = place(0.96 * s, 0.95 * s, spot);
     loose.add(parent, parts, { mass: 14 * s, surface: { kind: 'bike', sound: 'metal' }, look: g, at, turn });
   }
 
   /** A scooter-style moped on its centre stand, with a windscreen and a top box. */
-  function moped() {
+  function moped(spot) {
     const g = new THREE.Group();
     const paint = std({ color: 0x1f3566, roughness: 0.3, metalness: 0.15 });
     const R = 0.21;
@@ -198,13 +201,13 @@ export function parkBikes(loose, parent, std) {
       [[-0.99, 0.72, -0.19], [-0.65, 0.99, 0.19]], // top box
       [[-0.25, 0, -0.14], [-0.15, 0.2, 0.14]], // centre stand
     ];
-    const { at, turn } = place(1.02, 1.0);
+    const { at, turn } = place(1.02, 1.0, spot);
     loose.add(parent, parts, { mass: 40, surface: { kind: 'moped', sound: 'metal' }, look: g, at, turn });
   }
 
-  bicycle({ s: 1, color: 0x1e1e1e, saddle: std({ color: 0x6b4226, roughness: 0.6 }), crate: true, lean: -0.1 });
-  bicycle({ s: 1, color: 0x2c4f7c, lean: -0.12 });
-  bicycle({ s: 0.74, color: 0xe75a9b, lean: -0.12 });
-  bicycle({ s: 0.58, color: 0x6dbb3c, lean: -0.12 });
-  moped();
+  bicycle({ s: 1, color: 0x1e1e1e, saddle: std({ color: 0x6b4226, roughness: 0.6 }), crate: true, spot: { lean: -0.1, yaw: 0.25, out: 0.2, gap: 0.35 } });
+  bicycle({ s: 1, color: 0x2c4f7c, spot: { lean: -0.13, yaw: -0.15, gap: 0.15 } });
+  bicycle({ s: 0.74, color: 0xe75a9b, spot: { lean: -0.11, yaw: 0.55, out: 0.5, gap: 0.45 } });
+  bicycle({ s: 0.58, color: 0x6dbb3c, spot: { lean: -0.12, yaw: -0.25, out: 0.25, gap: 0.3 } });
+  moped({ yaw: 0.4, out: 0.45 });
 }
