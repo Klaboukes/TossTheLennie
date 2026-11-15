@@ -7,8 +7,8 @@ import { UTILITY } from './house.js';
 // Lennie's back garden, after the owner's sketch (docs/floorplan-floor1.png):
 // bushes all along the left fence, and down the right-hand side, behind the
 // utility room, the garage (very, very stuffed), the lounge set under a
-// striped awning, the round trampoline and the three wheelie bins by the gate
-// in the back fence. A wooden fence runs round it, with the alley behind.
+// striped awning, the round trampoline, and a tree beside the three wheelie
+// bins by the gate in the back fence. A wooden fence runs round it, with the alley behind.
 // Lennie bounces off all of it; the bushes, the lounge set, the awning and the
 // trampoline are bouncy.
 export const GARDEN = { x0: -6, x1: 6, back: -17.5 };
@@ -185,6 +185,23 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
       w.position.set(x + dx, 0.1, z0 + 0.08);
     }
   });
+
+  // ------------------------------------------------------------ the tree beside the bins, its crown over them and the trampoline
+  {
+    const [x, z, s] = [0.7, -15.3, 0.8];
+    const trunk = add(new THREE.Mesh(new THREE.CylinderGeometry(0.22 * s, 0.32 * s, 3 * s, 10), std({ color: 0x7a5232 })));
+    trunk.position.set(x, 1.5 * s, z);
+    const leafMats = [0x4f9a3c, 0x5fae47, 0x46893a].map((c) => std({ color: c, flatShading: true }));
+    for (const [dx, dy, dz, r, mi] of [[0, 3.9, 0, 1.8, 0], [0.9, 3.4, 0.4, 1.2, 1], [-0.8, 3.5, -0.5, 1.3, 2], [0.2, 4.8, -0.2, 1.1, 1]]) {
+      const leaf = add(new THREE.Mesh(new THREE.IcosahedronGeometry(r * s, 1), leafMats[mi]));
+      leaf.position.set(x + dx * s, dy * s, z + dz * s);
+    }
+    solid([x - 0.28 * s, 0, z - 0.28 * s], [x + 0.28 * s, 3 * s, z + 0.28 * s], 'tree');
+    const crown = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Sphere(1.9 * s) });
+    crown.position.set(x, 4.0 * s, z);
+    crown.surface = { kind: 'leaves' }; // landing up here is "Stuck in a tree!"
+    world.addBody(crown);
+  }
 
   // ------------------------------------------------------------ the bushes along the left-hand fence
   const greens = [0x3b7d3a, 0x2f6b34, 0x4f9a3c, 0x46893a].map((c) => std({ color: c, flatShading: true }));

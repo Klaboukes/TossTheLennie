@@ -46,6 +46,11 @@ When the owner says **land**, put the session's work live:
 3. Run the merge gate above (check script plus playing it in the browser, no console errors) on the rebased code. After another session's update, hard-refresh the browser (Ctrl+Shift+R) so it doesn't run stale cached files.
 4. Push the result to `main` (`git push origin HEAD:main`). GitHub Pages then updates the live page within a minute or so.
 5. Tell the owner in plain words what went live, and anything that didn't.
+6. Give the owner the command that brings their own folder (the main checkout, `C:\source\Toss the Lennie`) up to date, in its own `bash` code block so the app shows a Run button, and say in a line that their folder only shows the new work once they've run it:
+   ```bash
+   git -C "C:/source/Toss the Lennie" pull --ff-only
+   ```
+   Sessions can't run it themselves: they're kept out of the main checkout. If the owner says it failed (their folder isn't on `main`, or has changes of its own), help them sort it out without losing those changes.
 
 If the push is refused because `main` moved again, repeat from step 2. Never force-push `main`.
 

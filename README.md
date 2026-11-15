@@ -24,7 +24,7 @@ Then open http://localhost:5173.
 
 Lennie's house is a brick rowhouse in a 1970s Dutch terrace, with two floors and an attic.
 
-- **Floor 1**, after the owner's floor plan ([docs/house-design.md](docs/house-design.md)): at the front a toilet, the hallway with the coat rack and the stairs, and an open kitchen with a U of counters, wall cupboards, a cooker hood and plants on the window sill; under the stairs a storage cupboard; across the back the living room, white with the kids' drawings on the walls (dark grey corner couch and comfy chair, the TV turned towards the couch in the corner, a tall closet full of board games, a dining table with six chairs and a piano), with one big window onto the garden and a heating trench in the floor under it; and built on at the back a utility room with the fridge and the cat's litter box. The inside doors are white, and the ones to the hallway, the utility room and the garden have glass panes
+- **Floor 1**, after the owner's floor plan ([docs/house-design.md](docs/house-design.md)): at the front a toilet, the hallway with the coat rack and the stairs, and an open kitchen with a U of counters, wall cupboards, a cooker hood and plants on the window sill; under the stairs a storage cupboard; across the back the living room, white with the kids' drawings on the walls (dark grey corner couch and comfy chair, the TV turned towards the couch in the corner, a tall closet full of board games, a dining table with six chairs and a piano), with one big window onto the garden and a heating trench in the floor under it; and built on at the back a utility room with the fridge and the cat's litter box. The inside doors are white, and the ones to the hallway, the utility room and the garden have glass panes. The living room, kitchen, toilet, bedrooms and attic have white walls, with light off-white ceilings
 - **Floor 2:** bedroom (bed, wardrobe, a chair buried under clothes) and kids room (bed, toy box, beanbag)
 - **Floor 3, the attic:** study (desk, bookshelf, armchair, moving boxes) and bathroom under the sloping roof, with a washing machine and a bathtub Lennie can land in tucked into the dormer
 - **It's a mess:** dirty dishes, pans and half-eaten breakfast on the kitchen counter and table; toys, crayons and drawings all over the living room and kids room floors; clothes everywhere in the bedrooms; and the usual household stuff (washing-up liquid, loo rolls, shampoo, a vacuum cleaner left out, trash bags, a thirsty plant). The loose things don't get in Lennie's way: land among them or crash into the table they're on and they go flying.
@@ -33,8 +33,8 @@ Lennie's house is a brick rowhouse in a 1970s Dutch terrace, with two floors and
 - Every window has glass that shatters when Lennie hits it hard enough, including the dormer window up in the attic.
 - The TV in the living room is on. Throw Lennie into it hard and the screen cracks where he hit it, flickers and spits sparks, and he gets electrocuted: he flashes between glowing blue and an X-ray of his skeleton while lightning crackles over him, then lies there sooty and smoking. Bump him into the cracked TV again and he gets another shock. R fixes the TV.
 - Every doorway has a closed door. Doors are a bit tougher than windows: a hard hit smashes one straight away, a lighter one only cracks it, and the next knock breaks it.
-- **Outside:** two brick storeys with a tall window column and dark panels, small high windows, a flat canopy over the front door beside a little brick screen with breeze blocks, and a steep dark tiled roof with a chimney and the dormer. Lennie can land on the canopy, the roof and the dormer, and slide down the roof into the front garden.
-- **The gardens:** an open front garden with a big dark shrub in front of the window column and a low hedge along the cycle path; a fenced back garden after the floor plan, with bushes along one side and down the other the garage (stuffed full), a lounge set under a striped awning, a round trampoline and three wheelie bins by the gate.
+- **Outside:** two brick storeys with a tall window column and dark panels, small high windows, the toilet sticking out of the front beside the front door, a flat canopy over both, and a steep dark tiled roof with a chimney and the dormer. Lennie can land on the canopy, the roof and the dormer, and slide down the roof into the front garden.
+- **The gardens:** an open front garden with a big dark shrub in front of the window column and a low hedge along the cycle path; a fenced back garden after the floor plan, with bushes along one side and down the other the garage (stuffed full), a lounge set under a striped awning, a round trampoline, and a tree beside the three wheelie bins by the gate.
 
 ## The supermarket
 
@@ -138,13 +138,13 @@ The game is made to run smoothly on cheap tablets and older phones too. That's w
 - `index.html`, `style.css`: the page, toolbar, score panel, challenge, players board, turn card and help; the import map that loads three.js and cannon-es
 - `src/main.js`: scene, input (mouse and touch), camera, toss state machine, breaking glass and doors, landing spots, putting Lennie back when he leaves the play area, HUD, challenges, taking turns and the replay controls
 - `src/house.js`: the house (walls with windows and breakable doors, floors, stairs, the row's roof, furniture), plus cutaway and wall fading
-- `src/drawings.js`: the kids' drawings and paintings on the living room walls, all drawn on one canvas
+- `src/drawings.js`: the kids' drawings and paintings on the living room walls and the framed photos of friends in the toilet, all drawn on one canvas
 - `src/tv.js`: the living room TV in its corner, its screen cracking where Lennie hits it, flickering and sparking
 - `src/zap.js`: Lennie getting electrocuted: the X-ray skeleton, lightning, the blue flash, the spasms, soot and smoke
 - `src/clutter.js`: the mess in the house (dishes, toys, clothes, household stuff) and the board game closet, and sending it flying when Lennie lands in it
 - `src/street.js`: the neighbour houses, and the details every house in the row shares (porch, chimney, dormer, skylight, vents, downpipe)
 - `src/yard.js`: sky, lighting, lawn, the play area's edges and fence, the neighbours' garden trees, front-garden shrubs and the hedge
-- `src/garden.js`: Lennie's back garden: fences and gate, garage, lounge set and awning, trampoline, wheelie bins and bushes
+- `src/garden.js`: Lennie's back garden: fences and gate, garage, lounge set and awning, trampoline, tree, wheelie bins and bushes
 - `src/streetscape.js`: the street in front: cycle path, verge trees and lamps, and the road
 - `src/supermarket.js`: the supermarket across the road, inside and out (the breakable shop window, aisles, freezers and fridges, the bakery, the sloping veg stand, the cheese cooler, the pindakaas pyramid, the butcher's counter and the other displays), with its own fading walls and roof
 - `src/seethrough.js`: the see-through circle that keeps Lennie in view through whatever is between him and the camera
@@ -152,7 +152,7 @@ The game is made to run smoothly on cheap tablets and older phones too. That's w
 - `src/blobshadow.js`: the soft dark spot under Lennie (the game has no real shadows, so it stays smooth on low-end tablets)
 - `src/flickercheck.js`: when the game runs on your own computer (localhost), lists any spots where two surfaces lie in the same place and would flicker, in the browser console
 - `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking (the house's mess uses the same tumbling)
-- `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, breeze blocks, wallpaper, wood, floor tiles, grass)
+- `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, wallpaper, wood, floor tiles, grass)
 - `src/ragdoll.js`: Lennie's bodies, joints and look (1.90 m and 100 kg, with a bit of a belly, in a worn hoodie and joggers; his face after the photo in docs: thinning dark hair receding at the temples, rectangular glasses and a short salt-and-pepper beard)
 - `src/scoring.js`: contortion measurement, trick detection and the multiplier
 - `src/challenges.js`: the list of challenges and the progress kept in the browser

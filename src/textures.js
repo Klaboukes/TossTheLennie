@@ -213,24 +213,6 @@ function fakeGlass(color, glint) {
   });
 }
 
-/** A concrete decorative "breeze block" with a rounded cut-out pattern; one per face. */
-function breezeBlock() {
-  return canvasTexture(128, 1, (g, s) => {
-    g.fillStyle = '#d9d4cb';
-    g.fillRect(0, 0, s, s);
-    g.strokeStyle = '#a49d92';
-    g.lineWidth = 4;
-    g.strokeRect(2, 2, s - 4, s - 4);
-    g.fillStyle = '#3a3330';
-    const q = s / 4;
-    for (const [cx, cy] of [[q * 1.35, q * 1.35], [q * 2.65, q * 1.35], [q * 1.35, q * 2.65], [q * 2.65, q * 2.65]]) {
-      g.beginPath();
-      g.arc(cx, cy, q * 0.48, 0, Math.PI * 2);
-      g.fill();
-    }
-  });
-}
-
 function stone() {
   const r = rng(9);
   return canvasTexture(256, 1, (g, s) => {
@@ -260,7 +242,6 @@ export function textures() {
       grooves: grooves(),
       glassSky: fakeGlass('#8cc4e8', 'rgba(255,255,255,0.55)'),
       glassWarm: fakeGlass('#f0a75e', 'rgba(255,236,190,0.45)'),
-      breezeBlock: breezeBlock(),
       stone: stone(),
     };
   }

@@ -96,35 +96,42 @@ export function makeDetails(kit) {
 
   /**
    * Flat canopy over the front door (fascia material `fascia`), optionally
-   * resting on a short brick screen wall with two decorative breeze blocks.
+   * over a neighbour's toilet, which sticks out of the front beside the door:
+   * a solid brick block with a small window (Lennie's own is a real room, house.js).
    */
-  function porch({ x0, x1, screen, fascia = M.trim }) {
-    const c = { y0: 2.26, y1: 2.55, z1: 6.4 };
+  function porch({ x0, x1, toilet = null, frame = M.trim, fascia = M.trim }) {
+    const c = { y0: PORCH_Y, y1: 2.55, z1: 6.4 };
     box([x0, c.y0, OUT.z1], [x1, c.y1, c.z1], [fascia, fascia, M.darkRoof, M.soffit, fascia, fascia], { story: 0, cast: true });
     // thicker downwards in physics, so a fast Lennie doesn't slip through it
     body([x0, c.y0 - 0.06, OUT.z1], [x1, c.y1, c.z1], physMats.hard, { kind: 'wall' });
-    if (!screen) return;
-    const [s0, s1] = screen;
-    const sMin = [s0, 0, 5.95];
-    const sMax = [s1, c.y0, 6.2];
-    box(sMin, sMax, M.brickLight, { story: 0, cast: true });
-    body(sMin, sMax, physMats.hard, { kind: 'wall' });
-    const bx = s0 + (s1 - s0) * 0.35;
-    for (const y of [1.25, 1.61]) {
-      const block = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.03), M.breezeBlock);
-      block.position.set(bx, y, sMax[2] + 0.015);
-      groups[0].add(block);
-    }
+    if (!toilet) return;
+    const [t0, t1] = toilet;
+    const zf = LAYOUT.toiletFront;
+    box([t0, 0, OUT.z1], [t1, c.y0, zf], M.brick, { story: 0, cast: true });
+    body([t0, 0, OUT.z1], [t1, c.y0, zf], physMats.hard, { kind: 'wall' });
+    // its small high window, in the middle of the front
+    const [a, b] = [(t0 + t1) / 2 - 0.55, (t0 + t1) / 2 + 0.55];
+    box([a - 0.07, 1.25, zf - 0.01], [b + 0.07, 2.07, zf + 0.04], frame, { story: 0 });
+    box([a, 1.3, zf + 0.04], [b, 2.0, zf + 0.05], M.glassSky, { story: 0 });
+    box([a - 0.1, 1.2, zf - 0.01], [b + 0.1, 1.25, zf + 0.12], M.trim, { story: 0 });
   }
 
   return { roofTop, angle, chimney, vent, dormer, skylight, downpipe, porch };
 }
 
+// The front door's canopy: its underside, which is also the top of the toilet's bump-out.
+export const PORCH_Y = 2.26;
+
 // Front layout of every house in the row, in u (see top). Lennie's house uses
 // the same numbers (house.js), so the row lines up.
 export const LAYOUT = {
-  porch: [1.1, 5.55],
-  screen: [1.3, 3.45],
+  porch: [0, 5.55], // over the toilet's bump-out and the front door
+  porchNoToilet: [1.1, 5.55],
+  // The ground-floor toilet sticks out of the front beside the front door, in
+  // the owner's floor plan: from the party wall to just past the toilet's own
+  // wall, out to `toiletFront` (z), under the canopy.
+  toilet: [0, 2.885],
+  toiletFront: 6.2,
   door: [3.925, 5.025],
   column: [7.325, 10.625],
   small: [[0.425, 1.525], [2.125, 3.525]],
@@ -139,7 +146,7 @@ const STYLES = {
   // in pairs like the photo: Lennie's window column sits next to its right-hand
   // neighbour's, and its small windows next to its left-hand neighbour's.
   [-1]: { mirror: true, panel: 0x2f3238, frame: 0xfbfaf6, door: 0x3a3735, roof: ['chimney', 'vents'] },
-  [1]: { mirror: true, panel: 0x2e3a54, frame: 0xfbfaf6, door: 0x6b4a33, noScreen: true, roof: ['chimney', 'skylight', 'vents'] },
+  [1]: { mirror: true, panel: 0x2e3a54, frame: 0xfbfaf6, door: 0x6b4a33, noToilet: true, roof: ['chimney', 'skylight', 'vents'] },
   [2]: { mirror: false, panel: 0xc8372d, frame: 0xc8372d, door: 0x2f2b29, roof: ['dormer', 'vents'] },
   [3]: { mirror: true, panel: 0xeceae3, frame: 0xfbfaf6, door: 0x2d2b2a, roof: ['dormer'] },
 };
@@ -224,7 +231,9 @@ export function buildNeighbours(kit, details) {
     box([d0 + 0.14, 0.95, OUT.z1 + 0.07], [d1 - 0.14, 1.99, OUT.z1 + 0.08], M.glassSky, { story: 0, line: front });
 
     details.downpipe(X(LAYOUT.pipe), 2.55, () => ({ story: 0, line: front }));
-    details.porch({ x0: span(LAYOUT.porch)[0], x1: span(LAYOUT.porch)[1], screen: style.noScreen ? null : span(LAYOUT.screen) });
+    // the house on Lennie's right has no toilet sticking out in the photo
+    const [p0, p1] = span(style.noToilet ? LAYOUT.porchNoToilet : LAYOUT.porch);
+    details.porch({ x0: p0, x1: p1, toilet: style.noToilet ? null : span(LAYOUT.toilet), frame: frameMat });
 
     // ---- roof details
     for (const what of style.roof) {

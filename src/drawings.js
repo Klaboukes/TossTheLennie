@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 
-// The kids' drawings and paintings on the living room's white walls. They're
-// all drawn on one canvas (one texture, one material), and each picture on the
-// wall is a flat sheet showing its own bit of it, so together they cost the
-// graphics chip next to nothing. Each sheet fades with the wall it hangs on.
+// The kids' drawings and paintings on the living room's white walls (pictures
+// 0–7), and the framed snapshots of friends in the toilet (8–11: cartoon
+// people, not real photos). They're all drawn on one canvas (one texture, one
+// material), and each picture on the wall is a flat sheet showing its own bit
+// of it, so together they cost the graphics chip next to nothing. Each sheet
+// fades with the wall it hangs on.
 
 const COLS = 4;
-const ROWS = 2;
+const ROWS = 3;
 const CW = 256; // one drawing on the canvas, landscape like an A4 sheet
 const CH = 180;
 
@@ -198,6 +200,118 @@ function atlas() {
     },
   ];
 
+  // ---- the snapshots of friends: cartoon people in a photo frame
+  /** One friend: body, head, hair, a smile; `up` raises the arms. */
+  const friend = (x, y, s, { skin, shirt, hair, up = false, glasses = false }) => {
+    g.fillStyle = shirt;
+    g.beginPath();
+    g.ellipse(x, y + 26 * s, 15 * s, 22 * s, 0, Math.PI, 0);
+    g.fill();
+    g.fillRect(x - 15 * s, y + 26 * s, 30 * s, 40 * s);
+    g.strokeStyle = shirt;
+    g.lineWidth = 7 * s;
+    g.lineCap = 'round';
+    for (const d of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(x + d * 13 * s, y + 14 * s);
+      g.lineTo(x + d * (up ? 22 : 18) * s, y + (up ? -14 : 40) * s);
+      g.stroke();
+    }
+    g.fillStyle = skin;
+    g.beginPath();
+    g.arc(x, y, 12 * s, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = hair;
+    g.beginPath();
+    g.arc(x, y - 2 * s, 12.5 * s, Math.PI * 1.05, Math.PI * 1.95);
+    g.fill();
+    g.strokeStyle = '#3a2418';
+    g.lineWidth = 1.6 * s;
+    g.beginPath();
+    g.arc(x, y + 2 * s, 6 * s, 0.15 * Math.PI, 0.85 * Math.PI);
+    g.stroke();
+    g.fillStyle = '#2a2a2a';
+    for (const d of [-1, 1]) g.fillRect(x + d * 4.5 * s - 1.2 * s, y - 3 * s, 2.4 * s, 2.4 * s);
+    if (glasses) {
+      g.strokeStyle = '#222';
+      g.lineWidth = 1.4 * s;
+      for (const d of [-1, 1]) g.strokeRect(x + d * 4.5 * s - 3.6 * s, y - 5 * s, 7.2 * s, 5 * s);
+    }
+  };
+  const SKIN = ['#f0c2a2', '#d9a07a', '#8d5a3c', '#f5d0b5', '#b97d58'];
+  /** A photo: its scene, softly lit, behind a white mount in a dark frame. */
+  const photo = (drawScene) => {
+    drawScene();
+    const shine = g.createLinearGradient(0, 0, CW, CH);
+    shine.addColorStop(0, 'rgba(255,255,255,0.12)');
+    shine.addColorStop(0.5, 'rgba(255,255,255,0)');
+    g.fillStyle = shine;
+    g.fillRect(0, 0, CW, CH);
+    g.strokeStyle = '#f6f3ec';
+    g.lineWidth = 26;
+    g.strokeRect(13, 13, CW - 26, CH - 26);
+    frame('#2b2622');
+  };
+  const sky = (top, bottom, horizon = CH) => {
+    const grad = g.createLinearGradient(0, 0, 0, horizon);
+    grad.addColorStop(0, top);
+    grad.addColorStop(1, bottom);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, CW, horizon);
+  };
+  pictures.push(
+    // 8: a party, everybody cheering, with balloons
+    () => photo(() => {
+      g.fillStyle = '#4a3a6a';
+      g.fillRect(0, 0, CW, CH);
+      for (const [x, y, c] of [[50, 50, '#e2231a'], [205, 45, '#f6d04d'], [128, 38, '#2a7bd7']]) {
+        g.fillStyle = c;
+        g.beginPath(); g.ellipse(x, y, 13, 16, 0, 0, Math.PI * 2); g.fill();
+      }
+      friend(62, 92, 1, { skin: SKIN[0], shirt: '#e86fa0', hair: '#6b4226', up: true });
+      friend(105, 98, 1, { skin: SKIN[2], shirt: '#3fae3a', hair: '#1b1b1b' });
+      friend(150, 95, 1, { skin: SKIN[3], shirt: '#f59a23', hair: '#e2b04a', up: true });
+      friend(194, 92, 1, { skin: SKIN[1], shirt: '#2f5fbf', hair: '#3a281d', glasses: true });
+    }),
+    // 9: two friends on the beach
+    () => photo(() => {
+      sky('#7fc4f0', '#cfeaf8', 100);
+      g.fillStyle = '#2a7bd7';
+      g.fillRect(0, 100, CW, 30);
+      g.fillStyle = '#f0d9a0';
+      g.fillRect(0, 130, CW, CH - 130);
+      g.fillStyle = '#ffe36b';
+      g.beginPath(); g.arc(200, 45, 16, 0, Math.PI * 2); g.fill();
+      friend(105, 92, 1.1, { skin: SKIN[3], shirt: '#e2231a', hair: '#8a5a32', glasses: true });
+      friend(150, 95, 1.05, { skin: SKIN[4], shirt: '#f6f6f6', hair: '#1b1b1b', up: true });
+    }),
+    // 10: a barbecue in the garden, raising a glass
+    () => photo(() => {
+      sky('#9fd3ff', '#e2f2ff', 110);
+      g.fillStyle = '#6fae4f';
+      g.fillRect(0, 110, CW, CH - 110);
+      g.fillStyle = '#2b2b2b';
+      g.fillRect(28, 112, 40, 8);
+      g.fillRect(44, 120, 6, 30);
+      friend(95, 90, 1, { skin: SKIN[1], shirt: '#8e44ad', hair: '#3a281d' });
+      friend(140, 88, 1, { skin: SKIN[0], shirt: '#3c8a3a', hair: '#c9c4bb', glasses: true, up: true });
+      friend(185, 92, 1, { skin: SKIN[2], shirt: '#f2c14e', hair: '#1b1b1b' });
+      g.fillStyle = '#f6d04d';
+      g.fillRect(156, 68, 8, 12);
+    }),
+    // 11: a hike in the hills, arms in the air at the top
+    () => photo(() => {
+      sky('#8ec8ee', '#e8f4fb', 120);
+      g.fillStyle = '#7a9a6a';
+      g.beginPath(); g.moveTo(0, 130); g.lineTo(70, 60); g.lineTo(140, 125); g.lineTo(200, 70); g.lineTo(CW, 120); g.lineTo(CW, CH); g.lineTo(0, CH); g.fill();
+      g.fillStyle = '#ffffff';
+      g.beginPath(); g.moveTo(70, 60); g.lineTo(58, 72); g.lineTo(82, 72); g.fill();
+      friend(80, 100, 0.95, { skin: SKIN[4], shirt: '#2f5fbf', hair: '#3a281d', up: true });
+      friend(122, 104, 0.95, { skin: SKIN[3], shirt: '#e2231a', hair: '#e2b04a', up: true });
+      friend(164, 100, 0.95, { skin: SKIN[0], shirt: '#f59a23', hair: '#6b4226', up: true, glasses: true });
+    }),
+  );
+
   pictures.forEach((draw, i) => {
     const col = i % COLS;
     const row = Math.floor(i / COLS);
@@ -209,7 +323,7 @@ function atlas() {
     g.fillStyle = '#ffffff';
     g.fillRect(0, 0, CW, CH);
     draw();
-    if (i !== 5 && i !== 7) tape();
+    if (i < 8 && i !== 5 && i !== 7) tape(); // the paintings and photos are framed instead
     g.restore();
   });
 
@@ -220,7 +334,7 @@ function atlas() {
 }
 
 /**
- * Hangs the drawings. Each spot: { pic (0–7), x, y, z, face ('+x', '-x',
+ * Hangs the drawings. Each spot: { pic (0–11), x, y, z, face ('+x', '-x', '+z',
  * '-z'), w (metres wide), tilt (radians), line (the wall's fade line) }.
  */
 export function hangDrawings({ addMesh, std }, spots) {
