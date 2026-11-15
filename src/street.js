@@ -191,7 +191,8 @@ export function buildNeighbours(kit, details) {
       box([a - 0.07, ya - 0.05, z[0]], [b + 0.07, yb + 0.07, z[1]], frameMat, opts);
       z = Z(0.04, 0.05);
       box([a, ya, z[0]], [b, yb, z[1]], glass, opts);
-      z = Z(0.04, 0.08);
+      // the bars sit on the glass, not beside it: level with it, their ends flickered against its edges
+      z = Z(0.05, 0.08);
       for (const f of bars.v) box([a + (b - a) * f - 0.03, ya, z[0]], [a + (b - a) * f + 0.03, yb, z[1]], frameMat, opts);
       for (const f of bars.h) box([a, ya + (yb - ya) * f - 0.03, z[0]], [b, ya + (yb - ya) * f + 0.03, z[1]], frameMat, opts);
       z = Z(-0.01, 0.13);
