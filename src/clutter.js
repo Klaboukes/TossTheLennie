@@ -507,16 +507,18 @@ function keyStrip(g, x, y, len, u, vertical) {
 function closetDoorArt(mirror) {
   return canvasTexture(256, 512, (g, W, H) => {
     if (mirror) { g.translate(W, 0); g.scale(-1, 1); }
-    // the dark blue border with its gold key pattern
+    // The dark blue border with its gold key pattern runs round the outside of
+    // the whole closet: along this door's outer edge, top and bottom, but not
+    // down the middle, where the two doors meet.
     const bw = 22;
     g.fillStyle = MN.blue[0]; g.fillRect(0, 0, W, H);
     const u = (bw - 6) / 4.5;
-    keyStrip(g, bw, 4, W - 2 * bw, u, false);
-    keyStrip(g, bw, H - bw + 2, W - 2 * bw, u, false);
+    keyStrip(g, bw, 4, W - bw, u, false);
+    keyStrip(g, bw, H - bw + 2, W - bw, u, false);
     keyStrip(g, 4, bw, H - 2 * bw, u, true);
-    keyStrip(g, W - bw + 2, bw, H - 2 * bw, u, true);
-    g.fillStyle = MN.red; g.fillRect(bw, bw, W - 2 * bw, H - 2 * bw);
-    g.strokeStyle = MN.gold; g.lineWidth = 3; g.strokeRect(bw + 2, bw + 2, W - 2 * bw - 4, H - 2 * bw - 4);
+    g.fillStyle = MN.red; g.fillRect(bw, bw, W - bw, H - 2 * bw);
+    g.strokeStyle = MN.gold; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(W, bw + 2); g.lineTo(bw + 2, bw + 2); g.lineTo(bw + 2, H - bw - 2); g.lineTo(W, H - bw - 2); g.stroke();
 
     // two panels, each framed in teal and gold
     const panel = (x0, y0, x1, y1) => {
@@ -525,9 +527,11 @@ function closetDoorArt(mirror) {
       g.fillStyle = MN.red; g.fillRect(x0, y0, x1 - x0, y1 - y0);
       g.strokeStyle = MN.gold; g.lineWidth = 2; g.strokeRect(x0 + 5, y0 + 5, x1 - x0 - 10, y1 - y0 - 10);
     };
-    const cx = W / 2;
-    panel(44, 48, W - 44, 318);
-    panel(44, 348, W - 44, H - 46);
+    const px0 = bw + 20;
+    const px1 = W - 20;
+    const cx = (px0 + px1) / 2;
+    panel(px0, 48, px1, 318);
+    panel(px0, 348, px1, H - 46);
 
     // the upper panel: the medallion with the endless knot, clouds curling around it
     const my = 183;
@@ -536,7 +540,7 @@ function closetDoorArt(mirror) {
       cloudScroll(g, cx + f * 34, my + 92, 22, -Math.PI * 0.9, MN.blue, f);
       cloudScroll(g, cx + f * 70, my, 18, Math.PI * 1.5, MN.green, f);
     }
-    for (const [x, y, f, t] of [[62, 66, 1, 0], [W - 62, 66, -1, 0], [62, 300, 1, Math.PI], [W - 62, 300, -1, Math.PI]]) cloudScroll(g, x, y, 12, t, MN.teal, f);
+    for (const [x, y, f, t] of [[px0 + 18, 66, 1, 0], [px1 - 18, 66, -1, 0], [px0 + 18, 300, 1, Math.PI], [px1 - 18, 300, -1, Math.PI]]) cloudScroll(g, x, y, 12, t, MN.teal, f);
     const R = 52;
     g.fillStyle = MN.ink; circle(g, cx, my, R + 5); g.fill();
     g.fillStyle = MN.gold; circle(g, cx, my, R + 2); g.fill();
@@ -1277,9 +1281,9 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     b([X0, 0, Z0], [X0 + T, TOP, Z1], oak);
     b([X1 - T, 0, Z0], [X1, TOP, Z1], oak);
     b([X0 + T, 0, Z0], [X1 - T, TOP, Z0 + 0.02], inside); // between the sides, or its edges flicker through them
-    // the divider and the shelves start in front of the back, or their backs flicker against its back
+    // one cabinet, its shelves running all the way across; they start in front
+    // of the back, or their backs flicker against its back
     const ZB = Z0 + 0.02;
-    b([(X0 + X1) / 2 - T / 2, 0.08, ZB], [(X0 + X1) / 2 + T / 2, TOP - T, Z1 - 0.01], oak);
     b([X0, 0, Z1 - 0.04], [X1, 0.08, Z1], oak); // plinth
     const shelves = [0.08, 0.47, 0.86, 1.25, 1.64];
     for (const y of [...shelves, TOP - T]) b([X0, y - (y === 0.08 ? 0.08 : 0), ZB], [X1, y + (y === 0.08 ? 0 : T), Z1], oak);
@@ -1334,15 +1338,13 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
         top += 2 * hy;
       }
     }
-    const cols = [[X0 + T, (X0 + X1) / 2 - T / 2], [(X0 + X1) / 2 + T / 2, X1 - T]];
+    // four piles on every shelf: the left two behind the left door, the right two behind the right one
+    const inner = X1 - X0 - 2 * T;
     shelves.forEach((y, i) => {
       const shelfTop = y + (i === 0 ? 0 : T);
       const ceiling = (shelves[i + 1] ?? TOP - T) - 0.01;
-      cols.forEach(([a, c], side) => {
-        const w = c - a;
-        const sec = side ? secR : secL;
-        gamePile(sec, a + w * 0.27, shelfTop, Z1 - 0.22, ceiling - shelfTop - 0.01);
-        gamePile(sec, a + w * 0.73, shelfTop, Z1 - 0.22, ceiling - shelfTop - 0.01);
+      [0.13, 0.38, 0.62, 0.87].forEach((f, p) => {
+        gamePile(p < 2 ? secL : secR, X0 + T + inner * f, shelfTop, Z1 - 0.22, ceiling - shelfTop - 0.01);
       });
     });
     gamePile(secTop, X0 + 0.45, TOP + 0.08, Z1 - 0.24, 0.3);
