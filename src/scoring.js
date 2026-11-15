@@ -1,5 +1,6 @@
 import * as CANNON from 'cannon-es';
 import { HAND_OFFSET, FOOT_OFFSET } from './ragdoll.js';
+import { t, fixed } from './i18n.js';
 
 const POINTS_PER_JOINT = 120;
 const DEAD_ZONE = 0.3; // a joint bent less than this fraction of its range is just "relaxed"
@@ -94,21 +95,22 @@ export function chainMultiplier(chain) {
 export function evaluateToss(ragdoll, chain) {
   const c = measureContortion(ragdoll);
   const tricks = [...detectTricks(ragdoll), ...chain.bonuses];
-  const lines = [{ label: `Contortion ${Math.round(c.percent)}%`, value: Math.round(c.points) }];
-  for (const t of tricks) lines.push({ ...t, trick: true });
+  // (the score card's lines in the current language; the tricks keep their English labels)
+  const lines = [{ label: t(`Contortion ${Math.round(c.percent)}%`), value: Math.round(c.points) }];
+  for (const trick of tricks) lines.push({ ...trick, label: t(trick.label), trick: true });
 
-  const base = c.points + tricks.reduce((sum, t) => sum + t.value, 0);
+  const base = c.points + tricks.reduce((sum, trick) => sum + trick.value, 0);
   const mult = chainMultiplier(chain);
-  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const plural = (n, word) => t(`${n} ${word}${n === 1 ? '' : 's'}`);
   const multParts = [];
   if (chain.bounces) multParts.push(plural(chain.bounces, 'bounce'));
   if (chain.juggles) multParts.push(plural(chain.juggles, 'juggle'));
   if (chain.smashed) multParts.push(plural(chain.smashed, 'window'));
   if (chain.doors) multParts.push(plural(chain.doors, 'door'));
-  if (mult > 1) lines.push({ label: multParts.join(' · '), value: `×${mult.toFixed(2)}`, mult: true });
+  if (mult > 1) lines.push({ label: multParts.join(' · '), value: `×${fixed(mult, 2)}`, mult: true });
 
   const total = Math.round(base * mult);
   const worst = c.joints.reduce((a, b) => (b.norm > a.norm ? b : a));
-  const rating = RATINGS.find(([max]) => total < max)[1];
+  const rating = t(RATINGS.find(([max]) => total < max)[1]);
   return { total, base, mult, percent: c.percent, lines, tricks, worst, rating };
 }

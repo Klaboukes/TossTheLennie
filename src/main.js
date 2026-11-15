@@ -15,6 +15,7 @@ import { createSeeThrough } from './seethrough.js';
 import { combineScenery } from './batching.js';
 import { sceneryParts, reportFlicker } from './flickercheck.js';
 import { createBlobShadow } from './blobshadow.js';
+import { t, fmt, fixed, lang, setLang, onLangChange } from './i18n.js';
 
 const FIXED_DT = 1 / 120;
 // Physics may take this long per frame (ms). A slow device that can't keep up
@@ -94,7 +95,6 @@ const PLAYER_COLORS = ['#ff6b4a', '#3f5fd6', '#22a06b', '#b04ad6'];
 
 const $ = (id) => document.getElementById(id);
 const clamp = THREE.MathUtils.clamp;
-const fmt = (n) => Math.round(n).toLocaleString('en-US');
 
 // ---------------------------------------------------------------- renderer
 const canvas = $('scene');
@@ -316,6 +316,7 @@ function toast(message, ms = 2200) {
 function popAt(position, text, cls = '') {
   const v = new THREE.Vector3().copy(position).project(camera);
   if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return;
+  text = t(text);
   const el = document.createElement('div');
   el.className = `pop ${cls}`;
   el.textContent = text;
@@ -373,7 +374,7 @@ let countUp = null;
 /** `cheer` is 'best' (a new best), 'big' (a big toss) or null. */
 function showResult(result, where, cheer = null) {
   ui.rBadge.hidden = !cheer;
-  ui.rBadge.textContent = cheer === 'best' ? 'New best!' : 'Big toss!';
+  ui.rBadge.textContent = t(cheer === 'best' ? 'New best!' : 'Big toss!');
   ui.rBadge.classList.toggle('best', cheer === 'best');
   // A good one invites a replay (it never plays by itself).
   ui.replayBtn.classList.toggle('invite', !!cheer);
@@ -383,7 +384,7 @@ function showResult(result, where, cheer = null) {
     void el.offsetWidth;
     el.style.animation = '';
   }
-  ui.rTitle.textContent = `Toss #${stats.tosses}`;
+  ui.rTitle.textContent = t(`Toss #${stats.tosses}`);
   ui.rRating.textContent = result.rating;
   ui.rLines.innerHTML = '';
   result.lines.forEach((line, i) => {
@@ -399,7 +400,7 @@ function showResult(result, where, cheer = null) {
     ui.rLines.appendChild(li);
   });
   const deg = Math.round((result.worst.theta * 180) / Math.PI);
-  ui.rFoot.textContent = `Landed ${where}. Most bent: ${result.worst.label.toLowerCase()} (${deg}°).`;
+  ui.rFoot.textContent = t('Landed {where}. Most bent: {part} ({deg}°).', { where, part: t(result.worst.label).toLowerCase(), deg });
   ui.replayBtn.hidden = !replay.canPlay;
   countUp = { t: 0, dur: 0.9, to: result.total };
   ui.rTotal.textContent = '0';
@@ -473,7 +474,7 @@ function newSpotLine(tricks) {
   if (!id || spotsFound.has(id)) return null;
   spotsFound.add(id);
   try { localStorage.setItem(SPOTS_KEY, JSON.stringify([...spotsFound])); } catch { /* ignore */ }
-  return { label: `New spot found! ${spotsFound.size} of ${ALL_SPOTS.size}`, value: '★', trick: true };
+  return { label: t(`New spot found! ${spotsFound.size} of ${ALL_SPOTS.size}`), value: '★', trick: true };
 }
 // (a spot with a `when` only counts while that holds, like a freezer whose glass door is smashed)
 const inBox = (p, s) => p.x > s.min[0] && p.x < s.max[0] && p.y > s.min[1] && p.y < s.max[1] && p.z > s.min[2] && p.z < s.max[2] && (!s.when || s.when());
@@ -566,7 +567,7 @@ function finishToss() {
     toss.state = 'idle';
     replay.stop(false);
     resetChain();
-    toast('Too gentle! Give Lennie a proper fling.');
+    toast(t('Too gentle! Give Lennie a proper fling.'));
     sfx.fizzle();
     return;
   }
@@ -580,7 +581,7 @@ function finishToss() {
   // The challenge (free play only): a bonus on top when it's done.
   const done = match ? null : challenges.check({ total: result.total, ids: new Set(result.tricks.map((t) => t.id)), chain });
   if (done) {
-    result.lines.push({ label: 'Challenge done!', value: CHALLENGE_BONUS, trick: true });
+    result.lines.push({ label: t('Challenge done!'), value: CHALLENGE_BONUS, trick: true });
     result.total += CHALLENGE_BONUS;
   }
 
@@ -598,7 +599,7 @@ function finishToss() {
   bump(ui.total);
   if (beatBest) bump(ui.best);
   const cheer = beatBest ? 'best' : result.total >= BIG_TOSS ? 'big' : null;
-  showResult(result, locate(center), cheer);
+  showResult(result, sayWhere(center), cheer);
   sfx.score(result.total > 1600 ? 3 : result.total > 900 ? 2 : result.total > 400 ? 1 : 0);
   sfx.voice(result.total >= 900 ? 'land' : 'grunt');
   // A good toss leaves him seeing stars until he's picked up again.
@@ -943,6 +944,13 @@ function locate(p) {
   return where;
 }
 
+/** locate(p) in the current language ("in the kitchen (floor 1)" is a room and a floor). */
+function sayWhere(p) {
+  const where = locate(p);
+  const room = where.match(/^(.*) (\(floor \d\))$/);
+  return room ? `${t(room[1])} ${t(room[2])}` : t(where);
+}
+
 function clampInWorld(v, margin) {
   const h = YARD.half - margin;
   v.x = clamp(v.x, -h, h);
@@ -1219,7 +1227,7 @@ function endSling(throwIt = true) {
   if (!throwIt) return;
   const shot = slingShot(s);
   if (shot) launch(shot.v);
-  else toast('Pull Lennie back, then let go to throw him', 1800);
+  else toast(t('Pull Lennie back, then let go to throw him'), 1800);
 }
 
 function changeSlingAngle(steps) {
@@ -1227,8 +1235,8 @@ function changeSlingAngle(steps) {
   slingAngle = clamp(slingAngle + steps * SLING_ANGLE.step, SLING_ANGLE.min, SLING_ANGLE.max);
   if (sling) return;
   // Nothing on screen shows it yet, so say so.
-  if (slingAngle === before) toast(steps > 0 ? 'That\'s the highest arc' : 'That\'s the lowest arc', 1000);
-  else toast(steps > 0 ? 'Higher arc' : 'Lower arc', 800);
+  if (slingAngle === before) toast(t(steps > 0 ? 'That\'s the highest arc' : 'That\'s the lowest arc'), 1000);
+  else toast(t(steps > 0 ? 'Higher arc' : 'Lower arc'), 800);
 }
 
 /**
@@ -1621,7 +1629,7 @@ function updateAim() {
 function aimThrow() {
   if (grab || sling || turnPending || !ui.setup.hidden) return;
   if (isAirborne()) {
-    toast('Wait for Lennie to land, then aim again', 1400);
+    toast(t('Wait for Lennie to land, then aim again'), 1400);
     return;
   }
   const touch = document.body.classList.contains('touch');
@@ -1721,7 +1729,7 @@ function toggleAim() {
   const how = document.body.classList.contains('touch')
     ? 'tap where Lennie should go, then tap there again to throw'
     : 'point where Lennie should go and click. Scroll for a higher or lower arc';
-  toast(aim.on ? `Aim mode: ${how}` : 'Aim mode off', aim.on ? 3200 : 1200);
+  toast(aim.on ? t('Aim mode: {how}', { how: t(how) }) : t('Aim mode off'), aim.on ? 3200 : 1200);
 }
 
 // ---------------------------------------------------------------- camera
@@ -1851,6 +1859,7 @@ function updateCamera(dt) {
 // ---------------------------------------------------------------- buttons & keys
 let timeScale = 1;
 const btn = {
+  lang: $('btn-lang'),
   reset: $('btn-reset'),
   focus: $('btn-focus'),
   follow: $('btn-follow'),
@@ -1904,32 +1913,32 @@ function resetAll(say = true) {
   shop.repairAll();
   clearShards();
   dropLennie(0);
-  if (say) toast('Windows, doors and TV fixed, shelves stocked, the mess and the chairs back where they were, Lennie back downstairs', 1900);
+  if (say) toast(t('Windows, doors and TV fixed, shelves stocked, the mess and the chairs back where they were, Lennie back downstairs'), 1900);
 }
 
 function toggleFollow() {
   follow = !follow;
   btn.follow.setAttribute('aria-pressed', String(follow));
-  toast(follow ? 'Camera follows Lennie' : 'Camera follow off', 1200);
+  toast(t(follow ? 'Camera follows Lennie' : 'Camera follow off'), 1200);
 }
 
 function toggleCutaway() {
   cutaway = !cutaway;
   btn.cutaway.setAttribute('aria-pressed', String(cutaway));
-  toast(cutaway ? 'Cutaway on: upper floors hide when you look down' : 'Cutaway off: whole house shown', 1600);
+  toast(t(cutaway ? 'Cutaway on: upper floors hide when you look down' : 'Cutaway off: whole house shown'), 1600);
 }
 
 function toggleSlowmo() {
   timeScale = timeScale === 1 ? SLOWMO_SCALE : 1;
   btn.slowmo.setAttribute('aria-pressed', String(timeScale !== 1));
-  toast(timeScale !== 1 ? 'Slow motion on' : 'Slow motion off', 1200);
+  toast(t(timeScale !== 1 ? 'Slow motion on' : 'Slow motion off'), 1200);
 }
 
 function toggleSound() {
   sfx.unlock();
   sfx.setMuted(!sfx.muted);
   btn.sound.setAttribute('aria-pressed', String(!sfx.muted));
-  toast(sfx.muted ? 'Sound off' : 'Sound on', 1000);
+  toast(t(sfx.muted ? 'Sound off' : 'Sound on'), 1000);
 }
 
 // Full screen through the page itself rather than the browser's F11: then the
@@ -1948,11 +1957,11 @@ function toggleFullscreen() {
   }
   const request = root.requestFullscreen ?? root.webkitRequestFullscreen;
   Promise.resolve(request.call(root, { navigationUI: 'hide' }))
-    .catch(() => toast('Full screen isn\'t allowed here', 1600));
+    .catch(() => toast(t('Full screen isn\'t allowed here'), 1600));
 }
 function syncFullscreen() {
   btn.fullscreen.setAttribute('aria-pressed', String(!!fullscreenElement()));
-  btn.fullscreen.dataset.tip = fullscreenElement() ? 'Leave full screen (B or Esc)' : 'Full screen (B)';
+  btn.fullscreen.dataset.tip = t(fullscreenElement() ? 'Leave full screen (B or Esc)' : 'Full screen (B)');
 }
 btn.fullscreen.hidden = !canFullscreen;
 document.addEventListener('fullscreenchange', syncFullscreen);
@@ -1966,6 +1975,32 @@ btn.slowmo.addEventListener('click', toggleSlowmo);
 btn.aim.addEventListener('click', toggleAim);
 btn.sound.addEventListener('click', toggleSound);
 btn.fullscreen.addEventListener('click', toggleFullscreen);
+btn.lang.addEventListener('click', () => toggleLang());
+
+// Dutch or English (i18n.js). The button shows the language it switches to.
+function renderLangButton() {
+  const other = lang === 'nl' ? 'English' : 'Nederlands';
+  btn.lang.textContent = lang === 'nl' ? 'EN' : 'NL';
+  btn.lang.dataset.tip = `${other} (L)`;
+  btn.lang.setAttribute('aria-label', other);
+}
+renderLangButton();
+function toggleLang() {
+  setLang(lang === 'nl' ? 'en' : 'nl');
+  toast(lang === 'nl' ? 'Taal: Nederlands' : 'Language: English', 1200);
+}
+// After a switch, redo the texts the game wrote itself (index.html's own texts i18n.js does).
+onLangChange(() => {
+  renderLangButton();
+  renderStats();
+  syncFullscreen();
+  renderChallenge();
+  renderBoard();
+  if (!ui.setup.hidden) renderSetup();
+  if (!ui.turnCard.hidden && match && !matchOver()) showTurnCard();
+  const p = match && !matchOver() ? match.players[match.turn] : null;
+  ui.hintText.textContent = p ? t('{name}, grab me!', { name: p.name }) : t('Grab me!');
+});
 // Drop menu
 function setDropMenu(open) {
   ui.dropMenu.hidden = !open;
@@ -1979,7 +2014,7 @@ ui.dropMenu.querySelectorAll('[data-drop]').forEach((b) => {
     setDropMenu(false);
     setChallengeMenu(false);
     dropLennie(level);
-    toast(`Lennie dropped on ${LEVEL_NAMES[level]}`, 1200);
+    toast(t('Lennie dropped on {where}', { where: t(LEVEL_NAMES[level]) }), 1200);
   });
 });
 document.addEventListener('pointerdown', (e) => {
@@ -2038,10 +2073,11 @@ addEventListener('keydown', (e) => {
     case 'KeyM': toggleSound(); break;
     case 'KeyH': setHelp(ui.help.hidden); break;
     case 'KeyB': toggleFullscreen(); break;
+    case 'KeyL': toggleLang(); break;
     case 'Digit1': case 'Digit2': case 'Digit3': case 'Digit4': case 'Digit5': {
       const level = Number(e.code.slice(-1)) - 1;
       dropLennie(level);
-      toast(`Lennie dropped on ${LEVEL_NAMES[level]}`, 1200);
+      toast(t('Lennie dropped on {where}', { where: t(LEVEL_NAMES[level]) }), 1200);
       break;
     }
     default: return;
@@ -2119,14 +2155,14 @@ function renderChallenge() {
   ui.chProgress.style.width = `${(100 * challenges.doneCount) / challenges.count}%`;
   if (c) {
     ui.chNum.textContent = challenges.number;
-    ui.chText.textContent = c.text;
-    ui.chSkip.textContent = 'Skip';
-    ui.chSkip.title = ui.chSkip.ariaLabel = 'Skip this challenge';
+    ui.chText.textContent = t(c.text);
+    ui.chSkip.textContent = t('Skip');
+    ui.chSkip.title = ui.chSkip.ariaLabel = t('Skip this challenge');
   } else {
     ui.chNum.textContent = '★';
-    ui.chText.textContent = 'All challenges done. Lennie legend!';
-    ui.chSkip.textContent = 'Again';
-    ui.chSkip.title = ui.chSkip.ariaLabel = 'Start the challenges over';
+    ui.chText.textContent = t('All challenges done. Lennie legend!');
+    ui.chSkip.textContent = t('Again');
+    ui.chSkip.title = ui.chSkip.ariaLabel = t('Start the challenges over');
   }
   if (!ui.chMenu.hidden) renderChallengeList();
 }
@@ -2151,17 +2187,17 @@ function renderChallengeList() {
     const n = document.createElement('span');
     n.className = 'n';
     n.textContent = done ? '✓' : i + 1;
-    const t = document.createElement('span');
-    t.className = 't';
-    t.textContent = c.text;
-    b.append(n, t);
+    const text = document.createElement('span');
+    text.className = 't';
+    text.textContent = t(c.text);
+    b.append(n, text);
     if (c === current) {
       const tag = document.createElement('span');
       tag.className = 'tag';
-      tag.textContent = 'Now';
+      tag.textContent = t('Now');
       b.append(tag);
     }
-    b.setAttribute('aria-label', `${i + 1}. ${c.text}${done ? ' (done)' : ''}`);
+    b.setAttribute('aria-label', `${i + 1}. ${t(c.text)}${done ? ` ${t('(done)')}` : ''}`);
     li.append(b);
     ui.chList.append(li);
   });
@@ -2208,8 +2244,8 @@ document.addEventListener('pointerdown', (e) => {
 function challengeDone(c) {
   sfx.chime();
   sfx.voice('cheer');
-  toast(`Challenge done: ${c.text}! +${CHALLENGE_BONUS}`, 2600);
-  ui.chText.textContent = `✔ ${c.text}`;
+  toast(t('Challenge done: {text}! +{n}', { text: t(c.text), n: CHALLENGE_BONUS }), 2600);
+  ui.chText.textContent = `✔ ${t(c.text)}`;
   flash(ui.challenge, 'done');
   setTimeout(renderChallenge, 1600);
 }
@@ -2232,7 +2268,7 @@ let setupCount = 2;
 let savedNames = [];
 try { savedNames = JSON.parse(localStorage.getItem(NAMES_KEY) ?? '[]'); } catch { /* ignore */ }
 
-const playerName = (i) => savedNames[i]?.trim() || `Player ${i + 1}`;
+const playerName = (i) => savedNames[i]?.trim() || t(`Player ${i + 1}`);
 const matchOver = () => match.players.every((p) => p.scores.length >= TOSSES_PER_PLAYER);
 const playerTotal = (p) => p.scores.reduce((a, b) => a + b, 0);
 
@@ -2247,9 +2283,9 @@ function renderSetup() {
     const input = document.createElement('input');
     input.type = 'text';
     input.maxLength = 14;
-    input.placeholder = `Player ${i + 1}`;
+    input.placeholder = t(`Player ${i + 1}`);
     input.value = values[i] ?? savedNames[i] ?? '';
-    input.setAttribute('aria-label', `Name of player ${i + 1}`);
+    input.setAttribute('aria-label', t(`Name of player ${i + 1}`));
     input.addEventListener('keydown', (e) => {
       e.stopPropagation(); // typing a name mustn't drive the game
       if (e.key === 'Enter') ui.setupStart.click();
@@ -2273,7 +2309,7 @@ function setSetup(open) {
 }
 
 function startMatch() {
-  const names = [...ui.setupNames.querySelectorAll('input')].map((i, n) => i.value.trim() || `Player ${n + 1}`);
+  const names = [...ui.setupNames.querySelectorAll('input')].map((i, n) => i.value.trim() || t(`Player ${n + 1}`));
   savedNames = names;
   try { localStorage.setItem(NAMES_KEY, JSON.stringify(names)); } catch { /* ignore */ }
   setSetup(false);
@@ -2293,7 +2329,7 @@ function newMatch(names) {
 function endMatch() {
   match = null;
   turnPending = false;
-  ui.hintText.textContent = 'Grab me!';
+  ui.hintText.textContent = t('Grab me!');
   clearTimeout(turnTimer);
   ui.board.hidden = true;
   ui.turnCard.hidden = true;
@@ -2311,7 +2347,7 @@ function renderBoard() {
   ui.board.hidden = !match;
   if (!match) return;
   const cur = match.players[match.turn];
-  ui.boardRound.textContent = matchOver() ? 'Game over' : `Toss ${cur.scores.length + 1} of ${TOSSES_PER_PLAYER}`;
+  ui.boardRound.textContent = matchOver() ? t('Game over') : t(`Toss ${cur.scores.length + 1} of ${TOSSES_PER_PLAYER}`);
   ui.boardList.innerHTML = '';
   match.players.forEach((p, i) => {
     const li = document.createElement('li');
@@ -2343,9 +2379,11 @@ function showTurnCard() {
     const top = playerTotal(ranked[0]);
     const winners = ranked.filter((p) => playerTotal(p) === top);
     ui.turnCard.style.setProperty('--player', winners[0].color);
-    ui.turnKicker.textContent = 'Game over';
-    ui.turnTitle.textContent = winners.length > 1 ? "It's a tie!" : `${winners[0].name} wins!`;
-    ui.turnSub.textContent = winners.length > 1 ? `${winners.map((p) => p.name).join(' and ')} both scored ${fmt(top)}.` : `With ${fmt(top)} points from ${TOSSES_PER_PLAYER} tosses.`;
+    ui.turnKicker.textContent = t('Game over');
+    ui.turnTitle.textContent = winners.length > 1 ? t("It's a tie!") : t('{name} wins!', { name: winners[0].name });
+    ui.turnSub.textContent = winners.length > 1
+      ? t('{names} both scored {score}.', { names: winners.map((p) => p.name).join(` ${t('and')} `), score: fmt(top) })
+      : t('With {score} points from {n} tosses.', { score: fmt(top), n: TOSSES_PER_PLAYER });
     ui.turnRanking.innerHTML = '';
     ranked.forEach((p) => {
       const li = document.createElement('li');
@@ -2360,8 +2398,8 @@ function showTurnCard() {
       ui.turnRanking.appendChild(li);
     });
     ui.turnRanking.hidden = false;
-    ui.turnGo.textContent = 'Play again';
-    ui.turnAlt.textContent = 'Back to free play';
+    ui.turnGo.textContent = t('Play again');
+    ui.turnAlt.textContent = t('Back to free play');
     ui.turnAlt.hidden = false;
     ui.turnAlt.dataset.action = 'free';
     sfx.score(3);
@@ -2374,13 +2412,13 @@ function showTurnCard() {
     const p = match.players[match.turn];
     const first = match.players.every((q) => q.scores.length === 0);
     ui.turnCard.style.setProperty('--player', p.color);
-    ui.turnKicker.textContent = first ? 'Game on!' : `Toss ${p.scores.length + 1} of ${TOSSES_PER_PLAYER}`;
-    ui.turnTitle.textContent = `${p.name}'s turn!`;
-    const device = document.body.classList.contains('touch') ? 'tablet' : 'mouse';
-    ui.turnSub.textContent = first ? `${p.name} goes first. Ready?` : `Pass the ${device} to ${p.name}.`;
-    ui.turnGo.textContent = 'Go!';
+    ui.turnKicker.textContent = first ? t('Game on!') : t(`Toss ${p.scores.length + 1} of ${TOSSES_PER_PLAYER}`);
+    ui.turnTitle.textContent = t("{name}'s turn!", { name: p.name });
+    const device = t(document.body.classList.contains('touch') ? 'tablet' : 'mouse');
+    ui.turnSub.textContent = first ? t('{name} goes first. Ready?', { name: p.name }) : t('Pass the {device} to {name}.', { device, name: p.name });
+    ui.turnGo.textContent = t('Go!');
     if (replay.canPlay && !first) {
-      ui.turnAlt.textContent = 'Watch the last toss again';
+      ui.turnAlt.textContent = t('Watch the last toss again');
       ui.turnAlt.hidden = false;
       ui.turnAlt.dataset.action = 'replay';
     }
@@ -2400,8 +2438,8 @@ function beginTurn() {
   resetAll(false);
   hint.on = true;
   const p = match.players[match.turn];
-  ui.hintText.textContent = `${p.name}, grab me!`;
-  toast(`${p.name}'s turn!`, 1400);
+  ui.hintText.textContent = t('{name}, grab me!', { name: p.name });
+  toast(t("{name}'s turn!", { name: p.name }), 1400);
 }
 
 btn.players.addEventListener('click', () => setSetup(ui.setup.hidden));
@@ -2415,7 +2453,7 @@ ui.turnGo.addEventListener('click', beginTurn);
 ui.turnAlt.addEventListener('click', () => {
   if (ui.turnAlt.dataset.action === 'free') {
     endMatch();
-    toast('Free play', 1200);
+    toast(t('Free play'), 1200);
   } else {
     ui.turnCard.hidden = true;
     playReplay();
@@ -2424,7 +2462,7 @@ ui.turnAlt.addEventListener('click', () => {
 ui.boardEnd.addEventListener('click', () => {
   ui.boardEnd.blur();
   endMatch();
-  toast('Game ended: free play', 1400);
+  toast(t('Game ended: free play'), 1400);
 });
 
 // The Arc buttons: the arc of aimed throws in aim mode, the slingshot's launch angle otherwise.
@@ -2456,34 +2494,35 @@ function updateHud(dt, now) {
   ui.meterValue.textContent = `${Math.round(meter)}%`;
 
   const mult = chainMultiplier(toss);
-  const combo = mult > 1 ? ` · <b>×${mult.toFixed(2)}</b>` : '';
-  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const combo = mult > 1 ? ` · <b>×${fixed(mult, 2)}</b>` : '';
+  const plural = (n, w) => t(`${n} ${w}${n === 1 ? '' : 's'}`);
   let status;
   if (sling) {
-    const arc = document.body.classList.contains('touch') ? '▲ ▼ arc' : 'scroll: arc';
+    const arc = t(document.body.classList.contains('touch') ? '▲ ▼ arc' : 'scroll: arc');
     status = slingShot()
-      ? `<b>Let go</b> to throw · pull more to go further · ${arc}`
-      : 'Pull Lennie <b>back</b>, away from where he should go';
+      ? t('<b>Let go</b> to throw · pull more to go further · {arc}', { arc })
+      : t('Pull Lennie <b>back</b>, away from where he should go');
   } else if (toss.state === 'held') {
-    status = `Holding Lennie's <b>${grab?.part.label ?? 'limb'}</b>. Flick and let go!${combo}`;
+    status = t("Holding Lennie's <b>{part}</b>. Flick and let go!", { part: t(grab?.part.label ?? 'limb') }) + combo;
   } else if (toss.state === 'flying') {
     const bits = [plural(toss.bounces, 'bounce')];
     if (toss.juggles) bits.push(plural(toss.juggles, 'juggle'));
     if (toss.smashed) bits.push(plural(toss.smashed, 'window'));
     if (toss.doors) bits.push(plural(toss.doors, 'door'));
-    if (toss.tv) bits.push('TV');
+    if (toss.tv) bits.push(t('TV'));
     if (toss.zaps) bits.push(plural(toss.zaps, 'zap'));
     if (toss.stairs.size) bits.push(plural(toss.stairs.size, 'step'));
-    status = `Flying! ${bits.join(' · ')}${combo}`;
+    status = t('Flying! {bits}', { bits: bits.join(' · ') }) + combo;
   } else {
-    const where = locate(lennie.center(_center));
+    const where = sayWhere(lennie.center(_center));
     const place = `<b>${where[0].toUpperCase()}${where.slice(1)}</b>`;
-    status = toss.state === 'scored' ? `Scored! Landed ${where}.` : `${place} · grab Lennie, pull back and let go!`;
+    status = toss.state === 'scored' ? t('Scored! Landed {where}.', { where }) : t('{place} · grab Lennie, pull back and let go!', { place });
     if (aim.on && !hoverPart) {
-      const warn = aim.shot?.tooFar ? ' · <b>too far</b>' : aim.shot?.blocked ? ' · <b>something is in the way</b>' : '';
+      const problem = aim.shot?.tooFar ? 'too far' : aim.shot?.blocked ? 'something is in the way' : '';
+      const warn = problem ? ` · <b>${t(problem)}</b>` : '';
       status = document.body.classList.contains('touch')
-        ? (aim.pin ? `<b>Aim</b>: tap the ring again to throw · tap elsewhere to aim again${warn}` : '<b>Aim</b>: tap where Lennie should go')
-        : `<b>Aim</b>: click where Lennie should go · scroll: arc${warn}`;
+        ? (aim.pin ? t('<b>Aim</b>: tap the ring again to throw · tap elsewhere to aim again') + warn : t('<b>Aim</b>: tap where Lennie should go'))
+        : t('<b>Aim</b>: click where Lennie should go · scroll: arc') + warn;
     }
   }
   if (ui.status.innerHTML !== status) ui.status.innerHTML = status;
@@ -2591,7 +2630,7 @@ function placedBack(message) {
   resetChain();
   hideResult();
   focusLennie(0.8);
-  toast(message, 1800);
+  toast(t(message), 1800);
 }
 
 // Last resort when Lennie is stuck in the scenery with no good pose to go back to.
@@ -2602,7 +2641,7 @@ function rescueLost() {
   const c = lennie.center(_center);
   const level = shop.isInside(c) ? SHOP_DROP : Math.min(2, house.levelOf(c));
   dropLennie(level);
-  toast(`Lennie got stuck, so he's back on ${LEVEL_NAMES[level]}`, 1800);
+  toast(t("Lennie got stuck, so he's back on {where}", { where: t(LEVEL_NAMES[level]) }), 1800);
 }
 
 /** Ray from (ax, ay, az) to (bx, by, bz): does it hit any scenery? */

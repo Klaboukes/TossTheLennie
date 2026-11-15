@@ -7,6 +7,8 @@ Guidance for Claude Code (and humans) working in this repository.
 
 It's a just-for-laughs-and-giggles game for a friend and his kids to play, not for a broad online public. Keep it fun and simple: no accounts, analytics, ads, leaderboards or other features for strangers. A public GitHub Pages link is just the easy way to share it.
 
+The game is in Dutch and English. Code and texts are written in English and every text a player can see goes through `t()`; any new or changed text needs its Dutch version in `src/i18n.js` too, or Dutch players see English. With Dutch on, `i18nMissing` in the browser console lists texts that came up without one.
+
 Plain JavaScript modules with [three.js](https://threejs.org/) and [cannon-es](https://github.com/pmndrs/cannon-es), both loaded from a CDN through the import map in `index.html`. There is no build step and there are no dependencies. [README.md](README.md) describes the house, controls, scoring and what each file in `src/` does.
 
 The project owner doesn't write code. Talk to them in plain language about outcomes and the actions they need to take.

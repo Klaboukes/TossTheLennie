@@ -90,7 +90,10 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 | Sound on/off | M |
 | Full screen on/off (no browser bar sliding in at the top) | B (or the corners button); Esc also leaves it |
 | How to play | H |
+| Dutch or English | L (or the NL/EN button) |
 | Close the help, a menu or a replay | Esc |
+
+**Nederlands / English:** every text in the game (buttons, help, score card, challenges, the shouts that pop up) comes in Dutch and English. It starts in Dutch when the browser has Dutch among its languages, otherwise in English; the NL/EN button switches, and the choice is remembered in the browser. The shop signs and product labels in the supermarket are Dutch in both.
 
 **On a tablet or phone:** pull Lennie back and let go to fling him (▲ ▼ for a higher or lower arc), drag empty space to turn the camera, and pinch or slide two fingers to zoom and move. In aim mode, tap a spot to see the flight path and tap it again to throw. The help screen shows the touch controls on a touch screen and the mouse and keyboard ones on a computer.
 
@@ -173,6 +176,7 @@ Each frame, `main.js` moves the camera first, then lets the house and the shop d
 - `src/ragdoll.js`: Lennie's bodies, joints and look (1.90 m and 100 kg, with a bit of a belly, in a worn hoodie and joggers; his face after the photo in docs: thinning dark hair receding at the temples, rectangular glasses and a short salt-and-pepper beard)
 - `src/scoring.js`: contortion measurement, trick detection and the multiplier
 - `src/challenges.js`: the list of challenges and the progress kept in the browser
+- `src/i18n.js`: Dutch and English: the Dutch version of every text (the game's code is written in English; a new text needs its Dutch version added here), switching between them, and putting `index.html`'s own texts in the chosen language
 - `src/replay.js`: records each toss (and the chairs he knocks over) and plays it back in slow motion
 - `src/guard.js`: safety net that puts Lennie back in one piece if a limb ever ends up inside a wall or floor
 - `src/audio.js`: synthesized sound effects and Lennie's voice
