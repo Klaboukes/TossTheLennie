@@ -713,6 +713,19 @@ kbd {
 }
 .pop.big { font-size: 34px; text-shadow: 3px 3px 0 #5568ea; }
 .pop.good { color: #ffd166; text-shadow: 3px 3px 0 #22a06b; }
+/* a supermarket price tag: Lennie scanned at the checkout (effects.js) */
+.pop.price {
+  font-size: 22px;
+  color: #c8102e;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  background: #ffe14d;
+  border: 3px solid #c8102e;
+  border-radius: 6px 18px 18px 6px;
+  padding: 4px 14px 4px 22px;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.25);
+  background-image: radial-gradient(circle at 10px 50%, #fff 0 4px, transparent 5px);
+}
 .confetti {
   position: absolute;
   width: 9px;

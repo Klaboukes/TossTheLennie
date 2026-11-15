@@ -155,6 +155,15 @@ export class Zap {
     for (const p of this.puffs) { p.t = Infinity; p.m.visible = false; }
   }
 
+  /**
+   * Paints him again after his own colours changed: effects.js tints him
+   * (frozen, painted, wet) by changing each material's userData.zapBase and
+   * zapGlow, and the soot goes on top of that.
+   */
+  repaint() {
+    if (!this.active) this.#paint(0, this.soot);
+  }
+
   /** Normal body or the X-ray skeleton. */
   #show(xray) {
     if (xray === this.xray) return;

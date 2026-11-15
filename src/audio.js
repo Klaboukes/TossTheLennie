@@ -60,6 +60,24 @@ const LINES = {
     [{ v: 'ai', f: [420, 560], d: 1.0, wobble: 20 }], // aaaiii
     [{ v: 'e', f: [300, 340], d: 0.25 }, { v: 'ao', f: [420, 380], d: 0.9, wobble: 26 }], // eh-aaah
   ],
+  // Frozen solid and thawing: brrr.
+  cold: [
+    [{ v: 'u', f: [250, 230], d: 0.9, wobble: 30 }], // brrrr
+    [{ v: 'i', f: [300, 270], d: 0.8, wobble: 28 }], // iiiii
+    [{ v: 'o', f: [260, 250], d: 0.2 }, { v: 'u', f: [250, 220], d: 0.7, wobble: 30 }], // oh-brrr
+  ],
+  // Sat on the hot cooker: a high yelp.
+  hot: [
+    [{ v: 'au', f: [520, 760], d: 0.28 }, { v: 'u', f: [700, 480], d: 0.3 }], // au-ooh!
+    [{ v: 'i', f: [700, 950], d: 0.45 }], // iiee!
+    [{ v: 'a', f: [600, 820], d: 0.22, h: true }, { v: 'a', f: [800, 560], d: 0.3, h: true }], // ha-haa!
+  ],
+  // Something stinks: bleh.
+  yuck: [
+    [{ v: 'e', f: [230, 180], d: 0.5, breath: true }], // bleh
+    [{ v: 'ua', f: [210, 160], d: 0.45, h: true }], // bwah
+    [{ v: 'i', f: [330, 300], d: 0.15 }, { v: 'u', f: [260, 190], d: 0.4, wobble: 9 }], // ie-uw
+  ],
   // A challenge done or a match won.
   cheer: [
     [{ v: 'ea', f: [380, 520], d: 0.4 }], // yay
@@ -613,11 +631,189 @@ export class Sfx {
     }
   }
 
+  // ------------------------------------------------------------ special effects (effects.js)
+
+  /** Into the bath: a big splash, then a few drips. */
+  splash(strength = 1) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const s = Math.min(1, strength);
+    this.#burst(t, { f: 1600, to: 300, glide: 0.45, Q: 0.6, peak: 0.2 + s * 0.3, attack: 0.01, release: 0.5 });
+    this.#burst(t, { filter: 'highpass', f: 2500, peak: 0.06 + s * 0.12, attack: 0.005, release: 0.35 });
+    this.#tone(t, { f: 120, to: 55, glide: 0.15, peak: 0.1 + s * 0.3, release: 0.2 });
+    for (let i = 0; i < 6; i++) this.#tone(t + 0.3 + Math.random() * 0.9, { f: rand(800, 1400), to: rand(1800, 2600), glide: 0.04, peak: 0.04, release: 0.06 });
+  }
+
+  /** A box of hagelslag bursting: a rain of tiny ticks. */
+  sprinkle() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this.#burst(t, { filter: 'bandpass', f: 900, Q: 1.5, peak: 0.25, release: 0.06 }); // the box popping
+    for (let i = 0; i < 40; i++) {
+      this.#burst(t + 0.05 + Math.random() * 0.9, { filter: 'highpass', f: rand(4000, 7000), peak: rand(0.02, 0.06), release: 0.012 });
+    }
+  }
+
+  /** The washing machine's spin cycle: a rumble that speeds up, sloshing and thumping. */
+  rumble(duration = 2.5) {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const end = t + duration;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(30, t);
+    osc.frequency.exponentialRampToValueAtTime(90, end - 0.2);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 380;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.4);
+    g.gain.setValueAtTime(0.3, end - 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, end);
+    osc.connect(lp).connect(g).connect(this.master);
+    osc.start(t);
+    osc.stop(end + 0.05);
+    // thumps, closer together as it speeds up, and water sloshing about
+    for (let tt = t + 0.1, gap = 0.3; tt < end - 0.1; tt += gap, gap = Math.max(0.09, gap * 0.88)) {
+      this.#tone(tt, { f: 85, to: 50, glide: 0.08, peak: 0.25, release: 0.1 });
+    }
+    for (let i = 0; i < 4; i++) this.#burst(t + i * 0.55, { filter: 'bandpass', f: 500, to: 1100, glide: 0.4, Q: 1, peak: 0.06, attack: 0.1, release: 0.35 });
+  }
+
+  /** Sitting on the hot cooker: a sizzle with crackles. */
+  sizzle() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this.#burst(t, { filter: 'highpass', f: 3500, peak: 0.12, attack: 0.03, release: 1.1 });
+    for (let i = 0; i < 14; i++) {
+      this.#burst(t + Math.random() * 1.0, { filter: 'bandpass', f: rand(2500, 6000), Q: 4, peak: rand(0.04, 0.1), release: 0.015 });
+    }
+  }
+
+  /** Landing on the piano: a crash of random keys, louder for a harder landing. strength 0..1 */
+  piano(strength) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const k = this.#tire('piano', 1.5);
+    const s = Math.min(1, strength) * k;
+    const n = 4 + Math.round(Math.min(1, strength) * 6);
+    for (let i = 0; i < n; i++) {
+      const f = 55 * semis(Math.floor(rand(12, 60)));
+      const tt = t + Math.random() * 0.05;
+      this.#tone(tt, { type: 'triangle', f, peak: 0.05 + s * 0.08, attack: 0.004, release: rand(0.9, 1.6) });
+      this.#tone(tt, { f: f * 2.005, peak: 0.02 + s * 0.04, attack: 0.004, release: 0.5 });
+    }
+    this.#tone(t, { type: 'triangle', f: 55 * semis(Math.floor(rand(0, 8))), peak: 0.1 + s * 0.15, attack: 0.004, release: 1.8 });
+  }
+
+  /** A pillow bursting: a soft poof. */
+  poof() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this.#burst(t, { filter: 'bandpass', f: 900, to: 250, glide: 0.25, Q: 0.8, peak: 0.4, attack: 0.005, release: 0.3 });
+    this.#burst(t, { filter: 'highpass', f: 3000, peak: 0.06, attack: 0.02, release: 0.5 });
+  }
+
+  /** Flies buzzing round a stinky Lennie. */
+  buzz(duration = 2) {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    for (let i = 0; i < 2; i++) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.frequency.value = rand(170, 230);
+      const lfo = ctx.createOscillator();
+      const lg = ctx.createGain();
+      lfo.frequency.value = rand(2, 5);
+      lg.gain.value = rand(20, 40);
+      lfo.connect(lg).connect(osc.frequency);
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 700;
+      bp.Q.value = 2;
+      const g = ctx.createGain();
+      const t0 = t + i * rand(0.2, 0.6);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.035, t0 + 0.3);
+      g.gain.setValueAtTime(0.035, t0 + duration - 0.4);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+      osc.connect(bp).connect(g).connect(this.master);
+      osc.start(t0); lfo.start(t0);
+      osc.stop(t0 + duration + 0.05); lfo.stop(t0 + duration + 0.05);
+    }
+  }
+
+  /** Frozen solid: ice creaking and crackling over him. */
+  freeze() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this.#burst(t, { filter: 'highpass', f: 1800, to: 6000, glide: 0.6, peak: 0.1, attack: 0.05, release: 0.6 });
+    for (let i = 0; i < 10; i++) this.#tone(t + Math.random() * 0.7, { f: rand(2500, 5000), peak: rand(0.03, 0.07), release: 0.12 });
+    this.#tone(t, { type: 'sawtooth', f: 90, to: 60, glide: 0.6, peak: 0.05, attack: 0.05, release: 0.6, lowpass: 600 });
+  }
+
+  /** Teeth chattering while he thaws. */
+  chatter(duration = 1.5) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (let tt = t; tt < t + duration; tt += rand(0.045, 0.07)) {
+      this.#burst(tt, { filter: 'bandpass', f: rand(2200, 3000), Q: 5, peak: 0.08, release: 0.012 });
+    }
+  }
+
+  /** The checkout scanner: beep! */
+  beep() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this.#tone(t, { type: 'square', f: 1850, peak: 0.07, attack: 0.005, release: 0.14, lowpass: 4000 });
+  }
+
+  /** Headbutting a lamp post: a ringing metal bonk. */
+  bonk() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const f = rand(380, 460);
+    [[1, 1.2, 0.18], [2.76, 0.7, 0.08], [5.4, 0.4, 0.05]].forEach(([r, dur, peak]) => this.#tone(t, { f: f * r, peak, release: dur }));
+    this.#tone(t, { f: 140, to: 60, glide: 0.1, peak: 0.35, release: 0.15 });
+  }
+
+  /** A shopping trolley rattling across the shop floor, and a clank when it stops. */
+  rattle(duration = 2) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (let tt = t; tt < t + duration; tt += rand(0.03, 0.06)) {
+      this.#burst(tt, { filter: 'bandpass', f: rand(1200, 2600), Q: 3, peak: rand(0.02, 0.06), release: 0.02 });
+    }
+    this.#tone(t + duration, { f: rand(1400, 1800), peak: 0.08, release: 0.4 });
+    this.#burst(t + duration, { filter: 'bandpass', f: 800, Q: 1, peak: 0.25, release: 0.08 });
+  }
+
+  /** Squelching into pindakaas or a pot of paint. */
+  squelch() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this.#burst(t, { f: 700, to: 150, glide: 0.2, Q: 2, peak: 0.4, attack: 0.01, release: 0.25 });
+    this.#tone(t, { f: 260, to: 90, glide: 0.18, peak: 0.12, attack: 0.01, release: 0.2 });
+  }
+
+  /** Thorns catching his clothes: a few quick scratches. */
+  scratch() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const k = this.#tire('scratch', 1);
+    for (let i = 0; i < 3; i++) {
+      this.#burst(t + i * rand(0.05, 0.09), { filter: 'bandpass', f: rand(1800, 2600), to: rand(4500, 6500), glide: 0.06, Q: 2, peak: 0.12 * k, attack: 0.005, release: 0.06 });
+    }
+  }
+
   // ------------------------------------------------------------ Lennie's voice
 
   /**
    * Lennie's cartoon voice: a buzzy tone through two vowel filters that glide
-   * from one vowel to the next. kind: 'hit' | 'fly' | 'land' | 'grunt' | 'grab' | 'cheer';
+   * from one vowel to the next. kind: 'hit' | 'fly' | 'land' | 'grunt' | 'grab' | 'zap' | 'cold' | 'hot' | 'yuck' | 'cheer';
    * each picks one of several lines, never the same one twice in a row.
    */
   voice(kind) {

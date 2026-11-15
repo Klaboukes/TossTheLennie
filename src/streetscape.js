@@ -15,6 +15,8 @@ export const STREET = {
   farVerge: [25.1, 30],
   shopFront: 30, // the supermarket's front wall (SHOP.z0)
 };
+// the street lamps along the verge, 40 cm from the road (effects.js bonks Lennie on them)
+export const LAMP_XS = [-14, 7, 28];
 const REACH = 70; // how far the street runs left and right (fog hides the ends)
 
 export function buildStreet(scene, world, physMats, { std, tex }) {
@@ -84,7 +86,7 @@ export function buildStreet(scene, world, physMats, { std, tex }) {
 
   const lampMat = std({ color: 0x7d838a, roughness: 0.5, metalness: 0.3 });
   const lampHead = std({ color: 0xfff6d8, emissive: 0x6b6040, roughness: 0.4 });
-  for (const x of [-14, 7, 28]) {
+  for (const x of LAMP_XS) {
     const z = STREET.verge[1] - 0.4;
     const pole = add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 7, 8), lampMat), true);
     pole.position.set(x, 3.5, z);
@@ -92,6 +94,7 @@ export function buildStreet(scene, world, physMats, { std, tex }) {
     arm.position.set(x, 6.95, z + 0.5);
     const head = add(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.55), lampHead), true);
     head.position.set(x, 6.88, z + 1.05);
+    head.userData.lampHead = true; // (kept apart from the glued scenery, so it can flicker when Lennie bonks the pole)
     solid([x - 0.1, 0, z - 0.1], [x + 0.1, 7, z + 0.1], 'tree');
   }
 

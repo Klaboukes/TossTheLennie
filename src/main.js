@@ -10,6 +10,8 @@ import { Sfx } from './audio.js';
 import { StuckGuard } from './guard.js';
 import { Replay } from './replay.js';
 import { Zap } from './zap.js';
+import { Effects } from './effects.js';
+import { createTrolley } from './trolley.js';
 import { createCars } from './cars.js';
 import { Challenges, CHALLENGES, CHALLENGE_BONUS } from './challenges.js';
 import { createSeeThrough } from './seethrough.js';
@@ -201,6 +203,7 @@ for (const m of Object.values(physMats)) {
 const { shop } = buildYard(scene, world, physMats);
 const house = buildHouse(scene, world, physMats);
 const cars = createCars(scene, world, physMats.car);
+const trolley = createTrolley(scene, world, physMats.hard);
 const lennie = new Ragdoll(world, scene, lennieMat);
 // A little shove so he flops over instead of landing on his feet.
 function nudge() {
@@ -284,8 +287,21 @@ addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'touch' || e.pointerType === 'mouse') document.body.classList.toggle('touch', e.pointerType === 'touch');
 }, { capture: true });
 
-const replay = new Replay(lennie, [...house.loose.items, ...cars.items]);
+const replay = new Replay(lennie, [...house.loose.items, ...cars.items, trolley]);
 const zap = new Zap(scene, lennie);
+// The other special effects (effects.js): frozen in the freezer, a bath,
+// hagelslag, the spin cycle, the hot hob, the brambles and the rest.
+const effects = new Effects({
+  scene, world, ragdoll: lennie, zap, sfx, trolley,
+  spots: [...house.spots, ...shop.spots],
+  hooks: {
+    pop: (position, text, cls) => popAt(position, text, cls),
+    // counts towards this toss's bonus (houseBonuses)
+    feat: (id) => { if (toss.state === 'flying' || toss.state === 'held') toss.fx.add(id); },
+    free: () => !grab && !sling && !replay.playing,
+    enabled: () => !replay.playing,
+  },
+});
 const challenges = new Challenges();
 const hint = { on: true }; // the "Grab me!" bubble over Lennie, until he's first grabbed (and at each turn)
 
@@ -448,6 +464,7 @@ const toss = {
   toys: 0, // toys knocked out of the TV cabinet
   dishes: 0, // plates, mugs and glasses smashed
   cars: 0, // times a passing car sent him flying
+  fx: new Set(), // special effects (effects.js): 'frozen', 'splash', 'trolley'...
   stairs: new Set(),
   startLevel: null,
   startInside: false,
@@ -467,6 +484,7 @@ function resetChain() {
   toss.toys = 0;
   toss.dishes = 0;
   toss.cars = 0;
+  toss.fx = new Set();
   toss.stairs = new Set();
   toss.startLevel = null;
   toss.startInside = false;
@@ -480,7 +498,7 @@ const spots = [...house.spots, ...shop.spots];
 // comes to rest in one, the score card says so, so there's always a new one to hunt for.
 // (Both beds are one spot, and so on: it's the ids that count.)
 const SPOTS_KEY = 'toss-the-lennie:spots';
-const ALL_SPOTS = new Set([...spots.map((s) => s.id), 'tree', 'bush', 'trampnap']);
+const ALL_SPOTS = new Set([...spots.map((s) => s.id), 'tree', 'bush', 'brambles', 'trampnap']);
 const spotsFound = new Set();
 try {
   for (const id of JSON.parse(localStorage.getItem(SPOTS_KEY) ?? '[]')) if (ALL_SPOTS.has(id)) spotsFound.add(id);
@@ -539,6 +557,25 @@ function isHanging(center) {
   return center.y > 1.5 || (center.y > 0.5 && lennie.bodies.some((b) => house.isInside(b.position)));
 }
 
+// The special effects' bonuses (effects.js), each once a toss.
+const FX_BONUSES = [
+  ['frozen', 'Frozen solid!', 400],
+  ['splash', 'Splash!', 150],
+  ['hagelslag', 'Hagelslag shower!', 300],
+  ['spin', 'Spin cycle!', 350],
+  ['hotplate', 'Hot seat!', 300],
+  ['piano', 'Piano crash!', 200],
+  ['pillow', 'Pillow burst!', 250],
+  ['stink', 'Stinky Lennie!', 200],
+  ['paint', 'Paint job!', 300],
+  ['sticky', 'Sticky Lennie!', 250],
+  ['stuck', 'Stuck to the wall!', 300],
+  ['sint', 'Sinterklaas hat!', 300],
+  ['lamp', 'Bonked a lamp post!', 300],
+  ['trolley', 'Trolley ride!', 500],
+  ['scratched', 'Scratched by brambles!', 200],
+];
+
 /** The feats of a toss, each with an id that challenges can look for. */
 function houseBonuses(center) {
   const bonuses = [];
@@ -576,10 +613,12 @@ function houseBonuses(center) {
     const n = Math.min(toss.trampoline, 5);
     add('trampoline', n > 1 ? `Trampoline ×${n}` : 'Trampoline!', 80 * n);
   }
+  for (const [id, label, value] of FX_BONUSES) if (toss.fx.has(id)) add(id, label, value);
   // Where he came to rest: a piece of furniture, a tree, a bush...
   const spot = landingSpot();
   const touched = touching();
   if (spot) add(spot.id, spot.label, spot.value, spot.say);
+  else if (touched.has('bramble')) add('brambles', 'In the brambles!', 350, 'AUW!');
   else if (touched.has('leaves') && center.y > 2.2) add('tree', 'Stuck in a tree!', 500, 'HELP!');
   else if (touched.has('leaves')) add('bush', 'In the bushes', 150, 'RUSTLE!');
   else if (touched.has('trampoline')) add('trampnap', 'Napping on the trampoline', 200, 'ZZZ');
@@ -587,7 +626,7 @@ function houseBonuses(center) {
 }
 
 function finishToss() {
-  if (toss.maxSpeed < MIN_TOSS_SPEED && !toss.smashed && !toss.doors && !toss.tv && !toss.zaps && !toss.cars) {
+  if (toss.maxSpeed < MIN_TOSS_SPEED && !toss.smashed && !toss.doors && !toss.tv && !toss.zaps && !toss.cars && !toss.fx.size) {
     toss.state = 'idle';
     replay.stop(false);
     resetChain();
@@ -688,6 +727,7 @@ const BUMP = {
   moped: ['Vroom vroom!', 'Beep beep!', 'Helmet on!', 'Mind the paintwork!'],
   junk: ['Junk corner!', 'Out with the rubbish!', 'Bin day!', 'Recycled!'],
   trash: ['Bin bag!', 'Pee-yew!', 'Smells like Lennie!'],
+  bramble: ['Thorny!', 'Prickly!', 'Into the brambles!'],
 };
 function bumpLine(partName, kind, soft) {
   if (soft && BUMP[kind]) return pickLine(BUMP[kind]);
@@ -729,6 +769,7 @@ lennie.onCollide = (partName, e) => {
     return;
   }
   if (surf.kind === 'tv') hitTV(surf.piece, e, v, now);
+  if (v > 1) effects.onHit(partName, e.target, contactPoint(e), v, surf, e.contact.ni.y);
   if (surf.kind === 'door' && !surf.piece.broken && v > DOOR_CRACK_SPEED) {
     const door = surf.piece;
     // The cooldown stops one impact (several limbs at once) from counting twice.
@@ -1079,6 +1120,7 @@ function isAirborne() {
 }
 
 function startGrab(pick, pointerId, pointerType = 'mouse') {
+  effects.grabbed();
   const part = lennie.parts[pick.name];
   const p = pick.hit.point;
   const local = part.body.pointToLocalFrame(new CANNON.Vec3(p.x, p.y, p.z));
@@ -1207,6 +1249,7 @@ let slingAngle = SLING_ANGLE.start;
 function startSling(pick, e) {
   // Still rolling from the last toss: that one ends here.
   if (toss.state === 'flying') finishToss();
+  effects.grabbed();
   const part = lennie.parts[pick.name];
   const p = pick.hit.point;
   const local = part.body.pointToLocalFrame(new CANNON.Vec3(p.x, p.y, p.z));
@@ -2008,6 +2051,7 @@ function dropLennie(level) {
   stopReplay();
   replay.stop(false);
   const p = level === SHOP_DROP ? shop.spawnPoint() : house.spawnPoint(level);
+  effects.clear(); // (before he's moved: it lets go of anything holding him, frozen or stuck)
   lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
   zap.clear();
   guard.forget();
@@ -2748,6 +2792,7 @@ function subStep(h) {
     launchByTrampoline(trampHit);
     trampHit = 0;
   }
+  effects.afterStep();
   if (aim.guide) guideLaunch();
   const guarded = guard.check();
   if (guarded === 'lost') rescueLost();
@@ -2961,6 +3006,7 @@ function tick(dt, now) {
   blobShadow.update(lennieOnScreen(_blobCenter));
   updateShards(dt * timeScale);
   zap.update(dt * timeScale, !replay.playing);
+  effects.update(dt * timeScale, !replay.playing);
   if (!replay.playing) {
     shop.update(dt * timeScale);
     house.update(dt * timeScale);
@@ -2975,7 +3021,7 @@ requestAnimationFrame(frame);
 // Handy for debugging from the console. advance() runs the game loop by hand,
 // e.g. when the tab is in the background and requestAnimationFrame is paused.
 window.lennie = {
-  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, cars, replay,
+  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, effects, trolley, cars, replay,
   advance(seconds) {
     for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60, performance.now());
   },

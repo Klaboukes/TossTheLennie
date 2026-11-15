@@ -308,4 +308,62 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
     b.surface = { kind: 'leaves' };
     world.addBody(b);
   }
+
+  // ------------------------------------------------------------ brambles along the right-hand fence, behind the trampoline
+  // A thorny tangle of blackberry bushes between the lounge set and the bins:
+  // dark leaves, arching red-brown canes with thorns, and berries. They don't
+  // bounce him like the other bushes: they grab him and scratch him (effects.js).
+  {
+    const R = { x: 5.38, z0: -14.95, z1: -12.5 };
+    let bs = 41;
+    const r = () => ((bs = (bs * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const leaves = [0x2f4f26, 0x3a5a2a, 0x45662f, 0x34502a].map((c) => std({ color: c, flatShading: true }));
+    const cane = std({ color: 0x5e2c2a, roughness: 0.8 });
+    const thorn = std({ color: 0x8a6a4a, roughness: 0.7 });
+    const berries = [0x22102a, 0x2c1236, 0x22102a, 0xa3232d].map((c) => std({ color: c, roughness: 0.35 }));
+    for (let z = R.z0 + 0.35; z <= R.z1 - 0.3; z += 0.42) {
+      const rr = 0.36 + r() * 0.16;
+      const blob = add(new THREE.Mesh(new THREE.IcosahedronGeometry(rr, 1), leaves[Math.floor(r() * leaves.length)]));
+      blob.scale.set(0.95, 1.15, 1);
+      blob.position.set(R.x + (r() - 0.5) * 0.15, rr * 1.0, z);
+      const top = add(new THREE.Mesh(new THREE.IcosahedronGeometry(rr * 0.65, 1), leaves[Math.floor(r() * leaves.length)]));
+      top.position.set(R.x - 0.05 + (r() - 0.5) * 0.15, rr * 1.75, z + (r() - 0.5) * 0.25);
+    }
+    // canes arching out of the tangle towards the lawn, thorns along them
+    for (let i = 0; i < 11; i++) {
+      const z = R.z0 + 0.2 + (i / 10) * (R.z1 - R.z0 - 0.4) + (r() - 0.5) * 0.15;
+      const rad = 0.32 + r() * 0.25;
+      const arc = Math.PI * (0.55 + r() * 0.25);
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(new THREE.TorusGeometry(rad, 0.011, 4, 12, arc), cane));
+      for (let k = 1; k <= 5; k++) {
+        const a = (arc * k) / 6;
+        const t = new THREE.Mesh(new THREE.ConeGeometry(0.009, 0.035, 4), thorn);
+        t.position.set(Math.cos(a) * (rad + 0.02), Math.sin(a) * (rad + 0.02), 0);
+        t.rotation.z = a - Math.PI / 2;
+        g.add(t);
+      }
+      // standing up out of the bush, curving over towards -x
+      g.position.set(R.x - 0.1 - rad, 0.35 + r() * 0.35, z);
+      g.rotation.y = (r() - 0.5) * 0.5;
+      // (straight into the scene, so batching.js glues them together with the rest)
+      g.updateMatrix();
+      for (const m of [...g.children]) {
+        m.applyMatrix4(g.matrix);
+        add(m);
+      }
+    }
+    // blackberries (a few still red) on the side facing the garden
+    for (let i = 0; i < 26; i++) {
+      const z = R.z0 + 0.2 + r() * (R.z1 - R.z0 - 0.4);
+      const y = 0.35 + r() * 0.75;
+      const berry = add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.022, 1), berries[Math.floor(r() * berries.length)]), false);
+      berry.position.set(R.x - 0.42 - r() * 0.08 + Math.abs(y - 0.55) * 0.25, y, z);
+    }
+    // (stops short of the fence's thicker physics at x 5.85)
+    const b = new CANNON.Body({ mass: 0, material: physMats.branches ?? physMats.soft, shape: new CANNON.Box(new CANNON.Vec3(0.42, 0.62, (R.z1 - R.z0) / 2)) });
+    b.position.set(5.42, 0.62, (R.z0 + R.z1) / 2);
+    b.surface = { kind: 'bramble', sound: 'leaves' };
+    world.addBody(b);
+  }
 }
