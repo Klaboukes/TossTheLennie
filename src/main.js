@@ -1728,8 +1728,13 @@ const controls = new OrbitControls(camera, canvas);
 controls.target.set(-0.6, 0.5, -2.5); // where Lennie starts (house.spawnPoint(0))
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.minDistance = 0.8;
-controls.maxDistance = 32;
+// The zoom range is kept on camWanted (see updateCamera), not by the controls:
+// up against a wall the camera is held nearer than CAM_ZOOM.min, and the
+// controls would snap it back out to their own minimum on every scroll,
+// which would read as a big zoom out (even when scrolling in).
+const CAM_ZOOM = { min: 0.8, max: 32 };
+controls.minDistance = 0.01;
+controls.maxDistance = Infinity;
 // No further round than level: below that the camera would dip under the
 // floor or ground and get squashed up against Lennie, looking up.
 controls.maxPolarAngle = Math.PI / 2;
@@ -1789,8 +1794,14 @@ function updateCamera(dt) {
       // The controls zoom straight away (scroll, pinch), between frames: a
       // camera nearer or further than where it was left is a zoom, by that
       // much, of the distance the player chose.
+      // When a wall or the edge of the play area is holding the camera in
+      // nearer than that, zooming in starts from where the camera is, so it
+      // moves in straight away instead of first using up the distance it
+      // can't get to anyway.
       if (Math.abs(d - camShown) > 1e-4 && camShown > 1e-4) {
-        camWanted = clamp(camWanted * (d / camShown), controls.minDistance, controls.maxDistance);
+        const zoom = d / camShown;
+        const from = zoom < 1 ? Math.min(camWanted, camShown) : camWanted;
+        camWanted = clamp(from * zoom, CAM_ZOOM.min, CAM_ZOOM.max);
       }
       camera.position.copy(controls.target).addScaledVector(_arm.divideScalar(d), camWanted);
     }
@@ -1848,9 +1859,10 @@ function updateCamera(dt) {
     controls.target.y = CAM_MIN_Y;
   }
   _arm.subVectors(camera.position, controls.target);
-  camWanted = _arm.length();
-  if (camWanted < 1e-4) return;
-  _arm.divideScalar(camWanted);
+  const armLength = _arm.length();
+  if (armLength < 1e-4) return;
+  _arm.divideScalar(armLength);
+  camWanted = clamp(armLength, CAM_ZOOM.min, CAM_ZOOM.max);
   // Only when the spot the camera wants is inside furniture, a bush or a tree
   // does it move in, gliding to just in front of it; once that spot is free
   // again it glides back out. Things merely in between turn see-through, so
