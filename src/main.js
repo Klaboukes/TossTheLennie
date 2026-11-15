@@ -74,13 +74,6 @@ const AIM_GUIDE_TIME = 0.12;
 const AIM_LOFT = { start: 0.9, min: 0.1, max: 8, step: 0.3 }; // arc top, metres above the higher end
 const AIM_CLICK_PX = 6; // a press that moves further than this orbits the camera instead of throwing
 const SOFT = new Set(['cushion', 'leaves', 'trampoline']);
-// Scenery the camera mustn't end up inside. Walls, floors and roofs fade out of
-// the way instead, so they aren't on this list. (Things merely between the
-// camera and Lennie don't push the camera: they turn see-through, seethrough.js.)
-// A block is a neighbour's house, which is solid and doesn't fade; a shed is
-// Lennie's (stuffed) garage, solid too.
-const CAM_BLOCKERS = new Set(['furniture', 'cushion', 'leaves', 'tree', 'trampoline', 'block', 'shed']);
-const SOLID_BLOCKS = new Set(['block', 'shed']);
 const AIM_TAP_PX = 44; // on a touch screen, a second tap this close to the first one throws
 // The slingshot: grab Lennie and pull back, away from where he should go.
 const SLING = {
@@ -1728,13 +1721,12 @@ const controls = new OrbitControls(camera, canvas);
 controls.target.set(-0.6, 0.5, -2.5); // where Lennie starts (house.spawnPoint(0))
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-// The zoom range is kept on camWanted (see updateCamera), not by the controls:
-// up against a wall the camera is held nearer than CAM_ZOOM.min, and the
-// controls would snap it back out to their own minimum on every scroll,
-// which would read as a big zoom out (even when scrolling in).
-const CAM_ZOOM = { min: 0.8, max: 32 };
-controls.minDistance = 0.01;
-controls.maxDistance = Infinity;
+// The camera goes wherever it's turned or zoomed: inside furniture, trees,
+// the garage, the neighbours' houses or past the edge of the play area.
+// Whatever is between it and Lennie, or right in front of the lens, turns
+// see-through instead (seethrough.js).
+controls.minDistance = 0.8;
+controls.maxDistance = 32;
 // No further round than level: below that the camera would dip under the
 // floor or ground and get squashed up against Lennie, looking up.
 controls.maxPolarAngle = Math.PI / 2;
@@ -1754,7 +1746,7 @@ function focusLennie(dur = 0.7) {
   dir.normalize();
   if (dir.y < 0.25) dir.y = 0.25;
   dir.normalize();
-  const toCam = clampInWorld(to.clone().addScaledVector(dir, dist), 0.3);
+  const toCam = to.clone().addScaledVector(dir, dist);
   camAnim = { t: 0, dur, fromT: controls.target.clone(), toT: to, fromC: camera.position.clone(), toC: toCam };
 }
 
@@ -1763,49 +1755,9 @@ const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _move = new THREE.Vector3();
 
-// The camera stays inside the play area like on a spring: when turning it
-// would take it past an edge or under the ground, it slides in closer to what
-// it's looking at instead of getting stuck, and moves back out once there's
-// room again. camWanted is the distance the player chose (by zooming).
-let camWanted = null;
-const _arm = new THREE.Vector3();
-const CAM_BOX = { margin: 0.2, top: 30 };
 const CAM_MIN_Y = 0.4; // the lowest the camera looks at (and, being no lower than level, looks from)
-function armLimit(o, dir) {
-  const h = YARD.half - CAM_BOX.margin;
-  const lo = [-h, CAM_BOX.margin, -h];
-  const hi = [h, CAM_BOX.top, YARD.front - CAM_BOX.margin];
-  const oa = [o.x, o.y, o.z];
-  const da = [dir.x, dir.y, dir.z];
-  let t = Infinity;
-  for (let i = 0; i < 3; i++) {
-    if (da[i] > 1e-6) t = Math.min(t, (hi[i] - oa[i]) / da[i]);
-    else if (da[i] < -1e-6) t = Math.min(t, (lo[i] - oa[i]) / da[i]);
-  }
-  return Math.max(t, 0.05);
-}
 
 function updateCamera(dt) {
-  // put the camera back out at the chosen distance before the controls turn it
-  if (camWanted !== null) {
-    _arm.subVectors(camera.position, controls.target);
-    const d = _arm.length();
-    if (d > 1e-4) {
-      // The controls zoom straight away (scroll, pinch), between frames: a
-      // camera nearer or further than where it was left is a zoom, by that
-      // much, of the distance the player chose.
-      // When a wall or the edge of the play area is holding the camera in
-      // nearer than that, zooming in starts from where the camera is, so it
-      // moves in straight away instead of first using up the distance it
-      // can't get to anyway.
-      if (Math.abs(d - camShown) > 1e-4 && camShown > 1e-4) {
-        const zoom = d / camShown;
-        const from = zoom < 1 ? Math.min(camWanted, camShown) : camWanted;
-        camWanted = clamp(from * zoom, CAM_ZOOM.min, CAM_ZOOM.max);
-      }
-      camera.position.copy(controls.target).addScaledVector(_arm.divideScalar(d), camWanted);
-    }
-  }
   // During a toss the camera starts chasing Lennie once he's about to fly out
   // of the picture (on a narrow phone screen that's almost at once), and keeps
   // at it until he lands.
@@ -1858,105 +1810,6 @@ function updateCamera(dt) {
     camera.position.y += CAM_MIN_Y - controls.target.y;
     controls.target.y = CAM_MIN_Y;
   }
-  _arm.subVectors(camera.position, controls.target);
-  const armLength = _arm.length();
-  if (armLength < 1e-4) return;
-  _arm.divideScalar(armLength);
-  camWanted = clamp(armLength, CAM_ZOOM.min, CAM_ZOOM.max);
-  // Only when the spot the camera wants is inside furniture, a bush or a tree
-  // does it move in, gliding to just in front of it; once that spot is free
-  // again it glides back out. Things merely in between turn see-through, so
-  // turning round in a cramped aisle doesn't make the camera hop in and out.
-  const free = freeDistance(controls.target, _arm, camWanted);
-  const wasFree = camFree >= camWantedBefore - 1e-3; // not held in last frame, so zooming out isn't slowed down
-  camFree = Math.min(camFree, camWanted);
-  if (wasFree && free >= camFree) {
-    camFree = free;
-    camFreeSpeed = 0;
-  } else {
-    camFree = glide(camFree, free, free < camFree ? 0.22 : 0.5, dt);
-  }
-  camWantedBefore = camWanted;
-  camShown = Math.min(camWanted, armLimit(controls.target, _arm), camFree);
-  camera.position.copy(controls.target).addScaledVector(_arm, camShown);
-}
-
-let camShown = 0; // how far out the camera was left last frame
-let camFree = 1e3; // how far out the camera may be right now (glides towards freeDistance)
-let camFreeSpeed = 0;
-let camWantedBefore = 0;
-/** Moves camFree towards `to` like on a soft spring that doesn't overshoot, taking about `time` seconds. */
-function glide(from, to, time, dt) {
-  const w = 2 / time;
-  const x = w * dt;
-  const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
-  const change = from - to;
-  const temp = (camFreeSpeed + w * change) * dt;
-  camFreeSpeed = (camFreeSpeed - w * temp) * decay;
-  return to + (change + temp) * decay;
-}
-const CAM_RADIUS = 0.3; // the camera keeps this far from furniture, bushes and trees
-let camBoxes = [];
-let camBoxesFor = -1;
-/** Furniture, bushes and trees as boxes, grown by CAM_RADIUS: [minX, minY, minZ, maxX, maxY, maxZ]. */
-function camBlockers() {
-  if (camBoxesFor === world.bodies.length) return camBoxes;
-  camBoxesFor = world.bodies.length;
-  camBoxes = [];
-  for (const b of world.bodies) {
-    if (b.mass !== 0 || !CAM_BLOCKERS.has(b.surface?.kind)) continue;
-    b.updateAABB();
-    const { lowerBound: lo, upperBound: hi } = b.aabb;
-    const r = CAM_RADIUS;
-    // [...grown box, then for a neighbour's house its true size]
-    const box = [lo.x - r, lo.y - r, lo.z - r, hi.x + r, hi.y + r, hi.z + r];
-    if (SOLID_BLOCKS.has(b.surface.kind)) box.push(lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
-    camBoxes.push(box);
-  }
-  return camBoxes;
-}
-
-/** Whether `o` is inside a neighbour's house itself (not just near it). */
-const inBlock = (box, oa) => box.length > 6 && oa.every((v, i) => v > box[6 + i] && v < box[9 + i]);
-
-/**
- * How far out from `o` along `dir` (at most `want`) the camera can be without
- * being inside furniture, a bush or a tree. Something Lennie is lying on or
- * leaning against (`o` is in it) doesn't count: that part turns see-through.
- * A neighbour's house does count, unless `o` is inside it (flown in with WASD):
- * it's far too big to see through.
- */
-function freeDistance(o, dir, want) {
-  const oa = [o.x, o.y, o.z];
-  const da = [dir.x, dir.y, dir.z];
-  const boxes = camBlockers();
-  let t = want;
-  for (let pass = 0; pass < 8; pass++) {
-    let moved = false;
-    for (const box of boxes) {
-      let enter = -Infinity;
-      let exit = Infinity;
-      for (let i = 0; i < 3 && enter < exit; i++) {
-        if (Math.abs(da[i]) < 1e-9) {
-          if (oa[i] < box[i] || oa[i] > box[i + 3]) enter = Infinity;
-          continue;
-        }
-        const s1 = (box[i] - oa[i]) / da[i];
-        const s2 = (box[i + 3] - oa[i]) / da[i];
-        enter = Math.max(enter, Math.min(s1, s2));
-        exit = Math.min(exit, Math.max(s1, s2));
-      }
-      if (enter >= exit) continue;
-      if (enter <= 0.05 && (box.length === 6 || inBlock(box, oa))) continue;
-      const stop = Math.max(enter, 0);
-      if (t > stop && t < exit) {
-        t = stop;
-        moved = true;
-      }
-    }
-    if (!moved) break;
-  }
-  return Math.max(t, 0.4);
 }
 
 // ---------------------------------------------------------------- buttons & keys

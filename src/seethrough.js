@@ -15,10 +15,12 @@ import * as THREE from 'three';
 // it costs nothing per object. Lennie's own materials are left alone.
 
 const REACH = 2.5; // metres around Lennie's middle that must stay visible (he's 1.90 m)
+const MIN_SHARE = 0.35; // the circle's radius is at least this share of the screen's longer side (so it's 70% of the screen across)
 const IN_FRONT = 0.3; // only cut what's at least this much closer to the camera than his middle
 const BELOW = 0.05; // nothing lower than this under his middle is cut
 const LENS = 0.45; // anything closer to the camera than this is cut
 const LENS_SOFT = 0.3; // ...fading in over this much further
+const HOLD = { px: 1.5, m: 0.01 }; // the cut-away stays put until Lennie or the camera moves more than this (pixels on screen, metres)
 
 const uniforms = {
   seeCenter: { value: new THREE.Vector2() }, // Lennie on screen, in drawing-buffer pixels
@@ -108,15 +110,25 @@ export function createSeeThrough(scene, renderer, skip) {
       sweepIn = 0.5;
     }
     renderer.getDrawingBufferSize(_size);
-    state.center.copy(center);
-    state.dist = camera.position.distanceTo(center);
+    const dist = camera.position.distanceTo(center);
     const v = _v.copy(center).project(camera);
-    state.on = v.z < 1 && state.dist > 1e-3;
-    state.cx = (v.x * 0.5 + 0.5) * _size.x;
-    state.cy = (v.y * 0.5 + 0.5) * _size.y;
-    const pxPerM = _size.y / 2 / (Math.max(state.dist, 0.3) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
-    state.radius = THREE.MathUtils.clamp(REACH * pxPerM, 0.18 * _size.y, 0.9 * _size.y);
-    state.floor = center.y - BELOW;
+    const on = v.z < 1 && dist > 1e-3;
+    const cx = (v.x * 0.5 + 0.5) * _size.x;
+    const cy = (v.y * 0.5 + 0.5) * _size.y;
+    const pxPerM = _size.y / 2 / (Math.max(dist, 0.3) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+    const minRadius = MIN_SHARE * Math.max(_size.x, _size.y);
+    const radius = THREE.MathUtils.clamp(REACH * pxPerM, minRadius, Math.max(0.9 * _size.y, minRadius));
+    const floor = center.y - BELOW;
+    // Lennie lying still still trembles a tenth of a millimetre or so every
+    // frame. Following that would shift the dithered edges of the cut-away a
+    // hair each frame, and those speckles would flicker. So the cut-away only
+    // moves once something has really moved; then it jumps all at once.
+    const moved = on !== state.on || Math.hypot(cx - state.cx, cy - state.cy) > HOLD.px
+      || Math.abs(radius - state.radius) > HOLD.px || Math.abs(dist - state.dist) > HOLD.m
+      || Math.abs(floor - state.floor) > HOLD.m;
+    if (!moved) return;
+    state.center.copy(center);
+    Object.assign(state, { dist, on, cx, cy, radius, floor });
     uniforms.seeCenter.value.set(state.cx, state.cy);
     uniforms.seeRadius.value = state.radius;
     uniforms.seeDist.value = state.dist;

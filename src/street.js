@@ -179,7 +179,7 @@ export function buildNeighbours(kit, details) {
     floor.rotation.x = -Math.PI / 2;
     floor.position.set((x0 + x1) / 2, 0.01, 0);
     groups[0].add(floor);
-    // a solid block (not a wall that fades): the camera stays out of it
+    // a solid block for Lennie to bounce off (the camera may still go inside)
     body([x0, 0, OUT.z0], [x1, HOUSE.eaveY, OUT.z1], physMats.hard, { kind: 'block' });
 
     // ---- windows, door and panels (decoration on the facades)
