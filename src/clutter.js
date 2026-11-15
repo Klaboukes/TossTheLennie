@@ -1204,8 +1204,8 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   const hall = 'hall';
   put(hall, 'sneaker', -1.1, 0, 3.9, { yaw: 1.3 });
   put(hall, 'sneaker', -0.7, 0, 3.6, { yaw: 2.4 });
-  put(hall, 'shoeBlack', -1.57, 0, 4.1, { yaw: -0.4 });
-  put(hall, 'shoeBlack', -1.77, 0, 3.8, { yaw: 0.5 });
+  put(hall, 'shoeBlack', -2.35, 0, 2.45, { yaw: -0.4 }); // under the coat rack
+  put(hall, 'shoeBlack', -2.1, 0, 2.55, { yaw: 0.5 });
   put(hall, 'sockBlack', -2.45, 0, 2.2);
   put(hall, 'ball', -1.17, 0, 1.8);
 

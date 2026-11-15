@@ -58,8 +58,8 @@ export function buildYard(scene, world, physMats) {
   ground.surface = { kind: 'ground' };
   world.addBody(ground);
 
-  // a small garden path from the front door (house.js FRONT_DOOR is x −1.5 … −0.5) to the cycle path
-  const PATH = [-1.45, -0.55];
+  // a small garden path from the front door (house.js FRONT_DOOR is x −1.57 … −0.57) to the cycle path
+  const PATH = [-1.52, -0.62];
   const path = new THREE.Mesh(floorGeometry(PATH[0], 5.15, PATH[1], STREET.cycle[0]), std({ map: tex.stone }));
   path.position.y = 0.006;
   path.receiveShadow = true;

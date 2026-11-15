@@ -207,7 +207,7 @@ export const LAYOUT = {
   // `toiletFront` (z), under the canopy.
   toilet: [0, 2.2],
   toiletFront: 6.2,
-  door: [2.625, 3.625],
+  door: [2.555, 3.555],
   number: 3.8, // the house number's plaque, on the wall just past the door's frame, away from the toilet
   column: [4.925, 7.125],
   small: [[0.375, 1.075], [1.675, 2.875]],

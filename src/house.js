@@ -147,7 +147,7 @@ const BACK = [{ a: -3.5, b: -2.4 }, { a: 2.3, b: 3.4 }];
 // The convector heating trench runs in the floor under it.
 const BACK_GROUND = [{ a: -3.0, b: 0.65, sill: 0.55, bars: { v: [0.16], h: [] } }];
 const UTILITY_DOOR = [0.95, 2.0];
-const FRONT_DOOR = [-1.5, -0.5];
+const FRONT_DOOR = [-1.57, -0.57]; // its frame (0.07) stays just clear of the toilet and kitchen walls
 // The toilet sticks out of the front, as in the floor plan: a little brick
 // bump-out beside the front door, under the canopy, from the party wall to a
 // little short of the toilet's own wall, so the front door keeps a strip of
@@ -775,7 +775,7 @@ export function buildHouse(scene, world, physMats) {
     wall({ ...inner, run: 'z', at: GF.hallX, from: GF.hallZ + INT / 2, to: IN.z1, line: 'kitchenside-0', mats: { pos: paper('right'), neg: paper('hall') } });
     wall({
       ...inner, run: 'x', at: GF.hallZ, from: GF.stairX - INT / 2, to: GF.hallX + INT / 2, line: 'hallback-0',
-      openings: [door([-2.6, -1.5], false, true)], // a glass door
+      openings: [door([-1.58, -0.58], false, true)], // a glass door, filling the hall between the storage cupboard and the kitchen
       splits: [GF.toiletX],
       mats: { pos: paper('hall'), neg: (x) => paper(x < GF.toiletX ? 'storage' : 'left') },
     });
