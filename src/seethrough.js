@@ -7,6 +7,13 @@ import * as THREE from 'three';
 // right in front of the lens is cut the same way, so a cramped spot never
 // fills the screen with a close-up of a box.
 //
+// The circle is always centred on Lennie, but it's only big for scenery
+// close in front of him (the shelf or counter he's lying behind). Scenery
+// much nearer the camera, like a wall the camera is next to, is only cut in
+// a smaller circle that still clears all of him: a big hole there would sit
+// at the edge of the screen, away from him, and look like a window to
+// nowhere.
+//
 // Nothing below Lennie's middle is cut: the floor, bed or shelf he lies on
 // stays, and with the camera never lower than what it looks at, things below
 // him can't block the view of him anyway.
@@ -20,6 +27,10 @@ import * as THREE from 'three';
 
 const REACH = 2.5; // metres around Lennie's middle that must stay visible (he's 1.90 m)
 const MIN_SHARE = 0.35; // the circle's radius is at least this share of the screen's longer side (so it's 70% of the screen across)
+const NEAR_SHARE = 0.45; // scenery near the camera gets a circle at least this share of the big one...
+const NEAR_REACH = 1.3; // ...and at least this many metres around his middle, so all of him (1.90 m) stays clear
+const FULL_GAP = 0.8; // scenery up to this far in front of his middle gets the big circle
+const NEAR_GAP = 1.6; // scenery this far or further in front of him gets the smaller one (in between it shrinks)
 const IN_FRONT = 0.3; // only cut what's at least this much closer to the camera than his middle
 const BELOW = 0.05; // nothing lower than this under his middle is cut
 const LENS = 0.45; // anything closer to the camera than this is cut
@@ -28,7 +39,8 @@ const HOLD = { px: 1.5, m: 0.01 }; // the cut-away stays put until Lennie or the
 
 const uniforms = {
   seeCenter: { value: new THREE.Vector2() }, // Lennie on screen, in drawing-buffer pixels
-  seeRadius: { value: 0 }, // pixels
+  seeRadius: { value: 0 }, // pixels, for scenery close in front of him
+  seeRadiusNear: { value: 0 }, // pixels, for scenery near the camera
   seeDist: { value: 0 }, // camera to Lennie's middle
   seeFloor: { value: -1e3 }, // world height below which nothing is cut
   seeCeil: { value: 1e6 }, // world height from which up nothing is cut
@@ -46,6 +58,7 @@ const VERTEX_BODY = `
 const FRAGMENT_HEAD = `
 uniform vec2 seeCenter;
 uniform float seeRadius;
+uniform float seeRadiusNear;
 uniform float seeDist;
 uniform float seeFloor;
 uniform float seeCeil;
@@ -59,7 +72,8 @@ const FRAGMENT_BODY = `
     float seeCut = 1.0 - smoothstep(${LENS.toFixed(3)}, ${(LENS + LENS_SOFT).toFixed(3)}, seeD);
     if (seeOn > 0.5) {
       float seeR = length(gl_FragCoord.xy - seeCenter);
-      float seeRing = 1.0 - smoothstep(seeRadius * 0.75, seeRadius, seeR);
+      float seeRad = mix(seeRadius, seeRadiusNear, smoothstep(${FULL_GAP.toFixed(3)}, ${NEAR_GAP.toFixed(3)}, seeDist - seeD));
+      float seeRing = 1.0 - smoothstep(seeRad * 0.75, seeRad, seeR);
       float seeNear = 1.0 - smoothstep(seeDist - ${(IN_FRONT + 0.35).toFixed(3)}, seeDist - ${IN_FRONT.toFixed(3)}, seeD);
       seeCut = max(seeCut, seeRing * seeNear);
     }
@@ -86,7 +100,7 @@ export function createSeeThrough(scene, renderer, skip) {
   let sweepIn = 0;
   const _size = new THREE.Vector2();
   const _v = new THREE.Vector3();
-  const state = { center: new THREE.Vector3(), cx: 0, cy: 0, radius: 0, dist: 0, floor: -1e3, ceil: 1e6, on: false };
+  const state = { center: new THREE.Vector3(), cx: 0, cy: 0, radius: 0, radiusNear: 0, dist: 0, floor: -1e3, ceil: 1e6, on: false };
 
   function patch(mat) {
     if (patched.has(mat) || kept.has(mat)) return;
@@ -127,6 +141,7 @@ export function createSeeThrough(scene, renderer, skip) {
     const pxPerM = _size.y / 2 / (Math.max(dist, 0.3) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
     const minRadius = MIN_SHARE * Math.max(_size.x, _size.y);
     const radius = THREE.MathUtils.clamp(REACH * pxPerM, minRadius, Math.max(0.9 * _size.y, minRadius));
+    const radiusNear = THREE.MathUtils.clamp(NEAR_REACH * pxPerM, NEAR_SHARE * radius, radius);
     const floor = center.y - BELOW;
     ceil = Math.min(ceil, 1e6);
     // Lennie lying still still trembles a tenth of a millimetre or so every
@@ -134,13 +149,14 @@ export function createSeeThrough(scene, renderer, skip) {
     // hair each frame, and those speckles would flicker. So the cut-away only
     // moves once something has really moved; then it jumps all at once.
     const moved = on !== state.on || Math.hypot(cx - state.cx, cy - state.cy) > HOLD.px
-      || Math.abs(radius - state.radius) > HOLD.px || Math.abs(dist - state.dist) > HOLD.m
+      || Math.abs(radius - state.radius) > HOLD.px || Math.abs(radiusNear - state.radiusNear) > HOLD.px || Math.abs(dist - state.dist) > HOLD.m
       || Math.abs(floor - state.floor) > HOLD.m || ceil !== state.ceil;
     if (!moved) return;
     state.center.copy(center);
-    Object.assign(state, { dist, on, cx, cy, radius, floor, ceil });
+    Object.assign(state, { dist, on, cx, cy, radius, radiusNear, floor, ceil });
     uniforms.seeCenter.value.set(state.cx, state.cy);
     uniforms.seeRadius.value = state.radius;
+    uniforms.seeRadiusNear.value = state.radiusNear;
     uniforms.seeDist.value = state.dist;
     uniforms.seeFloor.value = state.floor;
     uniforms.seeCeil.value = state.ceil;
@@ -159,7 +175,8 @@ export function createSeeThrough(scene, renderer, skip) {
     const v = _v.copy(point).project(camera);
     const x = (v.x * 0.5 + 0.5) * _size.x - state.cx;
     const y = (v.y * 0.5 + 0.5) * _size.y - state.cy;
-    return Math.hypot(x, y) < state.radius * 0.8;
+    const t = THREE.MathUtils.smoothstep(state.dist - d, FULL_GAP, NEAR_GAP);
+    return Math.hypot(x, y) < THREE.MathUtils.lerp(state.radius, state.radiusNear, t) * 0.8;
   }
 
   sweep();
