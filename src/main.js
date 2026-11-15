@@ -755,6 +755,7 @@ lennie.onCollide = (partName, e) => {
   }
 
   const flying = toss.state === 'flying';
+  if (flying && surf.kind === 'trampoline' && v > TRAMP_MIN_SPEED && Math.abs(e.contact.ni.y) > 0.7) trampHit = Math.max(trampHit, v);
   if (flying && surf.kind === 'stair' && v > 1.5) toss.stairs.add(surf.id);
   if (flying && v > BOUNCE_IMPACT && now - toss.lastBounceAt > 250) {
     toss.bounces += 1;
@@ -843,6 +844,30 @@ function launchByCar(car) {
   lastVoiceAt = performance.now();
   lennie.setExpression('ouch', 1);
   popAt(c.setY(c.y + 0.8), pickLine(CAR_LINES), 'big');
+}
+
+// The trampoline: the springy contact alone only bounces the limb that lands
+// on it while the rest of the floppy body drags it back down, so the whole of
+// Lennie gets sent back up (after the physics step, subStep), nearly as fast
+// as he came down. Each bounce is a bit lower, so he still comes to rest.
+const TRAMP_MIN_SPEED = 3; // a slower landing just sinks in
+const TRAMP_KEEP = 0.7; // share of the landing speed he goes back up with
+const TRAMP_KICK = 0.5; // plus this, so a short drop still gets a real bounce
+const TRAMP_MAX_UP = 12;
+let trampHit = 0;
+let trampLaunchAt = 0;
+
+function launchByTrampoline(v) {
+  const now = performance.now();
+  if (now - trampLaunchAt < 200) return; // one launch per landing, not one per limb
+  trampLaunchAt = now;
+  const up = Math.min(TRAMP_MAX_UP, v * TRAMP_KEEP + TRAMP_KICK);
+  for (const b of bodies) {
+    if (b.velocity.y < up) b.velocity.y = up;
+    // a little less sideways drift, so he tends to stay above the mat
+    b.velocity.x *= 0.85;
+    b.velocity.z *= 0.85;
+  }
 }
 
 let lastMessAt = 0;
@@ -2696,6 +2721,10 @@ function subStep(h) {
   if (carHit) {
     launchByCar(carHit);
     carHit = null;
+  }
+  if (trampHit) {
+    launchByTrampoline(trampHit);
+    trampHit = 0;
   }
   if (aim.guide) guideLaunch();
   const guarded = guard.check();
