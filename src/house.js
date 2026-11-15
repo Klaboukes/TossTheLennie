@@ -662,7 +662,14 @@ export function buildHouse(scene, world, physMats) {
   // lies in one plane with neither.
   const FOUND = [M.trim, M.trim, M.base, M.base, M.trim, M.trim];
   const FOUND_TOP = 0.004;
-  box([OUT.x0, -0.3, OUT.z0], [OUT.x1, FOUND_TOP, OUT.z1], FOUND, { story: 0 });
+  // Its raised top layer stops 1 cm inside the walls' outer faces: level with them,
+  // its sides lay in one plane with the walls' bottom 4 mm and flickered. The rest
+  // stays under the grass, where the top layer's underside faces away from its top.
+  const foundation = (x0, z0, x1, z1) => {
+    box([x0, -0.3, z0], [x1, -0.005, z1], FOUND, { story: 0 });
+    box([x0 + 0.01, -0.005, z0 + 0.01], [x1 - 0.01, FOUND_TOP, z1 - 0.01], FOUND, { story: 0 });
+  };
+  foundation(OUT.x0, OUT.z0, OUT.x1, OUT.z1);
   for (let k = 1; k < HOUSE.stories; k++) {
     const top = k * H;
     const line = `slab-${k}`;
@@ -778,7 +785,7 @@ export function buildHouse(scene, world, physMats) {
     const zo = U.z0 - EXT / 2;
     const zi = U.z0 + EXT / 2; // inner face of its back wall
     const ext = { y0: 0, y1: U.top, story: 0, thick: EXT, physThick: EXT_PHYS };
-    box([xo, -0.3, zo], [OUT.x1, FOUND_TOP, OUT.z0], FOUND, { story: 0 }); // foundation
+    foundation(xo, zo, OUT.x1, OUT.z0);
     const floor = new THREE.Mesh(floorGeometry(U.x0 + EXT / 2, zi, IN.x1, OUT.z0), floorMat(room));
     floor.position.y = 0.01;
     floor.receiveShadow = true;
@@ -820,7 +827,7 @@ export function buildHouse(scene, world, physMats) {
     const zi = G.z0 + EXT / 2; // inner face of its back wall
     const zu = G.z1 - EXT / 2; // the utility room's back wall
     const ext = { y0: 0, y1: G.top, story: 0, thick: EXT, physThick: EXT_PHYS };
-    box([xo, -0.3, zo], [OUT.x1, FOUND_TOP, zu], FOUND, { story: 0 }); // foundation
+    foundation(xo, zo, OUT.x1, zu);
     const floor = new THREE.Mesh(floorGeometry(G.x0 + EXT / 2, zi, IN.x1, zu), floorMat(room));
     floor.position.y = 0.01;
     floor.receiveShadow = true;
@@ -858,7 +865,7 @@ export function buildHouse(scene, world, physMats) {
     const off = (EXT_PHYS - EXT) / 2;
     const zi = T.z1 - EXT; // inner face of its front
     const ext = { y0: 0, y1: T.top, story: 0, thick: EXT, physThick: EXT_PHYS };
-    box([T.x0, -0.3, OUT.z1], [T.x1, FOUND_TOP, T.z1], FOUND, { story: 0 }); // foundation
+    foundation(T.x0, OUT.z1, T.x1, T.z1);
     const floor = new THREE.Mesh(floorGeometry(IN.x0, IN.z1, T.x1 - EXT, zi), floorMat(ROOMS[0].toilet));
     floor.position.y = 0.01;
     floor.receiveShadow = true;
