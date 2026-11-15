@@ -79,10 +79,12 @@ const NL = {
   'Go!': 'Daar gaan we!',
   'Free play': 'Vrij spel',
   'Take turns': 'Om de beurt',
-  'Everyone gets 5 tosses, one after the other. Before each turn the house is fixed and Lennie goes back downstairs. Highest total wins!':
-    'Iedereen krijgt 5 worpen, na elkaar. Voor elke beurt wordt het huis gemaakt en gaat Lennie terug naar beneden. Wie de meeste punten heeft, wint!',
+  'Everyone gets the same number of tosses, one after the other. Before each turn the house is fixed and Lennie goes back downstairs. Highest total wins!':
+    'Iedereen krijgt evenveel worpen, na elkaar. Voor elke beurt wordt het huis gemaakt en gaat Lennie terug naar beneden. Wie de meeste punten heeft, wint!',
   'How many players': 'Hoeveel spelers',
   '{n} players': '{n} spelers',
+  'How many tosses each': 'Hoeveel worpen per speler',
+  '{n} tosses': '{n} worpen',
   'Start!': 'Start!',
   'Cancel': 'Annuleren',
   'Player {n}': 'Speler {n}',

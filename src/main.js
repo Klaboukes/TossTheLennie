@@ -90,7 +90,7 @@ const SLING = {
 };
 const SLING_ANGLE = { start: 35, min: 5, max: 80, step: 5 }; // launch angle above level, degrees
 const BIG_TOSS = 1500; // from this score a toss gets confetti and a "Big toss!" sticker
-const TOSSES_PER_PLAYER = 5;
+const TOSS_CHOICES = [5, 10, 15, 20]; // tosses each in a game of turns
 const PLAYER_COLORS = ['#ff6b4a', '#3f5fd6', '#22a06b', '#b04ad6'];
 
 const $ = (id) => document.getElementById(id);
@@ -2260,20 +2260,28 @@ ui.chSkip.addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------- taking turns
-// 2–4 players take turns, TOSSES_PER_PLAYER each; before each turn the house is
-// fixed and Lennie goes back downstairs, so everyone starts the same way.
+// 2–4 players take turns, the same number of tosses each (picked at the
+// start); before each turn the house is fixed and Lennie goes back
+// downstairs, so everyone starts the same way.
 const NAMES_KEY = 'toss-the-lennie:players';
-let match = null; // { players: [{ name, color, scores: [] }], turn }
+const TOSSES_KEY = 'toss-the-lennie:tosses';
+let match = null; // { players: [{ name, color, scores: [] }], turn, tosses }
 let setupCount = 2;
+let setupTosses = 5;
 let savedNames = [];
 try { savedNames = JSON.parse(localStorage.getItem(NAMES_KEY) ?? '[]'); } catch { /* ignore */ }
+try {
+  const t = Number(localStorage.getItem(TOSSES_KEY));
+  if (TOSS_CHOICES.includes(t)) setupTosses = t;
+} catch { /* ignore */ }
 
 const playerName = (i) => savedNames[i]?.trim() || t(`Player ${i + 1}`);
-const matchOver = () => match.players.every((p) => p.scores.length >= TOSSES_PER_PLAYER);
+const matchOver = () => match.players.every((p) => p.scores.length >= match.tosses);
 const playerTotal = (p) => p.scores.reduce((a, b) => a + b, 0);
 
 function renderSetup() {
   ui.setup.querySelectorAll('[data-players]').forEach((b) => b.setAttribute('aria-checked', String(Number(b.dataset.players) === setupCount)));
+  ui.setup.querySelectorAll('[data-tosses]').forEach((b) => b.setAttribute('aria-checked', String(Number(b.dataset.tosses) === setupTosses)));
   const values = [...ui.setupNames.querySelectorAll('input')].map((i) => i.value);
   ui.setupNames.innerHTML = '';
   for (let i = 0; i < setupCount; i++) {
@@ -2311,16 +2319,19 @@ function setSetup(open) {
 function startMatch() {
   const names = [...ui.setupNames.querySelectorAll('input')].map((i, n) => i.value.trim() || t(`Player ${n + 1}`));
   savedNames = names;
-  try { localStorage.setItem(NAMES_KEY, JSON.stringify(names)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(NAMES_KEY, JSON.stringify(names));
+    localStorage.setItem(TOSSES_KEY, String(setupTosses));
+  } catch { /* ignore */ }
   setSetup(false);
-  newMatch(names);
+  newMatch(names, setupTosses);
 }
 
-function newMatch(names) {
+function newMatch(names, tosses) {
   stopReplay();
   turnPending = true;
   clearTimeout(turnTimer);
-  match = { players: names.map((name, i) => ({ name, color: PLAYER_COLORS[i], scores: [] })), turn: 0 };
+  match = { players: names.map((name, i) => ({ name, color: PLAYER_COLORS[i], scores: [] })), turn: 0, tosses };
   renderBoard();
   renderChallenge();
   showTurnCard();
@@ -2347,7 +2358,7 @@ function renderBoard() {
   ui.board.hidden = !match;
   if (!match) return;
   const cur = match.players[match.turn];
-  ui.boardRound.textContent = matchOver() ? t('Game over') : t(`Toss ${cur.scores.length + 1} of ${TOSSES_PER_PLAYER}`);
+  ui.boardRound.textContent = matchOver() ? t('Game over') : t(`Toss ${cur.scores.length + 1} of ${match.tosses}`);
   ui.boardList.innerHTML = '';
   match.players.forEach((p, i) => {
     const li = document.createElement('li');
@@ -2358,7 +2369,7 @@ function renderBoard() {
     name.textContent = p.name;
     const dots = document.createElement('span');
     dots.className = 'dots';
-    dots.textContent = '●'.repeat(p.scores.length) + '○'.repeat(TOSSES_PER_PLAYER - p.scores.length);
+    dots.textContent = '●'.repeat(p.scores.length) + '○'.repeat(match.tosses - p.scores.length);
     const pts = document.createElement('span');
     pts.className = 'pts';
     pts.textContent = fmt(playerTotal(p));
@@ -2383,7 +2394,7 @@ function showTurnCard() {
     ui.turnTitle.textContent = winners.length > 1 ? t("It's a tie!") : t('{name} wins!', { name: winners[0].name });
     ui.turnSub.textContent = winners.length > 1
       ? t('{names} both scored {score}.', { names: winners.map((p) => p.name).join(` ${t('and')} `), score: fmt(top) })
-      : t('With {score} points from {n} tosses.', { score: fmt(top), n: TOSSES_PER_PLAYER });
+      : t('With {score} points from {n} tosses.', { score: fmt(top), n: match.tosses });
     ui.turnRanking.innerHTML = '';
     ranked.forEach((p) => {
       const li = document.createElement('li');
@@ -2412,7 +2423,7 @@ function showTurnCard() {
     const p = match.players[match.turn];
     const first = match.players.every((q) => q.scores.length === 0);
     ui.turnCard.style.setProperty('--player', p.color);
-    ui.turnKicker.textContent = first ? t('Game on!') : t(`Toss ${p.scores.length + 1} of ${TOSSES_PER_PLAYER}`);
+    ui.turnKicker.textContent = first ? t('Game on!') : t(`Toss ${p.scores.length + 1} of ${match.tosses}`);
     ui.turnTitle.textContent = t("{name}'s turn!", { name: p.name });
     const device = t(document.body.classList.contains('touch') ? 'tablet' : 'mouse');
     ui.turnSub.textContent = first ? t('{name} goes first. Ready?', { name: p.name }) : t('Pass the {device} to {name}.', { device, name: p.name });
@@ -2432,7 +2443,7 @@ function beginTurn() {
   turnPending = false;
   if (!match) return;
   if (matchOver()) {
-    newMatch(match.players.map((p) => p.name));
+    newMatch(match.players.map((p) => p.name), match.tosses);
     return;
   }
   resetAll(false);
@@ -2445,6 +2456,10 @@ function beginTurn() {
 btn.players.addEventListener('click', () => setSetup(ui.setup.hidden));
 ui.setup.querySelectorAll('[data-players]').forEach((b) => b.addEventListener('click', () => {
   setupCount = Number(b.dataset.players);
+  renderSetup();
+}));
+ui.setup.querySelectorAll('[data-tosses]').forEach((b) => b.addEventListener('click', () => {
+  setupTosses = Number(b.dataset.tosses);
   renderSetup();
 }));
 ui.setupStart.addEventListener('click', startMatch);

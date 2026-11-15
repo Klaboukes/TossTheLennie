@@ -166,11 +166,17 @@
 
   <div id="match-setup" class="glass" role="dialog" aria-labelledby="setup-title" hidden>
     <h2 id="setup-title">Take turns</h2>
-    <p class="help-lede">Everyone gets 5 tosses, one after the other. Before each turn the house is fixed and Lennie goes back downstairs. Highest total wins!</p>
+    <p class="help-lede">Everyone gets the same number of tosses, one after the other. Before each turn the house is fixed and Lennie goes back downstairs. Highest total wins!</p>
     <div class="setup-count" role="radiogroup" aria-label="How many players">
       <button data-players="2" role="radio">2 players</button>
       <button data-players="3" role="radio">3 players</button>
       <button data-players="4" role="radio">4 players</button>
+    </div>
+    <div class="setup-count" role="radiogroup" aria-label="How many tosses each">
+      <button data-tosses="5" role="radio">5 tosses</button>
+      <button data-tosses="10" role="radio">10 tosses</button>
+      <button data-tosses="15" role="radio">15 tosses</button>
+      <button data-tosses="20" role="radio">20 tosses</button>
     </div>
     <div id="setup-names" class="setup-names"></div>
     <div class="turn-actions">
