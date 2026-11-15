@@ -110,9 +110,11 @@ const SLACK = { side: 0.15, below: 0.35, above: 0.2 };
 // A doorway gets a little too: a tumbling Lennie's arms and legs snagged on its frame.
 const DOOR_SLACK = { side: 0.12, below: 0, above: 0.15 };
 const SMALL = { sill: 1.45, top: 2.25, bars: { v: [], h: [] }, slack: SLACK };
+const KITCHEN_SILL = 0.905;
 const FRONT = [
   // the toilet's small high window, and the kitchen's in the column
-  [{ a: -5.3, b: -4.2, ...SMALL }, { a: COLUMN[0], b: COLUMN[1], bars: { v: [1 / 3, 2 / 3], h: [0.7] } }],
+  // (the kitchen's sill is 5 mm above the 0.9 m worktop it reaches over, not level with it: that flickered)
+  [{ a: -5.3, b: -4.2, ...SMALL }, { a: COLUMN[0], b: COLUMN[1], sill: KITCHEN_SILL, bars: { v: [1 / 3, 2 / 3], h: [0.7] } }],
   // the first small one lights the corridor from the stairs, clear of its wall
   [{ a: -5.65, b: -4.8, ...SMALL }, { a: -4.0, b: -2.6, ...SMALL }, { a: COLUMN[0], b: COLUMN[1], sill: 0.6, top: 2.5, bars: { v: [0.32], h: [] } }],
 ];
@@ -380,7 +382,8 @@ export function buildHouse(scene, world, physMats) {
       // Outside corners show the facade material instead of white trim.
       const endHi = mats.ends && b === to ? mats.ends : M.trim;
       const endLo = mats.ends && a === from ? mats.ends : M.trim;
-      const faceMats = run === 'x' ? [endHi, endLo, M.trim, M.trim, pos, neg] : [pos, neg, M.trim, M.trim, endLo, endHi];
+      // (a box's faces go +x, −x, +y, −y, +z, −z; the `b` end is the + side either way)
+      const faceMats = run === 'x' ? [endHi, endLo, M.trim, M.trim, pos, neg] : [pos, neg, M.trim, M.trim, endHi, endLo];
       const [min, max] = extents(run, at, a, b, ya, yb, thick);
       box(min, max, faceMats, { story, line });
     }
@@ -746,7 +749,8 @@ export function buildHouse(scene, world, physMats) {
       ...ext, run: 'z', at: U.x1, from: zi, to: OUT.z0, physOffset: off, outward: 1, line: 'utility-e',
       mats: { pos: M.brick, neg: paper },
     });
-    const rMin = [xo - 0.1, U.top, zo - 0.1];
+    // no overhang at the back: the garage's roof carries on from there (overlapping, the two flickered)
+    const rMin = [xo - 0.1, U.top, zo];
     const rMax = [OUT.x1, U.top + 0.2, OUT.z0];
     box(rMin, rMax, [M.trim, M.trim, M.darkRoof, M.ceiling, M.trim, M.trim], { story: 1, cast: true, line: 'utility-roof' });
     body([rMin[0], U.top - 0.1, rMin[2]], rMax, physMats.hard, { kind: 'roof' }); // thicker downwards, so a fast Lennie doesn't slip through
@@ -954,7 +958,7 @@ export function buildHouse(scene, world, physMats) {
     // Little pot plants on the kitchen's window sill, in the window's recess.
     function windowPlants() {
       const z = 4.925;
-      const y = 0.9;
+      const y = KITCHEN_SILL;
       const add = (geo, mat, x, py, pz) => {
         const m = new THREE.Mesh(geo, mat);
         m.position.set(x, py, pz);

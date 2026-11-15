@@ -13,6 +13,7 @@ import { Zap } from './zap.js';
 import { Challenges, CHALLENGES, CHALLENGE_BONUS } from './challenges.js';
 import { createSeeThrough } from './seethrough.js';
 import { combineScenery } from './batching.js';
+import { sceneryParts, reportFlicker } from './flickercheck.js';
 import { createBlobShadow } from './blobshadow.js';
 
 const FIXED_DT = 1 / 120;
@@ -133,7 +134,13 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xe3f2ff);
 
-const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.05, 400);
+// Near: how close to the lens anything is drawn. Keep it as far out as
+// possible: the graphics chip tells what's in front by depth, and its
+// precision everywhere scales with this number, so 20 cm tells surfaces apart
+// 4x better than 5 cm did (fewer flickering spots, see flickercheck.js).
+// Nothing is lost: the see-through effect already cuts away scenery within
+// 45 cm of the lens (seethrough.js), and the camera stays 80 cm from Lennie.
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.2, 400);
 // Close enough to Lennie (on the living room floor) that you see him straight
 // away, from just outside the front window.
 camera.position.set(-0.9, 1.9, 5.9);
@@ -1703,9 +1710,16 @@ const notScenery = (o) => {
   for (let p = o; p; p = p.parent) if (p === lennie.stars) return true;
   return false;
 };
+// On the developer's own computer, the flicker check (flickercheck.js) lists
+// any spots where two surfaces lie in the same place, in the browser console.
+// It notes down the parts before they're glued together below, and checks a
+// little at a time once the game runs. The live game skips it.
+const DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+const builtParts = DEV ? sceneryParts(scene, notScenery) : null;
 // Everything is built: glue the scenery that never moves into a few big
 // meshes, so weak tablets and phones have far less to draw (batching.js).
 combineScenery(scene, notScenery);
+if (DEV) setTimeout(() => reportFlicker(builtParts), 1500);
 const seeThrough = createSeeThrough(scene, renderer, notScenery);
 const blobShadow = createBlobShadow(scene, world, SCENERY_ONLY);
 const _blobCenter = new THREE.Vector3();

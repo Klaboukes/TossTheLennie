@@ -508,7 +508,8 @@ function buildCatalogue() {
   const panM = mat(0x2b2b30, { roughness: 0.4, side: THREE.DoubleSide });
   C.pan = parts([
     [Cyl(0.13, 0.11, 0.035, 20, true), panM],
-    [new THREE.CircleGeometry(0.11, 20).rotateX(Math.PI / 2).translate(0, -0.0175, 0), panM],
+    // its bottom 3 mm up from the rim it stands on, so it doesn't flicker against the hob or counter under it
+    [new THREE.CircleGeometry(0.111, 20).rotateX(Math.PI / 2).translate(0, -0.0145, 0), panM],
     [new THREE.CircleGeometry(0.06, 14).rotateX(-Math.PI / 2).translate(0.02, -0.012, 0.01), mat(0xf6d04d, { roughness: 0.4 })],
     [at(Box(0.18, 0.015, 0.03), 0.22, 0.01, 0), mat(0x5a3a1c)],
   ]);

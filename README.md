@@ -150,6 +150,7 @@ The game is made to run smoothly on cheap tablets and older phones too. That's w
 - `src/seethrough.js`: the see-through circle that keeps Lennie in view through whatever is between him and the camera
 - `src/batching.js`: once everything is built, glues the scenery that never moves into a few big meshes, so there's far less to draw
 - `src/blobshadow.js`: the soft dark spot under Lennie (the game has no real shadows, so it stays smooth on low-end tablets)
+- `src/flickercheck.js`: when the game runs on your own computer (localhost), lists any spots where two surfaces lie in the same place and would flicker, in the browser console
 - `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking (the house's mess uses the same tumbling)
 - `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, breeze blocks, wallpaper, wood, floor tiles, grass)
 - `src/ragdoll.js`: Lennie's bodies, joints and look (1.90 m and 100 kg, with a bit of a belly, in a worn hoodie and joggers; his face after the photo in docs: thinning dark hair receding at the temples, rectangular glasses and a short salt-and-pepper beard)
