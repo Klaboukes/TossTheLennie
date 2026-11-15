@@ -7,7 +7,8 @@ import { canvasTexture } from './supermarket.js';
 // living room and the kids room, clothes everywhere in the bedrooms, and the
 // usual household stuff (washing-up liquid, loo rolls, shampoo, a vacuum
 // cleaner...). And in the living room a tall closet stuffed with Dutch board
-// games, which empties itself all over the floor when Lennie crashes into it.
+// games behind two painted doors: once Lennie smashes a door, the games behind
+// it empty themselves all over the floor when he crashes into the closet.
 //
 // The small things are loose "products" (products.js): they have no physics
 // bodies, so they never get in Lennie's way, but when he lands among them or
@@ -17,7 +18,10 @@ import { canvasTexture } from './supermarket.js';
 // cleaner, the plant) are only decoration; the closet, the clothes chair and
 // the washing machine are solid furniture.
 //
-// The names on the packaging and the boxes are plain Dutch words, no brands.
+// The names on the packaging and the boxes are plain Dutch words, no brands,
+// except the five big games the family actually plays (Catan, Risk, Axis &
+// Allies, Dungeons & Dragons, Carcassonne), which the owner asked for by name.
+// Their box art is our own drawing, not a copy of the real boxes.
 
 const TAU = Math.PI * 2;
 const INK = '#2b2b2b';
@@ -300,6 +304,101 @@ const LID_ART = {
     }
     label(g, '€', x, y, s * 0.4, s * 0.4, '#3fae3a');
   },
+  catan(g, x, y, s) {
+    // an island of hexes in the sea, with a few little houses on the corners
+    g.fillStyle = '#3b7dd8'; g.fillRect(x - s / 2, y - s / 2, s, s);
+    const r = s * 0.15;
+    const hexes = [[0, 0], [1, 0], [-1, 0], [0.5, -1], [-0.5, -1], [0.5, 1], [-0.5, 1]];
+    const cols = ['#e3d39a', '#e8c35a', '#2e7d32', '#9ccc65', '#c1582f', '#8a939c', '#e8c35a'];
+    g.strokeStyle = '#f2deb4'; g.lineWidth = 3;
+    hexes.forEach(([a, b], i) => {
+      const cx = x + a * r * Math.sqrt(3);
+      const cy = y + b * r * 1.5;
+      g.fillStyle = cols[i];
+      g.beginPath();
+      for (let k = 0; k < 6; k++) g.lineTo(cx + Math.cos(Math.PI / 6 + (k * TAU) / 6) * r, cy + Math.sin(Math.PI / 6 + (k * TAU) / 6) * r);
+      g.closePath(); g.fill(); g.stroke();
+    });
+    g.fillStyle = '#e2231a'; g.strokeStyle = INK; g.lineWidth = 2;
+    for (const [a, b] of [[0, -r], [r * 0.87, r * 0.5], [-r * 1.73, r]]) {
+      g.beginPath(); g.moveTo(x + a - s * 0.03, y + b + s * 0.025); g.lineTo(x + a + s * 0.03, y + b + s * 0.025); g.lineTo(x + a + s * 0.03, y + b - s * 0.01); g.lineTo(x + a, y + b - s * 0.04); g.lineTo(x + a - s * 0.03, y + b - s * 0.01); g.closePath(); g.fill(); g.stroke();
+    }
+  },
+  risk(g, x, y, s) {
+    // a world of coloured continents, armies and an attack arrow
+    g.fillStyle = '#9ad0f0'; g.fillRect(x - s / 2, y - s / 2, s, s);
+    g.strokeStyle = INK; g.lineWidth = 2;
+    for (const [a, b, rx, ry, c] of [[-0.3, -0.2, 0.15, 0.12, '#f6d04d'], [-0.22, 0.2, 0.08, 0.16, '#f59a23'], [0.02, -0.22, 0.09, 0.08, '#3b7dd8'], [0.05, 0.12, 0.1, 0.17, '#8a3b2a'], [0.28, -0.15, 0.17, 0.13, '#3fae3a'], [0.32, 0.3, 0.1, 0.07, '#b05cc8']]) {
+      g.fillStyle = c; g.beginPath(); g.ellipse(x + a * s, y + b * s, rx * s, ry * s, a, 0, TAU); g.fill(); g.stroke();
+    }
+    for (const [a, b, c] of [[-0.3, -0.2, '#e2231a'], [0.28, -0.15, '#1b1b1b'], [0.05, 0.12, '#e2231a']]) { g.fillStyle = c; g.fillRect(x + a * s - s * 0.03, y + b * s - s * 0.03, s * 0.06, s * 0.06); }
+    g.strokeStyle = '#e2231a'; g.lineWidth = s * 0.03;
+    g.beginPath(); g.moveTo(x - s * 0.22, y - s * 0.12); g.quadraticCurveTo(x, y - s * 0.4, x + s * 0.18, y - s * 0.18); g.stroke();
+    g.fillStyle = '#e2231a'; g.beginPath(); g.moveTo(x + s * 0.22, y - s * 0.14); g.lineTo(x + s * 0.12, y - s * 0.15); g.lineTo(x + s * 0.18, y - s * 0.24); g.closePath(); g.fill();
+  },
+  axis(g, x, y, s) {
+    // a war map with tanks on the land and planes over the sea
+    g.fillStyle = '#7fa8c9'; g.fillRect(x - s / 2, y - s / 2, s, s);
+    g.fillStyle = '#c9b98a'; g.fillRect(x - s / 2, y, s, s / 2);
+    g.fillStyle = '#9aa86a'; g.beginPath(); g.ellipse(x + s * 0.2, y + s * 0.25, s * 0.25, s * 0.15, 0, 0, TAU); g.fill();
+    const tank = (tx, ty, c) => {
+      g.fillStyle = c; g.strokeStyle = INK; g.lineWidth = 2;
+      g.fillRect(tx - s * 0.1, ty, s * 0.2, s * 0.06); g.strokeRect(tx - s * 0.1, ty, s * 0.2, s * 0.06);
+      g.fillRect(tx - s * 0.05, ty - s * 0.04, s * 0.09, s * 0.04); g.strokeRect(tx - s * 0.05, ty - s * 0.04, s * 0.09, s * 0.04);
+      g.fillRect(tx + s * 0.04, ty - s * 0.03, s * 0.12, s * 0.015);
+      g.fillStyle = INK; for (let i = 0; i < 4; i++) { circle(g, tx - s * 0.075 + i * s * 0.05, ty + s * 0.075, s * 0.018); g.fill(); }
+    };
+    tank(x - s * 0.18, y + s * 0.1, '#556b2f');
+    tank(x + s * 0.15, y + s * 0.28, '#6b6f72');
+    const plane = (px, py) => {
+      g.fillStyle = '#4a4f55';
+      g.fillRect(px - s * 0.12, py - s * 0.015, s * 0.24, s * 0.03);
+      g.fillRect(px - s * 0.02, py - s * 0.12, s * 0.05, s * 0.24);
+      g.fillRect(px - s * 0.12, py - s * 0.05, s * 0.025, s * 0.1);
+    };
+    plane(x - s * 0.15, y - s * 0.25);
+    plane(x + s * 0.22, y - s * 0.32);
+  },
+  dnd(g, x, y, s) {
+    // a big twenty-sided die in front of a sword
+    g.fillStyle = '#d9d2c0'; g.fillRect(x - s * 0.02, y - s * 0.48, s * 0.04, s * 0.8);
+    g.fillStyle = '#c9a74a'; g.fillRect(x - s * 0.14, y + s * 0.3, s * 0.28, s * 0.04); g.fillRect(x - s * 0.025, y + s * 0.34, s * 0.05, s * 0.12);
+    const r = s * 0.3;
+    const p = (k) => [x + Math.cos(-Math.PI / 2 + (k * TAU) / 6) * r, y + Math.sin(-Math.PI / 2 + (k * TAU) / 6) * r];
+    const t = [0, 1, 2].map((k) => [x + Math.cos(-Math.PI / 2 + (k * TAU) / 3) * r * 0.55, y + Math.sin(-Math.PI / 2 + (k * TAU) / 3) * r * 0.55]);
+    g.fillStyle = '#6c3483'; g.strokeStyle = '#f6d04d'; g.lineWidth = 3;
+    g.beginPath(); for (let k = 0; k < 6; k++) g.lineTo(...p(k)); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#8e44ad';
+    g.beginPath(); for (const v of t) g.lineTo(...v); g.closePath(); g.fill(); g.stroke();
+    g.beginPath();
+    for (const [a, b] of [[0, 0], [0, 1], [0, 5], [1, 1], [1, 2], [1, 3], [2, 3], [2, 4], [2, 5]]) { g.moveTo(...t[a]); g.lineTo(...p(b)); }
+    g.stroke();
+    label(g, '20', x, y + s * 0.02, r * 0.5, r * 0.4, '#f6d04d');
+  },
+  carc(g, x, y, s) {
+    // square landscape tiles with roads, a walled city and little wooden people
+    const n = 3;
+    const w = s / n;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const tx = x - s / 2 + i * w;
+      const ty = y - s / 2 + j * w;
+      g.fillStyle = (i + j) % 2 ? '#7cb342' : '#8bc34a'; g.fillRect(tx, ty, w, w);
+      g.strokeStyle = '#4e6b2a'; g.lineWidth = 1; g.strokeRect(tx, ty, w, w);
+    }
+    g.strokeStyle = '#f2deb4'; g.lineWidth = s * 0.05;
+    g.beginPath(); g.moveTo(x - s / 2, y + w * 0.5); g.lineTo(x + s / 2, y + w * 0.5); g.moveTo(x, y + w * 0.5); g.lineTo(x, y + s / 2); g.stroke();
+    g.fillStyle = '#c49a5e'; g.strokeStyle = '#7a5a30'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(x - s / 2, y - s / 2); g.lineTo(x + s * 0.2, y - s / 2); g.quadraticCurveTo(x - s * 0.05, y - s * 0.1, x - s / 2, y - s * 0.05); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#c0392b'; for (const [a, b] of [[-0.38, -0.38], [-0.22, -0.4], [-0.33, -0.25]]) g.fillRect(x + a * s, y + b * s, s * 0.06, s * 0.05);
+    const meeple = (mx, my, c) => {
+      g.fillStyle = c; g.strokeStyle = INK; g.lineWidth = 2;
+      g.beginPath(); circle(g, mx, my - s * 0.05, s * 0.025); g.fill(); g.stroke();
+      g.beginPath(); g.moveTo(mx - s * 0.05, my); g.lineTo(mx + s * 0.05, my); g.lineTo(mx + s * 0.03, my + s * 0.03); g.lineTo(mx + s * 0.04, my + s * 0.07); g.lineTo(mx - s * 0.04, my + s * 0.07); g.lineTo(mx - s * 0.03, my + s * 0.03); g.closePath(); g.fill(); g.stroke();
+    };
+    meeple(x + s * 0.3, y - s * 0.25, '#2a5bd7');
+    meeple(x - s * 0.25, y + s * 0.28, '#f6d04d');
+    meeple(x + s * 0.12, y + s * 0.05, '#e2231a');
+  },
 };
 
 const GAMES = [
@@ -320,6 +419,12 @@ const GAMES = [
   { id: 'gDobbel', name: 'DOBBELSPEL', size: [0.16, 0.06, 0.12], bg: '#e2231a', fg: '#ffffff', art: 'dobbel', in: [['die', 5]] },
   { id: 'gMikado', name: 'MIKADO', size: [0.22, 0.04, 0.05], bg: '#3fae3a', fg: '#ffffff', art: 'mikado', in: [['mikado', 10]] },
   { id: 'gStraten', name: 'STRATENSPEL', size: [0.4, 0.06, 0.27], bg: '#ffffff', fg: '#3fae3a', art: 'straten', in: [['geldRoze', 6], ['geldGroen', 6], ['geldBlauw', 6], ['pawnBlue', 2], ['die', 2]] },
+  // the big ones the family plays
+  { id: 'gCatan', name: 'CATAN', size: [0.4, 0.08, 0.28], bg: '#c8501e', fg: '#fff6d8', art: 'catan', in: [['catanWheat', 3], ['catanWood', 3], ['catanWool', 3], ['catanBrick', 3], ['catanOre', 3], ['catanHouseRed', 3], ['catanHouseBlue', 3], ['catanRoadRed', 4], ['catanRoadBlue', 4], ['die', 2]] },
+  { id: 'gRisk', name: 'RISK', size: [0.42, 0.07, 0.28], bg: '#1b1b1b', fg: '#e2231a', art: 'risk', in: [['armyRed', 8], ['armyBlue', 8], ['armyGreen', 6], ['armyYellow', 6], ['die', 3]] },
+  { id: 'gAxis', name: 'AXIS & ALLIES', size: [0.42, 0.08, 0.29], bg: '#55583a', fg: '#f2deb4', art: 'axis', in: [['tankGreen', 5], ['tankGrey', 5], ['tankTan', 4], ['planeGrey', 3], ['planeGreen', 3], ['chipRed', 4], ['chipBlue', 4], ['die', 3]] },
+  { id: 'gDnd', name: 'DUNGEONS & DRAGONS', size: [0.3, 0.06, 0.3], bg: '#7a0d12', fg: '#f6d04d', art: 'dnd', in: [['d20Purple', 2], ['d20Red', 2], ['d20Blue', 1], ['d8Purple', 2], ['d4Red', 2], ['die', 3], ['dndMini', 4]] },
+  { id: 'gCarc', name: 'CARCASSONNE', size: [0.3, 0.07, 0.3], bg: '#2a4f9a', fg: '#f6d04d', art: 'carc', in: [['carcTile', 12], ['meepleRed', 3], ['meepleBlue', 3], ['meepleYellow', 3], ['meepleGreen', 3]] },
 ];
 
 function gameBox(game) {
@@ -341,6 +446,117 @@ function gameBox(game) {
   const side = mat(new THREE.Color(game.bg).getHex());
   const s = texMat(spine);
   return { w, h, d, look: () => ({ geo: Box(w, h, d), material: [side, side, texMat(lid), mat(0xe9e1cf), s, s] }) };
+}
+
+// ---------------------------------------------------------------- the closet doors' painting
+// The closet's doors are painted like a Mongolian chest: vermilion, a gold key
+// pattern on a dark blue border, cloud scrolls shaded in bands from dark to
+// light, and an endless knot in a round medallion. The right door is the left
+// one mirrored.
+const MN = {
+  red: '#c8381e', dark: '#6e1a0e', gold: '#f2b53a', ink: '#2a1208',
+  blue: ['#0f2f6b', '#2a63b8', '#6aa6e8', '#d4ecff'],
+  green: ['#17502a', '#2f8f45', '#78c987', '#e0f7da'],
+  teal: ['#0b5c5c', '#1f9e9a', '#72d6cf', '#e3fffb'],
+};
+/** A curl of cloud scroll (a ram's horn), curling in from `turn`, shaded from dark to light. */
+function cloudScroll(g, x, y, r, turn, shades, flip = 1) {
+  g.beginPath();
+  for (let t = 0; t <= Math.PI * 2.4; t += 0.06) {
+    const rr = r * (1 - t / (Math.PI * 3));
+    g.lineTo(x + flip * Math.cos(turn + t) * rr, y + Math.sin(turn + t) * rr);
+  }
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.strokeStyle = MN.ink; g.lineWidth = r * 0.5; g.stroke();
+  [0.42, 0.3, 0.18, 0.07].forEach((w, i) => { g.strokeStyle = shades[i]; g.lineWidth = r * w; g.stroke(); });
+}
+/** The endless knot: an interlaced lattice turned on its corner, with a loop at each corner. */
+function endlessKnot(g, x, y, s) {
+  g.save(); g.translate(x, y); g.rotate(Math.PI / 4);
+  const n = 4;
+  const a = s / 2;
+  const step = s / n;
+  const path = () => {
+    g.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const o = -a + i * step;
+      g.moveTo(o, -a); g.lineTo(o, a); g.moveTo(-a, o); g.lineTo(a, o);
+    }
+    for (const [cx, cy] of [[-a, -a], [a, -a], [a, a], [-a, a]]) {
+      const lx = cx + Math.sign(cx) * step * 0.45;
+      const ly = cy + Math.sign(cy) * step * 0.45;
+      g.moveTo(lx + step * 0.6, ly); g.arc(lx, ly, step * 0.6, 0, TAU);
+    }
+  };
+  g.lineCap = 'round';
+  path(); g.strokeStyle = MN.ink; g.lineWidth = s * 0.1; g.stroke();
+  path(); g.strokeStyle = MN.gold; g.lineWidth = s * 0.055; g.stroke();
+  g.restore();
+}
+/** A strip of the square key pattern, `len` long from (x, y), across or (vertical) down. */
+function keyStrip(g, x, y, len, u, vertical) {
+  const P = (a, b) => (vertical ? [x + b * u, y + a * u] : [x + a * u, y + b * u]);
+  g.beginPath();
+  for (let ox = 0; ox + 4 <= len / u; ox += 4) {
+    g.moveTo(...P(ox, 4)); g.lineTo(...P(ox + 4, 4));
+    for (const [a, b] of [[ox, 4], [ox, 0], [ox + 3, 0], [ox + 3, 3], [ox + 1, 3], [ox + 1, 1.5], [ox + 2, 1.5]]) g.lineTo(...P(a, b));
+  }
+  g.strokeStyle = MN.gold; g.lineWidth = u * 0.55; g.lineCap = 'square'; g.lineJoin = 'miter'; g.stroke();
+}
+/** The front of one closet door, as a canvas texture. */
+function closetDoorArt(mirror) {
+  return canvasTexture(256, 512, (g, W, H) => {
+    if (mirror) { g.translate(W, 0); g.scale(-1, 1); }
+    // the dark blue border with its gold key pattern
+    const bw = 22;
+    g.fillStyle = MN.blue[0]; g.fillRect(0, 0, W, H);
+    const u = (bw - 6) / 4.5;
+    keyStrip(g, bw, 4, W - 2 * bw, u, false);
+    keyStrip(g, bw, H - bw + 2, W - 2 * bw, u, false);
+    keyStrip(g, 4, bw, H - 2 * bw, u, true);
+    keyStrip(g, W - bw + 2, bw, H - 2 * bw, u, true);
+    g.fillStyle = MN.red; g.fillRect(bw, bw, W - 2 * bw, H - 2 * bw);
+    g.strokeStyle = MN.gold; g.lineWidth = 3; g.strokeRect(bw + 2, bw + 2, W - 2 * bw - 4, H - 2 * bw - 4);
+
+    // two panels, each framed in teal and gold
+    const panel = (x0, y0, x1, y1) => {
+      g.fillStyle = MN.dark; g.fillRect(x0 - 6, y0 - 6, x1 - x0 + 12, y1 - y0 + 12);
+      g.fillStyle = MN.teal[1]; g.fillRect(x0 - 3, y0 - 3, x1 - x0 + 6, y1 - y0 + 6);
+      g.fillStyle = MN.red; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+      g.strokeStyle = MN.gold; g.lineWidth = 2; g.strokeRect(x0 + 5, y0 + 5, x1 - x0 - 10, y1 - y0 - 10);
+    };
+    const cx = W / 2;
+    panel(44, 48, W - 44, 318);
+    panel(44, 348, W - 44, H - 46);
+
+    // the upper panel: the medallion with the endless knot, clouds curling around it
+    const my = 183;
+    for (const f of [1, -1]) {
+      cloudScroll(g, cx + f * 34, my - 92, 22, Math.PI * 0.9, MN.blue, f);
+      cloudScroll(g, cx + f * 34, my + 92, 22, -Math.PI * 0.9, MN.blue, f);
+      cloudScroll(g, cx + f * 70, my, 18, Math.PI * 1.5, MN.green, f);
+    }
+    for (const [x, y, f, t] of [[62, 66, 1, 0], [W - 62, 66, -1, 0], [62, 300, 1, Math.PI], [W - 62, 300, -1, Math.PI]]) cloudScroll(g, x, y, 12, t, MN.teal, f);
+    const R = 52;
+    g.fillStyle = MN.ink; circle(g, cx, my, R + 5); g.fill();
+    g.fillStyle = MN.gold; circle(g, cx, my, R + 2); g.fill();
+    g.fillStyle = MN.blue[0]; circle(g, cx, my, R - 3); g.fill();
+    g.strokeStyle = MN.blue[2]; g.lineWidth = 2; circle(g, cx, my, R - 9); g.stroke();
+    endlessKnot(g, cx, my, R * 0.95);
+
+    // the lower panel: two big horns curling away from a gold diamond
+    const ly = (348 + H - 46) / 2;
+    for (const f of [1, -1]) {
+      cloudScroll(g, cx + f * 46, ly - 8, 30, Math.PI, f > 0 ? MN.blue : MN.green, f);
+      cloudScroll(g, cx + f * 50, ly + 46, 14, 0, MN.teal, f);
+      cloudScroll(g, cx + f * 50, ly - 58, 14, 0, MN.teal, f);
+    }
+    g.fillStyle = MN.ink;
+    g.beginPath(); g.moveTo(cx, ly - 30); g.lineTo(cx + 18, ly); g.lineTo(cx, ly + 30); g.lineTo(cx - 18, ly); g.closePath(); g.fill();
+    g.fillStyle = MN.gold;
+    g.beginPath(); g.moveTo(cx, ly - 25); g.lineTo(cx + 14, ly); g.lineTo(cx, ly + 25); g.lineTo(cx - 14, ly); g.closePath(); g.fill();
+    g.fillStyle = MN.red; circle(g, cx, ly, 5); g.fill();
+  });
 }
 
 // ---------------------------------------------------------------- the catalogue
@@ -396,6 +612,69 @@ function buildCatalogue() {
   C.geldRoze = tint('geld', 0xf2a2b8);
   C.geldGroen = tint('geld', 0xa5d36b);
   C.geldBlauw = tint('geld', 0x9ad0f0);
+  // standing pieces cut from an outline (x across, y up) and given some thickness
+  const upright = (pts, depth) => new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y))), { depth, bevelEnabled: false });
+  const woodPiece = mat(0xffffff, { roughness: 0.7 });
+  // Catan: land hexes, little houses and roads
+  C.catanHex = item(Cyl(0.035, 0.035, 0.004, 6), mat(0xffffff, { roughness: 0.7 }));
+  C.catanWheat = tint('catanHex', 0xe8c35a);
+  C.catanWood = tint('catanHex', 0x2e7d32);
+  C.catanWool = tint('catanHex', 0x9ccc65);
+  C.catanBrick = tint('catanHex', 0xc1582f);
+  C.catanOre = tint('catanHex', 0x8a939c);
+  C.catanHouse = item(upright([[-0.007, 0], [0.007, 0], [0.007, 0.01], [0, 0.017], [-0.007, 0.01]], 0.012), woodPiece);
+  C.catanHouseRed = tint('catanHouse', 0xe2231a);
+  C.catanHouseBlue = tint('catanHouse', 0x2a5bd7);
+  C.catanRoad = item(Box(0.03, 0.006, 0.006), woodPiece);
+  C.catanRoadRed = tint('catanRoad', 0xe2231a);
+  C.catanRoadBlue = tint('catanRoad', 0x2a5bd7);
+  // Risk: little army cubes
+  C.army = item(Box(0.01, 0.01, 0.01), plastic(0xffffff));
+  C.armyRed = tint('army', 0xe2231a);
+  C.armyBlue = tint('army', 0x2a5bd7);
+  C.armyGreen = tint('army', 0x3fae3a);
+  C.armyYellow = tint('army', 0xf6d04d);
+  // Axis & Allies: tanks, planes and chips
+  C.tank = parts([
+    [Box(0.03, 0.01, 0.018), plastic(0xffffff)],
+    [at(Cyl(0.007, 0.007, 0.006, 10), -0.002, 0.008, 0), plastic(0xffffff)],
+    [at(Cyl(0.0015, 0.0015, 0.018, 6), 0.012, 0.008, 0, 0, 0, Math.PI / 2), plastic(0xffffff)],
+  ]);
+  C.tankGreen = tint('tank', 0x556b2f);
+  C.tankGrey = tint('tank', 0x6b6f72);
+  C.tankTan = tint('tank', 0xc2a36b);
+  C.plane = parts([
+    [Box(0.03, 0.005, 0.006), plastic(0xffffff)],
+    [at(Box(0.008, 0.002, 0.034), 0.002, 0, 0), plastic(0xffffff)],
+    [at(Box(0.004, 0.002, 0.014), -0.013, 0.002, 0), plastic(0xffffff)],
+  ]);
+  C.planeGrey = tint('plane', 0x4a4f55);
+  C.planeGreen = tint('plane', 0x556b2f);
+  C.chip = disc(0xffffff, 0.012, 0.003);
+  C.chipRed = tint('chip', 0xc0392b);
+  C.chipBlue = tint('chip', 0x2a5bd7);
+  // Dungeons & Dragons: dice with lots of sides and grey miniatures
+  C.d20 = item(new THREE.IcosahedronGeometry(0.011), plastic(0xffffff));
+  C.d20Purple = tint('d20', 0x8e44ad);
+  C.d20Red = tint('d20', 0xc0392b);
+  C.d20Blue = tint('d20', 0x2a5bd7);
+  C.d8 = item(new THREE.OctahedronGeometry(0.01), plastic(0xffffff));
+  C.d8Purple = tint('d8', 0x8e44ad);
+  C.d4 = item(new THREE.TetrahedronGeometry(0.011), plastic(0xffffff));
+  C.d4Red = tint('d4', 0xc0392b);
+  C.dndMini = tint('chess', 0x8a939c);
+  // Carcassonne: square land tiles and meeples
+  const carcTop = canvasTexture(64, 64, (g) => {
+    g.fillStyle = '#7cb342'; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = '#c49a5e'; g.beginPath(); g.moveTo(0, 0); g.lineTo(64, 0); g.quadraticCurveTo(32, 26, 0, 0); g.fill();
+    g.fillStyle = '#f2deb4'; g.fillRect(0, 36, 64, 8); g.fillRect(28, 36, 8, 28);
+  });
+  C.carcTile = { w: 0.045, h: 0.004, d: 0.045, look: () => { const b = mat(0xe9e1cf); return { geo: Box(0.045, 0.004, 0.045), material: [b, b, texMat(carcTop), b, b, b] }; } };
+  C.meeple = item(upright([[-0.008, 0], [-0.0025, 0], [0, 0.005], [0.0025, 0], [0.008, 0], [0.004, 0.008], [0.009, 0.011], [0.008, 0.013], [0.003, 0.012], [0.0035, 0.016], [0, 0.018], [-0.0035, 0.016], [-0.003, 0.012], [-0.008, 0.013], [-0.009, 0.011], [-0.004, 0.008]], 0.005), woodPiece);
+  C.meepleRed = tint('meeple', 0xe2231a);
+  C.meepleBlue = tint('meeple', 0x2a5bd7);
+  C.meepleYellow = tint('meeple', 0xf6d04d);
+  C.meepleGreen = tint('meeple', 0x3fae3a);
   for (const game of GAMES) C[game.id] = gameBox(game);
   // the sjoelbak's pucks
   C.sjoelschijf = item(Cyl(0.026, 0.026, 0.012, 16), wood);
@@ -1013,8 +1292,12 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     b([X0 + 0.02, TOP + 0.08, Z0 + 0.05], [X1 - 0.02, TOP + 0.1, Z0 + 0.08], sjoel);
     b([X0 + 0.02, TOP + 0.08, Z1 - 0.06], [X1 - 0.02, TOP + 0.1, Z1 - 0.03], sjoel);
 
-    const sec = stocks[k].section({ bounds: ROOMS.living, floorY: 0.012, k, name: 'closet', fresh: false });
-    sections[k].push(sec);
+    // the games behind the left door, behind the right door, and on top
+    const [secL, secR, secTop] = [0, 1, 2].map(() => {
+      const s = stocks[k].section({ bounds: ROOMS.living, floorY: 0.012, k, name: 'closet', fresh: false });
+      sections[k].push(s);
+      return s;
+    });
     const games = GAMES.map((g) => g.id);
     let bag = [];
     const nextGame = () => {
@@ -1022,7 +1305,7 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
       return bag.pop();
     };
     /** A pile of game boxes, biggest at the bottom, with their pieces inside. */
-    function gamePile(cx, y, z, maxH) {
+    function gamePile(sec, cx, y, z, maxH) {
       const pick = [];
       let h = 0;
       for (let tries = 0; tries < 7; tries++) {
@@ -1055,29 +1338,76 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     shelves.forEach((y, i) => {
       const shelfTop = y + (i === 0 ? 0 : T);
       const ceiling = (shelves[i + 1] ?? TOP - T) - 0.01;
-      for (const [a, c] of cols) {
+      cols.forEach(([a, c], side) => {
         const w = c - a;
-        gamePile(a + w * 0.27, shelfTop, Z1 - 0.22, ceiling - shelfTop - 0.01);
-        gamePile(a + w * 0.73, shelfTop, Z1 - 0.22, ceiling - shelfTop - 0.01);
-      }
+        const sec = side ? secR : secL;
+        gamePile(sec, a + w * 0.27, shelfTop, Z1 - 0.22, ceiling - shelfTop - 0.01);
+        gamePile(sec, a + w * 0.73, shelfTop, Z1 - 0.22, ceiling - shelfTop - 0.01);
+      });
     });
-    gamePile(X0 + 0.45, TOP + 0.08, Z1 - 0.24, 0.3);
-    gamePile(X1 - 0.5, TOP + 0.08, Z1 - 0.24, 0.22);
+    gamePile(secTop, X0 + 0.45, TOP + 0.08, Z1 - 0.24, 0.3);
+    gamePile(secTop, X1 - 0.5, TOP + 0.08, Z1 - 0.24, 0.22);
     // a stack of sjoel pucks in the corner of the sjoelbak
     let puck = null;
-    for (let i = 0; i < 8; i++) puck = stocks[k].place('sjoelschijf', X0 + 1.0 + (rnd() - 0.5) * 0.01, TOP + 0.08 + i * 0.012, Z1 - 0.2, 0, sec, 0, { on: puck });
+    for (let i = 0; i < 8; i++) puck = stocks[k].place('sjoelschijf', X0 + 1.0 + (rnd() - 0.5) * 0.01, TOP + 0.08 + i * 0.012, Z1 - 0.2, 0, secTop, 0, { on: puck });
 
-    // Crashing into it empties it: the harder, the more of it comes down.
-    // Everything falls out of the front, and the games spill as they go.
+    // Two painted doors, shut. They're doors like the house's (main.js): a
+    // knock cracks one, and it swings a little way open on its hinges; a hard
+    // hit smashes it, and then the games behind it come pouring out.
+    const DT = 0.022;
+    const MID = (X0 + X1) / 2;
+    const Y0 = 0.015;
+    const Y1 = TOP - 0.006;
+    let burst = null; // the door just smashed: the next hit behind it empties the whole side
+    const doors = [[X0 + 0.004, MID - 0.003, -1], [MID + 0.003, X1 - 0.004, 1]].map(([a, c, hinge], i) => {
+      const w = c - a;
+      const center = new THREE.Vector3((a + c) / 2, (Y0 + Y1) / 2, Z1 + 0.001 + DT / 2);
+      const group = new THREE.Group();
+      group.position.copy(center);
+      const edge = mat(0x8f2414);
+      const slab = new THREE.Mesh(Box(w, Y1 - Y0, DT), [edge, edge, edge, edge, texMat(closetDoorArt(i === 1), { roughness: 0.45 }), inside]);
+      slab.castShadow = true;
+      slab.receiveShadow = true;
+      group.add(slab);
+      // a brass knob near where the doors meet
+      const knob = new THREE.Mesh(Sph(0.02), mat(0xc9a74a, { metalness: 0.6, roughness: 0.35 }));
+      knob.position.set(-hinge * (w / 2 - 0.06), 1.05 - center.y, DT / 2 + 0.014);
+      knob.castShadow = true;
+      group.add(knob);
+      groups[k].add(group);
+      const door = {
+        kind: 'door', group, broken: false, cracked: false, story: k,
+        color: 0xc8381e, center, normal: new THREE.Vector3(0, 0, 1), width: w, height: Y1 - Y0, body: null,
+      };
+      door.body = body([a, Y0, Z1 + 0.001], [c, Y1, Z1 + 0.001 + DT], physMats.hard, { kind: 'door', piece: door });
+      // cracked, the latch gives and it swings ajar on its hinges (house.js crackDoor)
+      door.onCrack = () => {
+        const pin = new THREE.Vector3(hinge * w / 2, 0, -DT / 2);
+        group.rotation.set(0, hinge * 0.25, 0);
+        group.position.copy(center).add(pin).sub(pin.clone().applyEuler(group.rotation));
+      };
+      door.onBreak = () => { burst = { side: i, at: performance.now() }; };
+      return door;
+    });
+
+    // Crashing into it empties it, but only where a door is smashed (the top
+    // always): the harder, the more of it comes down. Everything falls out of
+    // the front, and the games spill as they go.
     const out = new THREE.Vector3(0, 0, 1);
     solid.surface.tally = 'games';
     solid.surface.mess = ['Board game avalanche!', 'Game over!', 'Rules? What rules?', 'Who took the dice?', "Now it's a floor game!"];
-    solid.surface.onHit = (point, strength, push) => stocks[k].knock(sec, point, out, strength, push, {
-      radius: 0.5 + strength * 0.12,
-      chance: 0.9,
-      power: 1.15,
-    });
-    return { x0: X0, x1: X1, z0: Z0, z1: Z1, top: TOP };
+    const usual = (strength) => ({ radius: 0.5 + strength * 0.12, chance: 0.9, power: 1.15 });
+    solid.surface.onHit = (point, strength, push) => {
+      let n = stocks[k].knock(secTop, point, out, strength, push, usual(strength));
+      doors.forEach((d, i) => {
+        if (!d.broken) return;
+        const big = burst?.side === i && performance.now() - burst.at < 1500;
+        if (big) burst = null;
+        n += stocks[k].knock(i ? secR : secL, point, out, strength, push, big ? { radius: 1.8, chance: 1, power: 1.3 } : usual(strength));
+      });
+      return n;
+    };
+    return { x0: X0, x1: X1, z0: Z0, z1: Z1, top: TOP, doors };
   }
 
   function decorate() {
@@ -1197,6 +1527,7 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   return {
     scatter,
     spots,
+    doors: closet.doors, // the board game closet's doors, which house.js smashes and mends like its own
     update: (dt) => { for (const s of stocks) s.update(dt); },
     restock: () => { for (const s of stocks) s.restock(); },
   };

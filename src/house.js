@@ -750,6 +750,7 @@ export function buildHouse(scene, world, physMats) {
   const tv = buildTV(kit);
   // the mess: dishes, toys, clothes, household stuff and the board game closet (clutter.js)
   const clutter = buildClutter({ ...kit, H, garage });
+  doors.push(...clutter.doors);
 
   // ------------------------------------------------------------ the ground floor's own walls
   // The toilet's two walls, the wall between the hallway and the kitchen, the
@@ -1601,11 +1602,13 @@ export function buildHouse(scene, world, physMats) {
     piece.broken = true;
     piece.group.visible = false;
     world.removeBody(piece.body);
+    piece.onBreak?.();
   }
 
   /** A door that took a knock sags in its frame, pushed towards `dir` (±1 along its normal). */
   function crackDoor(door, dir) {
     door.cracked = true;
+    if (door.onCrack) return door.onCrack(dir); // the game closet's doors swing ajar instead
     door.group.position.copy(door.center).addScaledVector(door.normal, 0.03 * dir);
     if (door.normal.z) door.group.rotation.z = 0.03 * dir;
     else door.group.rotation.x = 0.03 * dir;
