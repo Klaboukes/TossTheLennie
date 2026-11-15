@@ -100,7 +100,7 @@ export function makeDetails(kit) {
    * a solid brick block with a small window (Lennie's own is a real room, house.js).
    */
   function porch({ x0, x1, toilet = null, frame = M.trim, fascia = M.trim }) {
-    const c = { y0: PORCH_Y, y1: 2.55, z1: 6.4 };
+    const c = { y0: PORCH_Y, y1: PORCH_TOP, z1: PORCH_FRONT };
     box([x0, c.y0, OUT.z1], [x1, c.y1, c.z1], [fascia, fascia, M.darkRoof, M.soffit, fascia, fascia], { story: 0, cast: true });
     // thicker downwards in physics, so a fast Lennie doesn't slip through it
     body([x0, c.y0 - 0.06, OUT.z1], [x1, c.y1, c.z1], physMats.hard, { kind: 'wall' });
@@ -116,11 +116,40 @@ export function makeDetails(kit) {
     box([a - 0.1, 1.2, zf - 0.01], [b + 0.1, 1.25, zf + 0.12], M.trim, { story: 0 });
   }
 
-  return { roofTop, angle, chimney, vent, dormer, skylight, downpipe, porch };
+  /**
+   * The house number on the front edge of the door canopy, centred over the
+   * door at x: big digits in `color` (white on Lennie's dark canopy, dark on
+   * the neighbours' white ones). Pulled in front in the depth test, like a road marking.
+   */
+  function houseNumber(n, x, color) {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = color;
+    g.font = 'bold 112px "Trebuchet MS", sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(String(n), 128, 70);
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 8;
+    const mat = std({ map, alphaTest: 0.5, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.26), mat);
+    mesh.position.set(x, (PORCH_Y + PORCH_TOP) / 2, PORCH_FRONT + 0.004);
+    addMesh(mesh, 0);
+  }
+
+  return { roofTop, angle, chimney, vent, dormer, skylight, downpipe, porch, houseNumber };
 }
 
 // The front door's canopy: its underside, which is also the top of the toilet's bump-out.
 export const PORCH_Y = 2.26;
+const PORCH_TOP = 2.55;
+const PORCH_FRONT = 6.4; // z of the canopy's front edge, where the house number is
+
+// House numbers along the row, by index (0 is Lennie's), as in the real street.
+export const HOUSE_NUMBERS = { [-1]: 12, 0: 10, 1: 8, 2: 6, 3: 4 };
 
 // Front layout of every house in the row, in u (see top). Lennie's house uses
 // the same numbers (house.js), so the row lines up.
@@ -234,6 +263,7 @@ export function buildNeighbours(kit, details) {
     // the house on Lennie's right has no toilet sticking out in the photo
     const [p0, p1] = span(style.noToilet ? LAYOUT.porchNoToilet : LAYOUT.porch);
     details.porch({ x0: p0, x1: p1, toilet: style.noToilet ? null : span(LAYOUT.toilet), frame: frameMat });
+    details.houseNumber(HOUSE_NUMBERS[i], (d0 + d1) / 2, '#2a2a2a');
 
     // ---- roof details
     for (const what of style.roof) {

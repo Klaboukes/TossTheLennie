@@ -128,6 +128,32 @@ export function buildStreet(scene, world, physMats, { std, tex }) {
   sign.rotation.x = Math.PI / 2; // the disc's printed face looks out over the street (+z)
   sign.position.set(signX, 2.2, STREET.verge[0] + 0.33);
 
+  // the blue Dutch street name sign on two low posts, readable from both sides
+  const nameTex = canvasTexture(768, 192, (g, w, h) => {
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#1d4594';
+    g.fillRect(10, 10, w - 20, h - 20);
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 6;
+    g.strokeRect(22, 22, w - 44, h - 44);
+    g.fillStyle = '#ffffff';
+    g.font = 'bold 104px "Trebuchet MS", sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('Appellaan', w / 2, h / 2 + 4);
+  });
+  const nameX = -9.5;
+  const nameZ = STREET.verge[0] + 0.5;
+  const board = { x0: nameX - 0.65, x1: nameX + 0.65, y0: 0.85, y1: 1.175, z0: nameZ - 0.015, z1: nameZ + 0.015 };
+  for (const x of [board.x0 + 0.12, board.x1 - 0.12]) {
+    boxAt([x - 0.03, 0, nameZ - 0.065], [x + 0.03, board.y1 - 0.02, nameZ - 0.015], lampMat, true);
+    solid([x - 0.03, 0, nameZ - 0.065], [x + 0.03, board.y1, nameZ - 0.015], 'tree');
+  }
+  const nameMat = std({ map: nameTex, roughness: 0.5 });
+  boxAt([board.x0, board.y0, board.z0], [board.x1, board.y1, board.z1], [lampMat, lampMat, lampMat, lampMat, nameMat, nameMat], true);
+  solid([board.x0, board.y0, board.z0], [board.x1, board.y1, board.z1], 'tree');
+
   // ------------------------------------------------------------ the supermarket across the road (supermarket.js)
   const shop = buildSupermarket(scene, world, physMats, { std, tex });
 

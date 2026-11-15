@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { textures, meterBoxUVs, floorGeometry } from './textures.js';
-import { makeDetails, buildNeighbours, LAYOUT, PORCH_Y } from './street.js';
+import { makeDetails, buildNeighbours, LAYOUT, PORCH_Y, HOUSE_NUMBERS } from './street.js';
 import { buildClutter } from './clutter.js';
 import { buildTV } from './tv.js';
 import { hangDrawings, hangPainting } from './drawings.js';
@@ -716,6 +716,7 @@ export function buildHouse(scene, world, physMats) {
   const ux = ([u0, u1]) => [OUT.x0 + u0, OUT.x0 + u1];
   buildRoof();
   details.porch({ x0: ux(LAYOUT.porch)[0], x1: ux(LAYOUT.porch)[1], fascia: M.canopy }); // over the toilet's bump-out (built below) and the door
+  details.houseNumber(HOUSE_NUMBERS[0], OUT.x0 + (LAYOUT.door[0] + LAYOUT.door[1]) / 2, '#f4f2ee');
   details.downpipe(OUT.x0 + LAYOUT.pipe, 2.55, (k) => ({ story: k, line: `south-${k}` }));
   buildNeighbours(kit, details);
   buildUtility();
