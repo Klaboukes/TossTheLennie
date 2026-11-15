@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // The family's bikes and a moped, parked front-first against the back fence
 // of the garden, between the bushes on the left and the tree by the bins: a
 // black omafiets with a crate on the front, a blue city bike, a pink kid's
-// bike and a little green one with stabilisers, and a mint scooter-style
+// bike and a little green one, and a dark blue scooter-style
 // moped with a windscreen and a top box.
 //
 // They're loose pieces (loose.js), like the dining chairs: Lennie knocks them
@@ -73,7 +73,7 @@ export function parkBikes(loose, parent, std) {
   });
 
   /** A bicycle `s` times the size of a grown-up's. */
-  function bicycle({ x, s, color, saddle = black, lean = -0.1, crate = false, stabilisers = false }) {
+  function bicycle({ x, s, color, saddle = black, lean = -0.1, crate = false }) {
     const g = new THREE.Group();
     const frame = std({ color, roughness: 0.45, metalness: 0.2 });
     const P = (px, py, pz = 0) => [px * s, py * s, pz * s];
@@ -137,27 +137,17 @@ export function parkBikes(loose, parent, std) {
       for (const side of [-1, 1]) tube(g, P(0.55, R, 0.05 * side), P(0.6, 0.8, 0.12 * side), 0.01 * s, black);
       parts.push([P(x0, y0, -w), P(x1, y1, w)]);
     }
-    if (stabilisers) {
-      for (const side of [-1, 1]) {
-        tube(g, P(-0.55, R, 0.04 * side), P(-0.6, 0.1, 0.2 * side), 0.012 * s, steel);
-        const sw = new THREE.Mesh(new THREE.TorusGeometry(0.075 * s, 0.022 * s, 6, 16), black);
-        sw.position.set(...P(-0.6, 0.097, 0.2 * side));
-        g.add(sw);
-        parts.push([P(-0.66, 0, side < 0 ? -0.22 : 0.18), P(-0.54, 0.19, side < 0 ? -0.18 : 0.22)]);
-      }
-    } else {
-      // the kickstand, out to its left; leaning on it brings its foot down to the ground
-      tube(g, P(-0.12, 0.28, -0.03), P(-0.3, 0.03, -0.13), 0.012 * s, steel);
-      parts.push([P(-0.34, 0.015, -0.16), P(-0.26, 0.06, -0.1)]);
-    }
-    const { at, turn } = place(x, 0.96 * s, stabilisers ? 0 : lean);
+    // the kickstand, out to its left; leaning on it brings its foot down to the ground
+    tube(g, P(-0.12, 0.28, -0.03), P(-0.3, 0.03, -0.13), 0.012 * s, steel);
+    parts.push([P(-0.34, 0.015, -0.16), P(-0.26, 0.06, -0.1)]);
+    const { at, turn } = place(x, 0.96 * s, lean);
     loose.add(parent, parts, { mass: 14 * s, surface: { kind: 'bike', sound: 'metal' }, look: g, at, turn });
   }
 
   /** A scooter-style moped on its centre stand, with a windscreen and a top box. */
   function moped(x) {
     const g = new THREE.Group();
-    const paint = std({ color: 0x86cdb9, roughness: 0.35, metalness: 0.1 });
+    const paint = std({ color: 0x1f3566, roughness: 0.3, metalness: 0.15 });
     const R = 0.21;
     for (const wx of [-0.55, 0.76]) {
       wheel(g, wx, R, 0.16, 0.05, false);
@@ -210,6 +200,6 @@ export function parkBikes(loose, parent, std) {
   bicycle({ x: -3.55, s: 1, color: 0x1e1e1e, saddle: std({ color: 0x6b4226, roughness: 0.6 }), crate: true, lean: -0.1 });
   bicycle({ x: -2.85, s: 1, color: 0x2c4f7c, lean: -0.12 });
   bicycle({ x: -2.2, s: 0.74, color: 0xe75a9b, lean: -0.12 });
-  bicycle({ x: -1.65, s: 0.58, color: 0x6dbb3c, stabilisers: true });
+  bicycle({ x: -1.65, s: 0.58, color: 0x6dbb3c, lean: -0.12 });
   moped(-0.45);
 }
