@@ -71,6 +71,129 @@ function wallpaper() {
   });
 }
 
+/**
+ * Lived-in white paint, tinted per room by the material colour: soft greyish
+ * blotches, scuffs along the skirting and a shadow of dust up by the ceiling.
+ * One tile is a storey high (3 m), so the floor is always at its bottom edge.
+ * With `kids`, the living room's walls also get grubby handprints and crayon
+ * scribbles down at a child's height. Its tile is wider, so they repeat less.
+ * A 'ceiling' gets just the blotches.
+ */
+function grime(kind) {
+  const kids = kind === 'kids';
+  const r = rng(kind.length * 7 + 3);
+  const wM = kids ? 4.5 : 3;
+  const c = document.createElement('canvas');
+  c.width = kids ? 768 : 512;
+  c.height = 512;
+  const g = c.getContext('2d');
+  const [w, h] = [c.width, c.height];
+  const px = w / wM; // pixels per metre
+  const yAt = (m) => h - m * (h / 3); // canvas y of a height above the floor
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, w, h);
+  /** Draws `f` at (x, y) and again across the tile's edges, so it tiles seamlessly. */
+  const wrap = (x, y, f) => {
+    for (const dx of [-w, 0, w]) for (const dy of [-h, 0, h]) f(x + dx, y + dy);
+  };
+  const smudge = (x, y, rad, a, tone = '110,98,80') => wrap(x, y, (X, Y) => {
+    const grad = g.createRadialGradient(X, Y, 0, X, Y, rad);
+    grad.addColorStop(0, `rgba(${tone},${a})`);
+    grad.addColorStop(1, `rgba(${tone},0)`);
+    g.fillStyle = grad;
+    g.fillRect(X - rad, Y - rad, rad * 2, rad * 2);
+  });
+  for (let i = 0; i < 26; i++) smudge(r() * w, r() * h, 20 + r() * 70, 0.03 + r() * 0.05);
+  if (kind === 'ceiling') return finish(c, wM);
+  // scuffs and dust along the floor, and a dusty shadow up under the ceiling
+  let grad = g.createLinearGradient(0, yAt(0.25), 0, h);
+  grad.addColorStop(0, 'rgba(90,80,65,0)');
+  grad.addColorStop(1, 'rgba(90,80,65,0.13)');
+  g.fillStyle = grad;
+  g.fillRect(0, yAt(0.25), w, h);
+  for (let i = 0; i < 18; i++) smudge(r() * w, yAt(0.04 + r() * 0.12), 6 + r() * 12, 0.08 + r() * 0.08, '60,55,50');
+  grad = g.createLinearGradient(0, 0, 0, yAt(2.75));
+  grad.addColorStop(0, 'rgba(100,95,85,0.09)');
+  grad.addColorStop(1, 'rgba(100,95,85,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, w, yAt(2.75));
+  if (kids) {
+    // grubby little handprints: a palm and four fingers and a thumb
+    const hand = (x, y, s, a) => {
+      g.save();
+      g.translate(x, y);
+      g.rotate((r() - 0.5) * 0.8);
+      g.fillStyle = `rgba(95,80,62,${a})`;
+      g.filter = 'blur(1.5px)'; // smeared, not stamped
+      g.beginPath();
+      g.ellipse(0, 0, 6 * s, 7 * s, 0, 0, Math.PI * 2);
+      for (const [fx, fy, len] of [[-5, -10, 5], [-1.7, -12, 6], [1.7, -12, 6], [5, -10, 5], [8, -1, 4]]) {
+        g.moveTo(fx * s + 1.6 * s, fy * s);
+        g.ellipse(fx * s, fy * s, 1.6 * s, len * s * 0.6, fx > 7 ? 1 : 0, 0, Math.PI * 2);
+      }
+      g.fill();
+      g.restore();
+    };
+    for (let i = 0; i < 14; i++) hand(30 + r() * (w - 60), yAt(0.55 + r() * 0.75), 0.9 + r() * 0.3, 0.04 + r() * 0.05);
+    // crayon on the wall, low down where small kids reach
+    const crayon = ['#d8382c', '#2f5fd0', '#2a9a48', '#8a3fb0', '#f08a1c'];
+    const stroke = (pts, color, lw = 2.2) => {
+      g.strokeStyle = color;
+      g.globalAlpha = 0.75;
+      g.lineWidth = lw;
+      g.lineCap = g.lineJoin = 'round';
+      g.beginPath();
+      pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      g.stroke();
+      g.globalAlpha = 1;
+    };
+    const jit = () => (r() - 0.5) * 3;
+    // zigzag scribbles
+    for (const [x, m, col] of [[0.35, 0.55, 0], [1.9, 0.4, 1], [3.6, 0.7, 3]]) {
+      const pts = [];
+      for (let i = 0; i < 14; i++) pts.push([x * px + i * 4 + jit(), yAt(m) + (i % 2 ? -18 : 6) + jit()]);
+      stroke(pts, crayon[col]);
+    }
+    // a spiral
+    {
+      const [cx, cy] = [1.2 * px, yAt(0.75)];
+      stroke(Array.from({ length: 50 }, (_, i) => [cx + Math.cos(i * 0.45) * i * 0.55 + jit() * 0.3, cy + Math.sin(i * 0.45) * i * 0.5]), crayon[4]);
+    }
+    // a sun with rays
+    {
+      const [cx, cy] = [2.7 * px, yAt(1.05)];
+      stroke(Array.from({ length: 16 }, (_, i) => [cx + Math.cos(i / 2.4) * 11, cy + Math.sin(i / 2.4) * 11]), crayon[4], 2.6);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        stroke([[cx + Math.cos(a) * 15, cy + Math.sin(a) * 15], [cx + Math.cos(a) * 24, cy + Math.sin(a) * 24]], crayon[4]);
+      }
+    }
+    // a stick figure and a house with a pointy roof
+    {
+      const [x, y] = [3.05 * px, yAt(0.45)];
+      stroke([[x, y], [x, y - 22]], crayon[1]);
+      stroke([[x - 9, y + 12], [x, y], [x + 9, y + 12]], crayon[1]);
+      stroke([[x - 11, y - 14], [x + 11, y - 18]], crayon[1]);
+      stroke(Array.from({ length: 12 }, (_, i) => [x + Math.cos(i / 1.8) * 6, y - 29 + Math.sin(i / 1.8) * 6]), crayon[1]);
+      const [hx, hy] = [0.6 * px, yAt(0.3)];
+      stroke([[hx, hy], [hx, hy - 30], [hx + 36, hy - 30], [hx + 36, hy], [hx, hy]], crayon[0]);
+      stroke([[hx - 4, hy - 28], [hx + 18, hy - 48], [hx + 40, hy - 28]], crayon[0]);
+      stroke([[hx + 14, hy], [hx + 14, hy - 14], [hx + 22, hy - 14], [hx + 22, hy]], crayon[2]);
+    }
+    // a long wobbly line, as if someone walked along with a crayon
+    stroke(Array.from({ length: 40 }, (_, i) => [2.1 * px + i * 6, yAt(0.82) + Math.sin(i * 0.5) * 4 + jit()]), crayon[2], 1.8);
+  }
+  return finish(c, wM);
+}
+function finish(c, wM) {
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1 / wM, 1 / 3);
+  t.anisotropy = 8;
+  return t;
+}
+
 function wood() {
   const r = rng(7);
   return canvasTexture(512, 2, (g, s) => {
@@ -234,6 +357,9 @@ export function textures() {
       brick: brick('#8e5a48', '#bdb1a5', 21),
       brickLight: brick('#a58a7a', '#d2c8bd', 23),
       wallpaper: wallpaper(),
+      grime: grime('wall'),
+      kidsWall: grime('kids'),
+      ceilingGrime: grime('ceiling'),
       wood: wood(),
       tiles: tiles(),
       carpet: carpet(),

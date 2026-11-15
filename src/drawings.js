@@ -354,3 +354,200 @@ export function hangDrawings({ addMesh, std }, spots) {
     addMesh(mesh, 0, s.line);
   }
 }
+
+/**
+ * The big black-and-white painting of a medieval town (an old etching, with
+ * hatched shading): a river with a stone bridge in front, the town wall with
+ * its towers and gate, steep gabled houses climbing a hill, a church spire,
+ * and the castle on top.
+ */
+function townPicture() {
+  const PW = 600;
+  const PH = 380;
+  const c = document.createElement('canvas');
+  c.width = PW;
+  c.height = PH;
+  const g = c.getContext('2d');
+  const r = rng(23);
+  const ink = (a) => `rgba(20,20,20,${a})`;
+  g.fillStyle = '#e9e6de';
+  g.fillRect(0, 0, PW, PH);
+  /** Hatching: parallel strokes over the current path. */
+  const hatch = (x0, y0, x1, y1, gap, slant) => {
+    g.save();
+    g.clip();
+    g.strokeStyle = ink(0.5);
+    g.lineWidth = 1;
+    g.beginPath();
+    for (let x = x0 - (y1 - y0); x < x1 + (y1 - y0); x += gap) {
+      g.moveTo(x, y0);
+      g.lineTo(x + (y1 - y0) * slant, y1);
+    }
+    g.stroke();
+    g.restore();
+  };
+  const trace = (pts) => {
+    g.beginPath();
+    pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+    g.closePath();
+  };
+  /** A filled, outlined shape, hatched every `gap` pixels if given. */
+  const shape = (pts, fill, gap = 0, slant = 0.6) => {
+    trace(pts);
+    g.fillStyle = fill;
+    g.fill();
+    if (gap) {
+      const xs = pts.map((p) => p[0]);
+      const ys = pts.map((p) => p[1]);
+      hatch(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys), gap, slant);
+      trace(pts);
+    }
+    g.strokeStyle = ink(0.85);
+    g.lineWidth = 1.4;
+    g.stroke();
+  };
+  // the sky: long faint horizontal strokes and outlined clouds
+  g.strokeStyle = ink(0.16);
+  g.lineWidth = 1;
+  for (let y = 12; y < 130; y += 7) {
+    g.beginPath();
+    g.moveTo(r() * 60, y);
+    g.lineTo(PW - r() * 60, y + (r() - 0.5) * 2);
+    g.stroke();
+  }
+  for (const [x, y, s] of [[70, 60, 1], [420, 42, 1.3]]) {
+    g.fillStyle = '#efece5';
+    g.strokeStyle = ink(0.6);
+    for (const [dx, dy, rr] of [[0, 0, 18], [22, -10, 22], [48, -2, 18], [68, 4, 13]]) {
+      g.beginPath();
+      g.arc(x + dx * s, y + dy * s, rr * s, Math.PI * 0.9, Math.PI * 2.1);
+      g.fill();
+      g.stroke();
+    }
+  }
+  // far hills, and the hill the town is built on
+  shape([[0, 190], [80, 160], [170, 175], [260, 150], [380, 165], [470, 140], [600, 170], [600, 240], [0, 240]], '#d8d5cd', 7, 0);
+  shape([[20, 300], [150, 215], [260, 150], [330, 140], [420, 175], [560, 260], [590, 300]], '#cfccc4', 5, 0.8);
+  // the castle on top: a keep with battlements and a flag, and a tower with a pointed roof
+  const crenel = (x0, x1, y) => {
+    for (let x = x0; x < x1 - 4; x += 10) shape([[x, y], [x, y - 7], [x + 6, y - 7], [x + 6, y]], '#bdb9b0');
+  };
+  shape([[265, 150], [265, 75], [325, 75], [325, 150]], '#c4c0b7', 4, 0.2);
+  crenel(265, 325, 75);
+  shape([[325, 150], [325, 95], [355, 95], [355, 150]], '#b3afa6', 3, 0.3);
+  shape([[321, 95], [340, 58], [359, 95]], '#8e8a82', 3, -0.5);
+  g.strokeStyle = ink(0.9);
+  g.beginPath();
+  g.moveTo(295, 68);
+  g.lineTo(295, 38);
+  g.stroke();
+  shape([[295, 38], [318, 44], [295, 50]], '#7a766f');
+  for (const [x, y] of [[280, 100], [305, 100], [292, 128], [337, 118]]) shape([[x, y], [x, y - 10], [x + 3, y - 14], [x + 6, y - 10], [x + 6, y]], '#2a2a2a');
+  // the church with its tall spire, part way down the hill
+  shape([[150, 215], [150, 165], [215, 165], [215, 215]], '#d0ccc3', 4, 0.2);
+  shape([[145, 165], [182, 142], [220, 165]], '#9b978f', 3, -0.6);
+  shape([[160, 165], [160, 112], [180, 112], [180, 165]], '#c8c4bb', 3, 0.2);
+  shape([[156, 112], [170, 38], [184, 112]], '#8a867e', 3, -0.4);
+  shape([[164, 142], [164, 130], [170, 124], [176, 130], [176, 142]], '#222222');
+  g.strokeStyle = ink(0.9);
+  g.beginPath();
+  g.moveTo(170, 38); g.lineTo(170, 26); g.moveTo(165, 31); g.lineTo(175, 31);
+  g.stroke();
+  // houses with steep and stepped gables, climbing the hill in rows
+  const house = (x, base, w, h, stepped) => {
+    const top = base - h;
+    shape([[x, base], [x, top], [x + w, top], [x + w, base]], r() < 0.5 ? '#dcd8cf' : '#cfcac0', r() < 0.4 ? 4 : 0, 0.2);
+    if (stepped) {
+      const s = w / 6;
+      shape([[x - 1, top], [x + s, top], [x + s, top - 6], [x + 2 * s, top - 6], [x + 2 * s, top - 12], [x + 4 * s, top - 12], [x + 4 * s, top - 6], [x + 5 * s, top - 6], [x + 5 * s, top], [x + w + 1, top]], '#a8a49b', 3, -0.5);
+    } else shape([[x - 2, top], [x + w / 2, top - w * 0.8], [x + w + 2, top]], '#8f8b83', 3, -0.6);
+    for (let wy = top + 7; wy < base - 9; wy += 12) for (let wx = x + 4; wx < x + w - 6; wx += 9) shape([[wx, wy], [wx + 4, wy], [wx + 4, wy + 6], [wx, wy + 6]], '#333333');
+  };
+  for (const [front, x0, x1, base, h] of [[0, 70, 145, 250, 30], [0, 222, 262, 222, 26], [0, 365, 470, 232, 32], [1, 40, 560, 285, 40]]) {
+    for (let x = x0; x < x1; x += 22 + r() * 8) house(x, base + (front ? 0 : r() * 6), 18 + r() * 8, h + r() * 14, r() < 0.45);
+  }
+  // the town wall in front, with towers and a gate
+  shape([[20, 330], [20, 285], [580, 285], [580, 330]], '#c9c5bc', 5, 0.15);
+  crenel(20, 580, 285);
+  g.strokeStyle = ink(0.3);
+  g.lineWidth = 1;
+  for (let y = 293; y < 330; y += 8) for (let x = 26 + (y % 16); x < 570; x += 16 + r() * 6) {
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + 10, y); g.stroke();
+  }
+  for (const x of [20, 190, 400, 552]) {
+    shape([[x - 8, 330], [x - 8, 265], [x + 28, 265], [x + 28, 330]], '#bfbbb2', 3, 0.25);
+    shape([[x - 12, 265], [x + 10, 232], [x + 32, 265]], '#86827a', 3, -0.6);
+  }
+  g.beginPath();
+  g.moveTo(280, 330); g.lineTo(280, 307); g.arc(298, 307, 18, Math.PI, 0); g.lineTo(316, 330);
+  g.closePath();
+  g.fillStyle = '#1e1e1e';
+  g.fill();
+  // the river in front, with the bridge to the gate and ripples
+  g.fillStyle = '#dedad2';
+  g.fillRect(0, 330, PW, PH - 330);
+  g.strokeStyle = ink(0.35);
+  for (let y = 336; y < PH; y += 5) {
+    for (let x = r() * 30; x < PW; x += 30 + r() * 40) {
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + 12 + r() * 20, y); g.stroke();
+    }
+  }
+  shape([[232, 346], [232, 330], [364, 330], [364, 346]], '#b8b4ab', 3, 0.2);
+  for (const x of [232, 276, 320]) {
+    // one span: its piers and the arch between them, down into the water
+    g.beginPath();
+    g.moveTo(x, 346); g.lineTo(x + 44, 346); g.lineTo(x + 44, PH); g.lineTo(x + 37, PH); g.lineTo(x + 37, 366);
+    g.arc(x + 22, 366, 15, 0, Math.PI, true);
+    g.lineTo(x + 7, PH); g.lineTo(x, PH);
+    g.closePath();
+    g.fillStyle = '#b8b4ab';
+    g.fill();
+    g.strokeStyle = ink(0.85);
+    g.stroke();
+  }
+  // a few dark trees on the banks
+  g.fillStyle = '#3a3a3a';
+  for (const [x, y] of [[60, 330], [520, 332], [548, 334]]) {
+    g.beginPath();
+    g.ellipse(x, y - 22, 14, 22, 0, 0, Math.PI * 2);
+    g.fill();
+    g.fillRect(x - 2, y - 4, 4, 8);
+  }
+  // an old print: darker towards the edges
+  const v = g.createRadialGradient(PW / 2, PH / 2, PH * 0.3, PW / 2, PH / 2, PW * 0.6);
+  v.addColorStop(0, 'rgba(0,0,0,0)');
+  v.addColorStop(1, 'rgba(40,35,25,0.25)');
+  g.fillStyle = v;
+  g.fillRect(0, 0, PW, PH);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+/**
+ * Hangs the medieval town painting on a wall: a black wooden frame with the
+ * picture set in it. (x, y, z) is the middle of its back, on the wall's face;
+ * `w` and `h` are the frame's outer size; `face` is the way it looks.
+ */
+export function hangPainting({ addMesh, std }, { x, y, z, w, h, face, line }) {
+  const yaw = { '+x': Math.PI / 2, '-x': -Math.PI / 2, '-z': Math.PI, '+z': 0 }[face];
+  const place = (geo) => geo.rotateY(yaw).translate(x, y, z);
+  const B = 0.07; // the frame's width
+  const D = 0.045; // how far it stands off the wall (sunk 5 mm into it, so no face lies on the wall's)
+  const frame = std({ color: 0x1d1a18, roughness: 0.5 });
+  for (const [x0, y0, x1, y1] of [
+    [-w / 2, h / 2 - B, w / 2, h / 2], // top
+    [-w / 2, -h / 2, w / 2, -h / 2 + B], // bottom
+    [-w / 2, -h / 2 + B, -w / 2 + B, h / 2 - B], // the sides, between them
+    [w / 2 - B, -h / 2 + B, w / 2, h / 2 - B],
+  ]) {
+    const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, D + 0.005).translate((x0 + x1) / 2, (y0 + y1) / 2, D / 2 - 0.0025);
+    addMesh(new THREE.Mesh(place(geo), frame), 0, line);
+  }
+  // the picture, set back in the frame and reaching in under its edges
+  const pic = new THREE.PlaneGeometry(w - 2 * B + 0.02, h - 2 * B + 0.02).translate(0, 0, D - 0.015);
+  const mesh = new THREE.Mesh(place(pic), std({ map: townPicture(), roughness: 0.8 }));
+  mesh.receiveShadow = true;
+  addMesh(mesh, 0, line);
+}

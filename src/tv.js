@@ -1,4 +1,4 @@
-// The living room TV. It's on, showing a sunny cartoon. Throw Lennie into it
+// The living room TV. It's on, with the kids' blocky building game on it. Throw Lennie into it
 // hard enough and the screen cracks where he hit it: a spider web of cracks,
 // a black blot of dead pixels, coloured lines, a flickering picture and
 // sparks spitting out of the hole. Touching a cracked TV gives him a shock
@@ -15,51 +15,85 @@ const SCREEN = { x: -0.037, y0: 0.55, y1: 1.2, z0: -0.6, z1: 0.6 };
 const W = 256;
 const H = 144;
 
-/** The cartoon on the TV: blue sky, sun, clouds, a green hill and a windmill. */
+/** The game on the TV: a blocky building game, seen through the player's eyes. */
 function drawPicture(g) {
+  let seed = 11;
+  const r = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const B = 8; // one block, in canvas pixels
   const sky = g.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#3f8fe0');
-  sky.addColorStop(1, '#a8dcff');
+  sky.addColorStop(0, '#6f9fef');
+  sky.addColorStop(1, '#b9d4ff');
   g.fillStyle = sky;
   g.fillRect(0, 0, W, H);
-  g.fillStyle = '#ffd23f';
-  g.beginPath();
-  g.arc(206, 34, 18, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = '#ffffff';
-  for (const [x, y, s] of [[50, 30, 1], [120, 20, 0.8], [160, 50, 0.6]]) {
-    g.beginPath();
-    g.arc(x, y, 12 * s, 0, Math.PI * 2);
-    g.arc(x + 14 * s, y - 4 * s, 14 * s, 0, Math.PI * 2);
-    g.arc(x + 30 * s, y, 11 * s, 0, Math.PI * 2);
-    g.fill();
+  // the square sun and flat blocky clouds
+  g.fillStyle = '#fff6b0';
+  g.fillRect(200, 12, 18, 18);
+  g.fillStyle = 'rgba(255,255,255,0.92)';
+  for (const [x, y, w] of [[24, 18, 40], [36, 10, 16], [120, 26, 48], [136, 18, 24]]) g.fillRect(x, y, w, 8);
+  /** One block: its colour, speckled with darker and lighter pixels. */
+  const block = (bx, by, color, specks) => {
+    g.fillStyle = color;
+    g.fillRect(bx, by, B, B);
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle = specks[Math.floor(r() * specks.length)];
+      g.fillRect(bx + Math.floor(r() * 4) * 2, by + Math.floor(r() * 4) * 2, 2, 2);
+    }
+  };
+  const DIRT = ['#8b5a33', ['#6f4526', '#9c6a40']];
+  // rolling hills, a column of blocks at a time: grass on dirt on stone
+  const ground = [];
+  for (let c = 0; c < W / B; c++) ground.push(10 + Math.round(Math.sin(c * 0.33) * 1.6 + Math.sin(c * 0.11 + 1) * 2));
+  ground.forEach((top, c) => {
+    for (let row = top; row < H / B; row++) {
+      const [x, y] = [c * B, row * B];
+      if (row < top + 3) block(x, y, ...DIRT);
+      else block(x, y, '#7f7f7f', ['#6a6a6a', '#959595', r() < 0.1 ? '#2b2b2b' : '#8a8a8a']);
+      if (row === top) {
+        g.fillStyle = '#5fae3a';
+        g.fillRect(x, y, B, 3);
+        g.fillStyle = '#4c9530';
+        g.fillRect(x + (c % 3) * 2, y + 3, 2, 2);
+      }
+    }
+  });
+  // a pond in the dip
+  g.fillStyle = 'rgba(52, 92, 220, 0.85)';
+  for (let c = 20; c < 24; c++) g.fillRect(c * B, ground[c] * B, B, B * 2);
+  // a tree: a trunk and a cube of leaves
+  const tc = 7;
+  for (let i = 1; i <= 3; i++) block(tc * B, (ground[tc] - i) * B, '#6b4f2a', ['#5a4022', '#7a5c33']);
+  for (let dx = -2; dx <= 2; dx++) for (let dy = 0; dy < 3; dy++) {
+    if (Math.abs(dx) === 2 && dy === 0) continue;
+    block((tc + dx) * B, (ground[tc] - 6 + dy) * B, '#3d8a2a', ['#2f6f20', '#4fa236']);
   }
-  g.fillStyle = '#4caf50';
-  g.beginPath();
-  g.ellipse(80, H + 30, 170, 80, 0, 0, Math.PI * 2);
-  g.fill();
-  g.fillStyle = '#3d9142';
-  g.beginPath();
-  g.ellipse(230, H + 20, 120, 60, 0, 0, Math.PI * 2);
-  g.fill();
-  // a windmill on the hill
-  g.fillStyle = '#7a4a2a';
-  g.beginPath();
-  g.moveTo(88, 60); g.lineTo(100, 60); g.lineTo(106, 96); g.lineTo(82, 96);
-  g.fill();
-  g.strokeStyle = '#f4f2ee';
-  g.lineWidth = 4;
-  for (let i = 0; i < 4; i++) {
-    const a = 0.4 + (i * Math.PI) / 2;
-    g.beginPath();
-    g.moveTo(94, 58);
-    g.lineTo(94 + Math.cos(a) * 30, 58 + Math.sin(a) * 30);
-    g.stroke();
-  }
-  // the channel logo in the corner
-  g.fillStyle = 'rgba(255,255,255,0.8)';
-  g.font = 'bold 12px sans-serif';
-  g.fillText('TV', 8, 16);
+  // the player's hand, holding a pickaxe, in the bottom right corner
+  g.fillStyle = '#6b4f2a';
+  for (let i = 0; i < 7; i++) g.fillRect(206 + i * 5, 128 - i * 5, 6, 6);
+  g.fillStyle = '#7fd8d0';
+  for (let i = -3; i <= 3; i++) g.fillRect(232 + i * 5, 92 + Math.abs(i) * 3, 6, 6);
+  g.fillStyle = '#c99a6e';
+  g.fillRect(214, 116, 26, 28);
+  g.fillStyle = '#b5845a';
+  g.fillRect(214, 136, 26, 8);
+  // the crosshair, the hearts and the hotbar
+  g.fillStyle = 'rgba(255,255,255,0.85)';
+  g.fillRect(W / 2 - 5, H / 2 - 1, 10, 2);
+  g.fillRect(W / 2 - 1, H / 2 - 5, 2, 10);
+  const x0 = W / 2 - 54;
+  g.fillStyle = 'rgba(30,30,30,0.75)';
+  g.fillRect(x0, H - 14, 108, 12);
+  const items = ['#5fae3a', '#8b5a33', '#7f7f7f', '#6b4f2a', '#3d8a2a', null, '#e8d36a', null, '#c0392b'];
+  items.forEach((c, i) => {
+    g.strokeStyle = i === 1 ? '#ffffff' : '#8f8f8f';
+    g.lineWidth = 1;
+    g.strokeRect(x0 + 1.5 + i * 12, H - 12.5, 9, 9);
+    if (c) {
+      g.fillStyle = c;
+      g.fillRect(x0 + 3 + i * 12, H - 11, 6, 6);
+    }
+  });
+  g.fillStyle = '#e8322b';
+  for (let i = 0; i < 10; i++) g.fillRect(x0 + i * 6, H - 21, 4, 4);
 }
 
 /** The broken screen, cracked from (cx, cy) in canvas pixels. */

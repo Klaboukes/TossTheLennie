@@ -4,7 +4,7 @@ import { textures, meterBoxUVs, floorGeometry } from './textures.js';
 import { makeDetails, buildNeighbours, LAYOUT, PORCH_Y } from './street.js';
 import { buildClutter } from './clutter.js';
 import { buildTV } from './tv.js';
-import { hangDrawings } from './drawings.js';
+import { hangDrawings, hangPainting } from './drawings.js';
 import { createLoose } from './loose.js';
 
 // A Dutch terraced house: two brick storeys and an attic under a steep roof,
@@ -70,16 +70,18 @@ const HOLES = {
 };
 
 // White painted walls (no wallpaper) for the living room, the kitchen, the
-// toilet, the bedrooms and the attic.
-const WHITE_PAINT = { wall: 0xfbfbf8, wallTex: 'paint' };
+// toilet, the utility room, the bedrooms and the attic: a lived-in, slightly
+// grubby white (textures.js), and in the living room with the kids' handprints
+// and crayon on it too.
+const WHITE_PAINT = { wall: 0xf4f1ea, wallTex: 'paint' };
 const ROOMS = [
   {
     hall: { name: 'Hallway', wall: 0xeadfc8, floor: 'wood' },
-    left: { name: 'Living room', floor: 'wood', ...WHITE_PAINT },
+    left: { name: 'Living room', floor: 'wood', ...WHITE_PAINT, wallTex: 'kids' },
     right: { name: 'Kitchen', floor: 'tiles', floorTint: 0xf1ece2, ...WHITE_PAINT },
     toilet: { name: 'Toilet', floor: 'tiles', floorTint: 0xd9d4cc, ...WHITE_PAINT }, // white walls, tiles only on the floor
     storage: { name: 'Storage cupboard', wall: 0xeadfc8, floor: 'wood' },
-    utility: { name: 'Utility room', wall: 0xe4ece6, floor: 'tiles', floorTint: 0xc9c2b6, wallTex: 'tiles' },
+    utility: { name: 'Utility room', floor: 'tiles', floorTint: 0xc9c2b6, ...WHITE_PAINT },
     garage: { name: 'Garage', wall: 0xd6d2c9, wallTex: 'paint', floor: 'stone', floorTint: 0x9d9a94 },
   },
   {
@@ -130,9 +132,9 @@ const FRONT = [
 ];
 const BACK = [{ a: -5.2, b: -3.8 }, { a: 3.6, b: 5.0 }];
 // The living room's back wall: one big window frame onto the garden, a wide
-// pane with a side window on its right, and the door to the utility room.
+// pane with a side window on its left (seen from inside, by the TV), and the door to the utility room.
 // The convector heating trench runs in the floor under it.
-const BACK_GROUND = [{ a: -4.75, b: 0.95, sill: 0.55, bars: { v: [0.84], h: [] } }];
+const BACK_GROUND = [{ a: -4.75, b: 0.95, sill: 0.55, bars: { v: [0.16], h: [] } }];
 const UTILITY_DOOR = [1.7, 2.8];
 const FRONT_DOOR = [-2.2, -1.1];
 // The toilet sticks out of the front, as in the floor plan: a little brick
@@ -197,7 +199,8 @@ export function buildHouse(scene, world, physMats) {
     trim: std({ color: 0xfbfaf6, roughness: 0.6 }),
     // Ceilings: a warm off-white, just set apart from the white walls. They face down,
     // where only the lawn's greenish bounce light reaches, so a glow of their own keeps them light.
-    ceiling: std({ color: 0xf3efe6, emissive: 0xa8a398 }),
+    // A little grubby, like the walls (the glow too, or it would wash the grime out).
+    ceiling: std({ map: tex.ceilingGrime, color: 0xf0ece3, emissive: 0xa8a398, emissiveMap: tex.ceilingGrime }),
     wood: std({ map: tex.wood, roughness: 0.6 }),
     stairSide: std({ color: 0xf3efe6 }),
     roofTiles: std({ map: tex.pantiles, roughness: 0.8 }),
@@ -214,8 +217,8 @@ export function buildHouse(scene, world, physMats) {
   const wallpaper = (room) => {
     const key = `${room.wall}-${room.wallTex ?? 'paper'}`;
     if (!wallpaperCache.has(key)) {
-      // 'paint' is a plain painted wall, without the wallpaper's stripes
-      const map = room.wallTex === 'paint' ? null : room.wallTex === 'tiles' ? tex.tiles : tex.wallpaper;
+      // 'paint' is a painted wall, without the wallpaper's stripes but a bit grubby; 'kids' with handprints and crayon
+      const map = { paint: tex.grime, kids: tex.kidsWall, tiles: tex.tiles }[room.wallTex] ?? tex.wallpaper;
       wallpaperCache.set(key, std({ map, color: room.wall }));
     }
     return wallpaperCache.get(key);
@@ -709,13 +712,15 @@ export function buildHouse(scene, world, physMats) {
     { pic: 4, face: '-z', x: -1.2, y: 1.42, z: GF.hallZ - INT / 2 - 0.006, w: 0.36, tilt: 0.05, line: 'hallback-0' },
     { pic: 2, face: '-x', x: ex, y: 1.5, z: -3.4, w: 0.55, tilt: -0.05, line: 'east-0' }, // by the dining table
     { pic: 6, face: '-x', x: ex, y: 1.82, z: -2.6, w: 0.45, tilt: 0.07, line: 'east-0' },
-    { pic: 7, face: '-x', x: ex, y: 1.5, z: -1.7, w: 0.65, line: 'east-0' },
+    { pic: 7, face: '+x', x: wx, y: 1.88, z: -3.05, w: 0.5, tilt: -0.03, line: 'west-0' }, // above the TV's corner
     // framed snapshots of friends in the toilet: on its back wall, its side, and in its bump-out by the loo
     { pic: 8, face: '+z', x: -4.95, y: 1.62, z: GF.toiletZ + INT / 2 + 0.006, w: 0.42, tilt: 0.02, line: 'toilet-0' },
     { pic: 9, face: '+z', x: -4.15, y: 1.48, z: GF.toiletZ + INT / 2 + 0.006, w: 0.36, tilt: -0.02, line: 'toilet-0' },
     { pic: 10, face: '+x', x: wx, y: 1.55, z: 4.3, w: 0.42, line: 'west-0' },
     { pic: 11, face: '+x', x: wx, y: 1.6, z: 5.4, w: 0.36, tilt: 0.02, line: 'toiletoutw-0' },
   ]);
+  // the big black-and-white painting of a medieval town on the wall behind the dining table (drawings.js)
+  hangPainting(kit, { face: '-x', x: IN.x1, y: 1.62, z: -1.25, w: 1.5, h: 0.98, line: 'east-0' });
   // the TV on its cabinet, which cracks and sparks when Lennie hits it (tv.js)
   const tv = buildTV(kit);
   // the mess: dishes, toys, clothes, household stuff and the board game closet (clutter.js)
