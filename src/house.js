@@ -1278,6 +1278,22 @@ export function buildHouse(scene, world, physMats) {
     }
   }
 
+  /**
+   * The underside of the ceiling over `p` (Lennie) while the camera is below
+   * it too, else Infinity. The see-through window around him leaves that
+   * ceiling whole: a hole in it would show the floor above, which the cutaway
+   * only hides once the camera rises past the ceiling. The attic has no floor
+   * above, just the roof, so that may still be cut.
+   */
+  function ceilingOver(p, camera) {
+    if (!isInside(p)) return Infinity;
+    const k = storyAt(p.y);
+    if (k >= HOUSE.stories - 1) return Infinity;
+    const under = (k + 1) * H - T;
+    // a little under it, so rounding never counts the ceiling's own face as below
+    return camera.position.y < under ? under - 0.02 : Infinity;
+  }
+
   /** True when a mesh is hidden by the cutaway or faded out of the way, so aiming looks past it. */
   function isFaded(mesh) {
     for (let o = mesh; o; o = o.parent) if (!o.visible) return true;
@@ -1331,6 +1347,7 @@ export function buildHouse(scene, world, physMats) {
     spawnPoint,
     spots,
     updateView,
+    ceilingOver,
     isFaded,
     breakPiece,
     crackDoor,

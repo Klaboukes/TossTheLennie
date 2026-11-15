@@ -2686,7 +2686,8 @@ function tick(dt, now) {
   updateHint();
   house.updateView(camera, controls.target, dt, cutaway);
   shop.updateView(camera, controls.target, dt);
-  seeThrough.update(camera, lennieOnScreen(_seeCenter), dt);
+  lennieOnScreen(_seeCenter);
+  seeThrough.update(camera, _seeCenter, dt, house.ceilingOver(_seeCenter, camera));
   blobShadow.update(lennieOnScreen(_blobCenter));
   updateShards(dt * timeScale);
   zap.update(dt * timeScale, !replay.playing);

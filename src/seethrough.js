@@ -11,6 +11,10 @@ import * as THREE from 'three';
 // stays, and with the camera never lower than what it looks at, things below
 // him can't block the view of him anyway.
 //
+// Nothing at or above the ceiling over Lennie is cut either, while the camera
+// is under that ceiling too: a hole in it would show the floor above, which
+// the house's cutaway only hides once the camera rises past the ceiling.
+//
 // It works by adding a few lines to the shaders of all scenery materials, so
 // it costs nothing per object. Lennie's own materials are left alone.
 
@@ -27,6 +31,7 @@ const uniforms = {
   seeRadius: { value: 0 }, // pixels
   seeDist: { value: 0 }, // camera to Lennie's middle
   seeFloor: { value: -1e3 }, // world height below which nothing is cut
+  seeCeil: { value: 1e6 }, // world height from which up nothing is cut
   seeOn: { value: 0 }, // 0 while Lennie is behind the camera
 };
 
@@ -43,12 +48,13 @@ uniform vec2 seeCenter;
 uniform float seeRadius;
 uniform float seeDist;
 uniform float seeFloor;
+uniform float seeCeil;
 uniform float seeOn;
 varying vec3 vSeeWorld;
 float seeNoise(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
 `;
 const FRAGMENT_BODY = `
-  if (vSeeWorld.y > seeFloor) {
+  if (vSeeWorld.y > seeFloor && vSeeWorld.y < seeCeil) {
     float seeD = distance(vSeeWorld, cameraPosition);
     float seeCut = 1.0 - smoothstep(${LENS.toFixed(3)}, ${(LENS + LENS_SOFT).toFixed(3)}, seeD);
     if (seeOn > 0.5) {
@@ -80,7 +86,7 @@ export function createSeeThrough(scene, renderer, skip) {
   let sweepIn = 0;
   const _size = new THREE.Vector2();
   const _v = new THREE.Vector3();
-  const state = { center: new THREE.Vector3(), cx: 0, cy: 0, radius: 0, dist: 0, floor: -1e3, on: false };
+  const state = { center: new THREE.Vector3(), cx: 0, cy: 0, radius: 0, dist: 0, floor: -1e3, ceil: 1e6, on: false };
 
   function patch(mat) {
     if (patched.has(mat) || kept.has(mat)) return;
@@ -102,8 +108,11 @@ export function createSeeThrough(scene, renderer, skip) {
     });
   }
 
-  /** Points the cut-away at `center` (Lennie's middle) for this frame. */
-  function update(camera, center, dt) {
+  /**
+   * Points the cut-away at `center` (Lennie's middle) for this frame; `ceil`
+   * is the height from which up nothing is cut (the ceiling over him).
+   */
+  function update(camera, center, dt, ceil = Infinity) {
     sweepIn -= dt;
     if (sweepIn <= 0) {
       sweep();
@@ -119,20 +128,22 @@ export function createSeeThrough(scene, renderer, skip) {
     const minRadius = MIN_SHARE * Math.max(_size.x, _size.y);
     const radius = THREE.MathUtils.clamp(REACH * pxPerM, minRadius, Math.max(0.9 * _size.y, minRadius));
     const floor = center.y - BELOW;
+    ceil = Math.min(ceil, 1e6);
     // Lennie lying still still trembles a tenth of a millimetre or so every
     // frame. Following that would shift the dithered edges of the cut-away a
     // hair each frame, and those speckles would flicker. So the cut-away only
     // moves once something has really moved; then it jumps all at once.
     const moved = on !== state.on || Math.hypot(cx - state.cx, cy - state.cy) > HOLD.px
       || Math.abs(radius - state.radius) > HOLD.px || Math.abs(dist - state.dist) > HOLD.m
-      || Math.abs(floor - state.floor) > HOLD.m;
+      || Math.abs(floor - state.floor) > HOLD.m || ceil !== state.ceil;
     if (!moved) return;
     state.center.copy(center);
-    Object.assign(state, { dist, on, cx, cy, radius, floor });
+    Object.assign(state, { dist, on, cx, cy, radius, floor, ceil });
     uniforms.seeCenter.value.set(state.cx, state.cy);
     uniforms.seeRadius.value = state.radius;
     uniforms.seeDist.value = state.dist;
     uniforms.seeFloor.value = state.floor;
+    uniforms.seeCeil.value = state.ceil;
     uniforms.seeOn.value = state.on ? 1 : 0;
   }
 
@@ -141,7 +152,7 @@ export function createSeeThrough(scene, renderer, skip) {
    * looks past it like it looks past faded walls.
    */
   function hides(point, camera) {
-    if (point.y <= state.floor) return false;
+    if (point.y <= state.floor || point.y >= state.ceil) return false;
     const d = camera.position.distanceTo(point);
     if (d < LENS + LENS_SOFT / 2) return true;
     if (!state.on || d > state.dist - IN_FRONT - 0.15) return false;
