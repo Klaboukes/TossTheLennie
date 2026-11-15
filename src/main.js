@@ -445,6 +445,7 @@ const toss = {
   products: 0, // knocked off the supermarket's shelves
   mess: 0, // dishes, toys and clothes in the house sent flying
   games: 0, // board games knocked out of the closet
+  toys: 0, // toys knocked out of the TV cabinet
   cars: 0, // times a passing car sent him flying
   stairs: new Set(),
   startLevel: null,
@@ -462,6 +463,7 @@ function resetChain() {
   toss.products = 0;
   toss.mess = 0;
   toss.games = 0;
+  toss.toys = 0;
   toss.cars = 0;
   toss.stairs = new Set();
   toss.startLevel = null;
@@ -553,6 +555,7 @@ function houseBonuses(center) {
   if (shop.isOnRoof(center) && !toss.startOnShopRoof) add('shoproof', 'On the supermarket roof!', 600);
   if (toss.products >= 5) add('mess', `Knocked ${toss.products} products off the shelves`, Math.min(400, 10 * toss.products));
   if (toss.games >= 3) add('games', `Board game avalanche! (${toss.games} games)`, Math.min(500, 20 * toss.games));
+  if (toss.toys >= 5) add('toys', `Toy avalanche! (${toss.toys} toys)`, Math.min(500, 8 * toss.toys));
   if (toss.mess >= 5) add('housemess', `Made the mess even worse (${toss.mess} things)`, Math.min(300, 6 * toss.mess));
   const steps = toss.stairs.size;
   if (steps >= 10) add('fullflight', `Full flight! (${steps} steps)`, 400);

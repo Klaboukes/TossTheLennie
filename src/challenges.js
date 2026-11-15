@@ -17,6 +17,7 @@ export const CHALLENGES = [
   { id: 'stairs', text: 'Tumble Lennie down the stairs', test: (r) => r.ids.has('stairs') || r.ids.has('fullflight') },
   { id: 'bed', text: 'Put Lennie to bed', test: (r) => r.ids.has('bed') },
   { id: 'games', text: 'Knock the board games out of the closet', test: (r) => r.ids.has('games') },
+  { id: 'toys', text: 'Smash the TV cabinet doors and let the toys out', test: (r) => r.ids.has('toys') },
   { id: 'trampoline', text: 'Bounce Lennie on the trampoline', test: (r) => r.chain.trampoline >= 1 },
   { id: 'bath', text: 'Land Lennie in the bath', test: (r) => r.ids.has('bath') },
   { id: 'juggle', text: 'Catch Lennie in mid-air twice in one toss', test: (r) => r.chain.juggles >= 2 },

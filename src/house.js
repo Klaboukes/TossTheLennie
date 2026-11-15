@@ -155,155 +155,6 @@ export const ROW = { width: 12.25, left: 1, right: 3 };
 ROW.x0 = -6.125 - ROW.left * ROW.width;
 ROW.x1 = 6.125 + ROW.right * ROW.width;
 
-/**
- * The front of the TV's low cabinet: a brightly painted folk-art piece, three
- * doors, each a different colour with a prancing horse on it and flowers in
- * the corners. One canvas pixel per 2.6 mm; the cabinet front is 2 m by 0.5 m.
- */
-function paintedCabinetTexture() {
-  const [W, H] = [768, 192];
-  const c = document.createElement('canvas');
-  c.width = W;
-  c.height = H;
-  const g = c.getContext('2d');
-  // the red frame around the doors, with a yellow stripe along the top and bottom
-  g.fillStyle = '#c8302a';
-  g.fillRect(0, 0, W, H);
-  g.fillStyle = '#f2c230';
-  g.fillRect(0, 6, W, 4);
-  g.fillRect(0, H - 10, W, 4);
-  const rounded = (x, y, w, h, r) => {
-    g.beginPath();
-    g.roundRect(x, y, w, h, r);
-  };
-  const flower = (x, y, r, petal, heart) => {
-    g.fillStyle = petal;
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
-      g.beginPath();
-      g.ellipse(x + Math.cos(a) * r, y + Math.sin(a) * r, r * 0.85, r * 0.55, a, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.fillStyle = heart;
-    g.beginPath();
-    g.arc(x, y, r * 0.6, 0, Math.PI * 2);
-    g.fill();
-  };
-  /** A folk-art horse, about 100 by 90 units around (0, 0), facing right; scaled by s, mirrored by flip. */
-  const horse = (cx, cy, s, flip, body, mane, saddle, dots) => {
-    g.save();
-    g.translate(cx, cy);
-    g.scale(s * flip, s);
-    g.lineCap = 'round';
-    g.lineJoin = 'round';
-    // tail, behind everything
-    g.strokeStyle = mane;
-    g.lineWidth = 7;
-    g.beginPath();
-    g.moveTo(-28, -6);
-    g.quadraticCurveTo(-50, -4, -44, 26);
-    g.stroke();
-    // legs: the front pair lifted mid-prance
-    g.strokeStyle = body;
-    g.lineWidth = 7;
-    for (const [x0, y0, x1, y1, x2, y2] of [
-      [-22, 4, -26, 22, -30, 38],
-      [-14, 6, -12, 22, -14, 38],
-      [16, 4, 26, 16, 24, 28],
-      [22, 2, 34, 8, 36, 20],
-    ]) {
-      g.beginPath();
-      g.moveTo(x0, y0);
-      g.lineTo(x1, y1);
-      g.lineTo(x2, y2);
-      g.stroke();
-    }
-    // body, neck and head
-    g.fillStyle = body;
-    g.beginPath();
-    g.ellipse(0, -2, 32, 15, 0, 0, Math.PI * 2);
-    g.fill();
-    g.beginPath();
-    g.moveTo(14, -14);
-    g.quadraticCurveTo(22, -34, 30, -44);
-    g.lineTo(42, -38);
-    g.quadraticCurveTo(34, -20, 30, 2);
-    g.closePath();
-    g.fill();
-    g.beginPath();
-    g.ellipse(42, -38, 15, 7, 0.55, 0, Math.PI * 2);
-    g.fill();
-    g.beginPath(); // ears
-    g.moveTo(30, -46);
-    g.lineTo(31, -56);
-    g.lineTo(37, -46);
-    g.fill();
-    // mane: a wavy row of tufts down the neck
-    g.fillStyle = mane;
-    for (let i = 0; i < 5; i++) {
-      g.beginPath();
-      g.arc(27 - i * 4, -44 + i * 7, 5, 0, Math.PI * 2);
-      g.fill();
-    }
-    // the painted saddle cloth, with dots along its edge
-    g.fillStyle = saddle;
-    g.beginPath();
-    g.moveTo(-14, -15);
-    g.lineTo(10, -15);
-    g.quadraticCurveTo(12, 4, -2, 8);
-    g.quadraticCurveTo(-16, 4, -14, -15);
-    g.fill();
-    g.fillStyle = dots;
-    for (const [x, y] of [[-11, -8], [-6, 1], [1, 3], [7, -2], [8, -10]]) {
-      g.beginPath();
-      g.arc(x, y, 2, 0, Math.PI * 2);
-      g.fill();
-    }
-    // bridle and eye
-    g.strokeStyle = saddle;
-    g.lineWidth = 2.5;
-    g.beginPath();
-    g.moveTo(32, -43);
-    g.lineTo(46, -30);
-    g.stroke();
-    g.fillStyle = '#1a1414';
-    g.beginPath();
-    g.arc(39, -42, 2.2, 0, Math.PI * 2);
-    g.fill();
-    g.restore();
-  };
-  const DOORS = [
-    { bg: '#2fb5b0', rim: '#f6efe0', horse: '#f6efe0', mane: '#c8302a', saddle: '#f2c230', dots: '#2a5fb0' },
-    { bg: '#f2c230', rim: '#2a5fb0', horse: '#2a5fb0', mane: '#e8559a', saddle: '#c8302a', dots: '#f6efe0' },
-    { bg: '#e8559a', rim: '#f6efe0', horse: '#1f2a6b', mane: '#f2c230', saddle: '#2fb5b0', dots: '#f6efe0' },
-  ];
-  DOORS.forEach((d, i) => {
-    const x = i * 256;
-    // the door, with a thin painted line inside its edge
-    g.fillStyle = d.bg;
-    rounded(x + 12, 18, 232, H - 36, 10);
-    g.fill();
-    g.strokeStyle = d.rim;
-    g.lineWidth = 3;
-    rounded(x + 20, 26, 216, H - 52, 7);
-    g.stroke();
-    // flowers in the corners and a row of dots along the bottom
-    for (const [fx, fy] of [[x + 38, 44], [x + 218, 44], [x + 38, H - 44], [x + 218, H - 44]]) flower(fx, fy, 7, d.rim, d.mane);
-    g.fillStyle = d.saddle;
-    for (let k = 0; k < 7; k++) {
-      g.beginPath();
-      g.arc(x + 74 + k * 18, H - 36, 2.5, 0, Math.PI * 2);
-      g.fill();
-    }
-    // the outer doors' horses face the middle one
-    horse(x + 126, 98, 1.05, i === 2 ? -1 : 1, d.horse, d.mane, d.saddle, d.dots);
-  });
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
-  return t;
-}
-
 /** The convector trench's grille: wooden slats across it, 3 per 10 cm, over the dark trench. */
 function grilleTexture(length) {
   const c = document.createElement('canvas');
@@ -1303,16 +1154,6 @@ export function buildHouse(scene, world, physMats) {
         }
       }
     }
-    // The TV's painted cabinet: red, a turquoise top, and the painted doors on
-    // its front (+x). That face has metre UVs, 2.75 to 4.75 across and 0 to
-    // 0.5 up, so the texture is stretched over exactly that.
-    const paintedCabinet = () => {
-      const front = paintedCabinetTexture();
-      front.repeat.set(1 / 2, 1 / 0.5);
-      front.offset.set(-2.75 / 2, 0);
-      const red = col(0xc8302a);
-      return [std({ map: front, roughness: 0.6 }), red, col(0x2fb5b0), red, red, red];
-    };
     const WOOD = 0x9b6a3f;
     const WHITE = 0xf4f2ee;
 
@@ -1338,12 +1179,8 @@ export function buildHouse(scene, world, physMats) {
       [[-4.8, 0.45, -1.55], [-3.65, 0.52, -1.12], SOFA_CUSHION, { soft: true, phys: false }],
       [[-3.6, 0.45, -1.55], [-2.45, 0.52, -1.12], SOFA_CUSHION, { soft: true, phys: false }],
       [[-2.4, 0.45, -1.55], [-1.25, 0.52, -1.12], SOFA_CUSHION, { soft: true, phys: false }],
-      // the low cabinet behind the couch, and the TV's low cabinet in the back corner
+      // the low cabinet behind the couch (the TV's painted cabinet is in clutter.js, full of toys)
       [[-2.9, 0, -0.75], [-1.0, 0.55, -0.35], WHITE],
-      [[-5.875, 0, -4.75], [-4.95, 0.5, -2.75], null, { mat: paintedCabinet() }],
-      // a little brass knob on each of its three doors
-      // (top middle, above the horse's back)
-      ...[0, 1, 2].map((i) => [[-4.95, 0.36, -2.75 - (i + 0.5) * (2 / 3) - 0.016], [-4.928, 0.39, -2.75 - (i + 0.5) * (2 / 3) + 0.016], 0xd9b04a, { phys: false }]),
       // the comfy chair by the back window, just in front of the heating trench
       [[-0.4, 0, -4.6], [0.6, 0.42, -3.5], SOFA, { soft: true }],
       [[-0.4, 0.42, -4.6], [0.6, 1.05, -4.3], SOFA, { soft: true }],

@@ -26,6 +26,118 @@ import { canvasTexture } from './supermarket.js';
 const TAU = Math.PI * 2;
 const INK = '#2b2b2b';
 
+// The TV cabinet's three painted doors (buildTVCabinet), left to right as you face it.
+const DOOR_LOOKS = [
+  { bg: '#2fb5b0', rim: '#f6efe0', horse: '#f6efe0', mane: '#c8302a', saddle: '#f2c230', dots: '#2a5fb0' },
+  { bg: '#f2c230', rim: '#2a5fb0', horse: '#2a5fb0', mane: '#e8559a', saddle: '#c8302a', dots: '#f6efe0' },
+  { bg: '#e8559a', rim: '#f6efe0', horse: '#1f2a6b', mane: '#f2c230', saddle: '#2fb5b0', dots: '#f6efe0' },
+];
+
+/**
+ * One painted door of the TV cabinet: a folk-art horse mid-prance, a painted
+ * line inside the edge, flowers in the corners. `flip` -1 has the horse face left.
+ */
+function horseDoorTexture(d, flip) {
+  const [W, H] = [256, 152];
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = d.bg;
+  g.fillRect(0, 0, W, H);
+  g.strokeStyle = d.rim;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.roundRect(9, 9, W - 18, H - 18, 7);
+  g.stroke();
+  const dot = (x, y, r) => {
+    g.beginPath();
+    g.arc(x, y, r, 0, TAU);
+    g.fill();
+  };
+  // flowers in the corners, a row of dots along the bottom
+  for (const [x, y] of [[26, 26], [W - 26, 26], [26, H - 26], [W - 26, H - 26]]) {
+    g.fillStyle = d.rim;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * TAU - Math.PI / 2;
+      g.beginPath();
+      g.ellipse(x + Math.cos(a) * 7, y + Math.sin(a) * 7, 6, 3.9, a, 0, TAU);
+      g.fill();
+    }
+    g.fillStyle = d.mane;
+    dot(x, y, 4.2);
+  }
+  g.fillStyle = d.saddle;
+  for (let k = 0; k < 7; k++) dot(74 + k * 18, H - 20, 2.5);
+
+  // the horse, drawn in units about 100 by 90 around its middle
+  g.save();
+  g.translate(W / 2, 78);
+  g.scale(0.95 * flip, 0.95);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  const stroke = (color, width, pts) => {
+    g.strokeStyle = color;
+    g.lineWidth = width;
+    g.beginPath();
+    g.moveTo(pts[0], pts[1]);
+    for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]);
+    g.stroke();
+  };
+  // the tail, behind everything
+  g.strokeStyle = d.mane;
+  g.lineWidth = 7;
+  g.beginPath();
+  g.moveTo(-28, -6);
+  g.quadraticCurveTo(-50, -4, -44, 26);
+  g.stroke();
+  // the legs, the front pair lifted
+  for (const leg of [[-22, 4, -26, 22, -30, 38], [-14, 6, -12, 22, -14, 38], [16, 4, 26, 16, 24, 28], [22, 2, 34, 8, 36, 20]]) stroke(d.horse, 7, leg);
+  // body, neck, head and ears
+  g.fillStyle = d.horse;
+  g.beginPath();
+  g.ellipse(0, -2, 32, 15, 0, 0, TAU);
+  g.fill();
+  g.beginPath();
+  g.moveTo(14, -14);
+  g.quadraticCurveTo(22, -34, 30, -44);
+  g.lineTo(42, -38);
+  g.quadraticCurveTo(34, -20, 30, 2);
+  g.closePath();
+  g.fill();
+  g.beginPath();
+  g.ellipse(42, -38, 15, 7, 0.55, 0, TAU);
+  g.fill();
+  g.beginPath();
+  g.moveTo(30, -46);
+  g.lineTo(31, -56);
+  g.lineTo(37, -46);
+  g.fill();
+  // the mane: a row of tufts down the neck
+  g.fillStyle = d.mane;
+  for (let i = 0; i < 5; i++) dot(27 - i * 4, -44 + i * 7, 5);
+  // the painted saddle cloth, dotted
+  g.fillStyle = d.saddle;
+  g.beginPath();
+  g.moveTo(-14, -15);
+  g.lineTo(10, -15);
+  g.quadraticCurveTo(12, 4, -2, 8);
+  g.quadraticCurveTo(-16, 4, -14, -15);
+  g.fill();
+  g.fillStyle = d.dots;
+  for (const [x, y] of [[-11, -8], [-6, 1], [1, 3], [7, -2], [8, -10]]) dot(x, y, 2);
+  // bridle and eye
+  stroke(d.saddle, 2.5, [32, -43, 46, -30]);
+  g.fillStyle = '#1a1414';
+  dot(39, -42, 2.2);
+  g.restore();
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
 // The rooms, as their inner wall faces (x, z) on each floor (k).
 // The ground floor follows the floor plan (house.js): the living room all
 // across the back, the kitchen at the front right, the hallway at the front
@@ -1260,6 +1372,8 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
 
   // ---------------------------------------------------------------- the board game closet
   const closet = buildCloset();
+  // ---------------------------------------------------------------- the TV cabinet, full of toys
+  const tvCabinet = buildTVCabinet();
 
   for (const s of stocks) s.build();
 
@@ -1412,6 +1526,145 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     return { x0: X0, x1: X1, z0: Z0, z1: Z1, top: TOP, doors };
   }
 
+  // The low black cabinet the TV stands on, in the living room's back left
+  // corner, its front facing the room (+x). Three painted doors with a horse
+  // on each, and behind them the kids' toys, crammed in. Crash Lennie into a
+  // door hard enough and it flies off and lands on the floor, and the toys
+  // behind it come tumbling out; a really hard hit takes the doors next to it
+  // along. "Fix everything" (restock) puts the doors back and the toys away.
+  function buildTVCabinet() {
+    const k = 0;
+    const [X0, X1, Z0, Z1, TOP] = [-5.875, -4.95, -4.75, -2.75, 0.5];
+    const DOOR_T = 0.02;
+    const FRONT = X1 - DOOR_T; // the carcass ends here; the doors are in front of it
+    const BASE = 0.06; // the bottom inside, on its plinth
+    const LID = TOP - 0.03; // the underside of the top, which reaches over the doors
+    const W = (Z1 - Z0) / 3; // one door, and the compartment behind it
+    const BREAK = 5; // m/s: a hit this hard sends the door flying
+    const ALL = 10; // ... and this hard, the doors next to it too
+    const OUT = new THREE.Vector3(1, 0, 0);
+    const black = std({ color: 0x1a191c, roughness: 0.45 });
+    const inside = std({ color: 0x2a282c, roughness: 0.8 });
+    const b = (min, max, m) => box(min, max, m, { story: k, cast: true });
+    b([X0, 0, Z0], [FRONT, BASE, Z1], black); // plinth and bottom
+    b([X0, LID, Z0], [X1, TOP, Z1], black); // the top
+    b([X0, BASE, Z0], [FRONT, LID, Z0 + 0.02], black); // the two ends
+    b([X0, BASE, Z1 - 0.02], [FRONT, LID, Z1], black);
+    b([X0, BASE, Z0 + 0.02], [X0 + 0.02, LID, Z1 - 0.02], inside); // the back
+    for (const i of [1, 2]) b([X0 + 0.02, BASE, Z1 - i * W - 0.01], [FRONT, LID, Z1 - i * W + 0.01], black); // dividers
+    const solid = body([X0, 0, Z0], [X1, TOP, Z1], physMats.hard, { kind: 'furniture' });
+
+    // the toys inside: on the bottom of each compartment, a grid of piles,
+    // blocks at the bottom and a car or a few bricks on top, and one big toy
+    const piles = ['blockA', 'blockB', 'blockC', 'blockD'];
+    const tops = ['brickRed', 'brickBlue', 'brickYellow', 'brickWhite', 'carRed', 'carBlue', 'carYellow', 'duck', 'crayonRed', 'crayonBlue', 'crayonGreen'];
+    const big = ['teddy', 'ball', 'teddy'];
+    const pick = (list) => list[Math.floor(rnd() * list.length)];
+
+    const DOOR_H = LID - 0.005 - (BASE + 0.005);
+    const brass = std({ color: 0xd9b04a, roughness: 0.35, metalness: 0.6 });
+    const doors = DOOR_LOOKS.map((look, i) => {
+      const zc = Z1 - (i + 0.5) * W;
+      const sec = stocks[k].section({ bounds: ROOMS.living, floorY: 0.012, k, name: 'tvcabinet', fresh: false });
+      sections[k].push(sec);
+      const [a, c] = [zc - W / 2 + 0.05, zc + W / 2 - 0.05]; // z, clear of the dividers
+      const bigX = X0 + 0.12;
+      stocks[k].place(big[i], bigX, BASE, zc, rnd() * TAU, sec);
+      for (let x = X0 + 0.28; x < FRONT - 0.06; x += 0.14) {
+        for (let z = a + 0.04; z < c - 0.03; z += 0.13) {
+          let below = null;
+          let y = BASE;
+          const n = Math.floor(rnd() * 4); // 0 to 3 blocks
+          for (let j = 0; j < n; j++) {
+            below = stocks[k].place(pick(piles), x + (rnd() - 0.5) * 0.02, y, z + (rnd() - 0.5) * 0.02, rnd() * TAU, sec, 0, { on: below });
+            y += 0.07;
+          }
+          const id = pick(tops);
+          below = stocks[k].place(id, x, y, z, rnd() * TAU, sec, 0, { on: below });
+          if (id.startsWith('brick') && rnd() < 0.6) stocks[k].place(pick(tops.slice(0, 4)), x, y + 0.038, z, rnd() * TAU, sec, 0, { on: below });
+        }
+      }
+
+      // the door: painted on the front, its colour all round the edges, a brass knob
+      const group = new THREE.Group();
+      group.rotation.order = 'YXZ'; // when it falls: tipped over (z) first, then turned (y)
+      const face = std({ map: horseDoorTexture(look, i === 2 ? -1 : 1), roughness: 0.55 });
+      const edge = std({ color: look.bg, roughness: 0.55 });
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(DOOR_T, DOOR_H, W - 0.008), [face, edge, edge, edge, edge, edge]);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.013, 12, 8), brass);
+      knob.position.set(DOOR_T / 2 + 0.006, DOOR_H / 2 - 0.1, 0); // top middle, above the horse's back
+      for (const m of [panel, knob]) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+        group.add(m);
+      }
+      const home = new THREE.Vector3(FRONT + DOOR_T / 2, BASE + 0.005 + DOOR_H / 2, zc);
+      group.position.copy(home);
+      groups[k].add(group);
+      // lying on the floor: each door a little higher than the last, in case they land across each other
+      return { group, home, zc, sec, state: 'shut', t: 0, T: 1, vel: new THREE.Vector3(), yaw: 0, restY: 0.012 + DOOR_T / 2 + 0.004 + i * 0.003 };
+    });
+
+    /** Knocks a door off: it flies out into the room, turning over to land flat on its back, horse up. */
+    function fling(door, v) {
+      const p = Math.min(1, v / 14);
+      door.state = 'flying';
+      door.t = 0;
+      door.vel.set(1.1 + p * 1.2 + rnd() * 0.4, 1.0 + p * 1.0 + rnd() * 0.4, (rnd() - 0.5) * 0.8);
+      door.yaw = (rnd() - 0.5) * 1.2;
+      const G = 9.8;
+      const vy = door.vel.y;
+      door.T = (vy + Math.sqrt(vy * vy + 2 * G * (door.home.y - door.restY))) / G; // till it hits the floor
+    }
+
+    solid.surface.tally = 'toys';
+    solid.surface.mess = ['Toy avalanche!', 'Toy story!', 'Playtime!', 'Who put all that in there?', 'Tidy up time!'];
+    solid.surface.onHit = (point, v, push) => {
+      // only a hit on the front counts; landing on top, by the TV, leaves the doors shut
+      if (point.x < X1 - 0.1 || point.y > LID) return 0;
+      const i = Math.max(0, Math.min(2, Math.floor((Z1 - point.z) / W)));
+      let n = 0;
+      for (const j of v > ALL ? [i, i - 1, i + 1] : [i]) {
+        const door = doors[j];
+        if (!door) continue;
+        if (door.state === 'shut') {
+          if (v < BREAK) continue;
+          fling(door, v);
+          // everything behind it comes out, the toys at the back a little less often
+          n += stocks[k].knock(door.sec, new THREE.Vector3(FRONT, BASE + 0.1, door.zc), OUT, v, push, { radius: 1.1, chance: 1, power: 1.1 });
+        } else {
+          n += stocks[k].knock(door.sec, point, OUT, v, push, { radius: 0.6, chance: 0.9 });
+        }
+      }
+      return n;
+    };
+
+    function update(dt) {
+      for (const door of doors) {
+        if (door.state !== 'flying') continue;
+        door.t = Math.min(door.t + dt, door.T);
+        const { t, T, vel, home, group } = door;
+        group.position.set(home.x + vel.x * t, home.y + vel.y * t - 4.9 * t * t, home.z + vel.z * t);
+        const p = t / T;
+        group.rotation.set(0, door.yaw * p, (Math.PI / 2) * (1 - (1 - p) ** 2)); // easing out, so it's flat when it lands
+        if (t >= T) {
+          group.position.y = door.restY;
+          door.state = 'down';
+        }
+      }
+    }
+
+    function reset() {
+      for (const door of doors) {
+        door.state = 'shut';
+        door.group.position.copy(door.home);
+        door.group.rotation.set(0, 0, 0);
+      }
+    }
+
+    return { update, reset };
+  }
+
   function decorate() {
     const add = (k, mesh, cast = true) => {
       mesh.castShadow = cast;
@@ -1530,7 +1783,13 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     scatter,
     spots,
     doors: closet.doors, // the board game closet's doors, which house.js smashes and mends like its own
-    update: (dt) => { for (const s of stocks) s.update(dt); },
-    restock: () => { for (const s of stocks) s.restock(); },
+    update: (dt) => {
+      for (const s of stocks) s.update(dt);
+      tvCabinet.update(dt);
+    },
+    restock: () => {
+      for (const s of stocks) s.restock();
+      tvCabinet.reset();
+    },
   };
 }
