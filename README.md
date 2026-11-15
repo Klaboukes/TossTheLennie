@@ -133,6 +133,20 @@ Lennie reacts: a grin and a "wheee!" or "wa-hoo!" when he's flung, "ow!", "oof",
 
 The game is made to run smoothly on cheap tablets and older phones too. That's why there are no real shadows (Lennie has a soft spot under him instead, which grows and fades as he flies higher), why the shelves hold one row of products, and why the picture is drawn a little less sharp than a phone's screen could show. If a device still can't keep up, the game makes the picture a bit less sharp by itself, a step at a time.
 
+## How it fits together
+
+What you see of Lennie through all the walls and furniture comes from a few parts working together. A change to one of them can undo another (a hole in a ceiling, a flickering frame), so check the others when you touch one:
+
+- **Floors (`house.js`):** each storey is its own group, and the roof is a fourth. The cutaway hides every storey above the one the camera looks at once the camera rises to that storey's ceiling, or comes within the near plane's 20 cm of it. The supermarket has no storeys.
+- **Fading walls (`house.js`, `supermarket.js`):** every wall, floor slab and roof slope belongs to a *line*. A line fades when the sight line from the camera's target to the camera crosses it.
+- **The see-through circle (`seethrough.js`):** a few lines added to every scenery material's shader cut away what lies between the camera and Lennie, inside a circle around him on screen, plus anything within 45 cm of the lens. It never cuts below Lennie's middle, nor the ceiling over him while the camera is under it (`ceilingOver()`); otherwise you'd see the floor above.
+- **The camera (`main.js`):** it draws nothing closer than 20 cm (its near plane), which keeps depth sharp enough that surfaces don't flicker. The see-through circle and the cutaway make sure nothing that close is ever needed.
+- **Gluing (`batching.js`):** once everything is built, scenery that never moves is glued into a few big meshes, but only with its siblings in the same group, so hiding, fading and breaking keep working. Anything with `userData` stays separate. `flickercheck.js` notes every part down before the gluing.
+- **Aiming (`main.js`)** looks past whatever is hidden, faded or cut away, so you can aim at what you see.
+- **Physics (cannon-es)** is built alongside the visuals but isn't the same shape: outside walls and the roof are thicker in physics, so a fast throw can't slip through them. Never work out one from the other.
+
+Each frame, `main.js` moves the camera first, then lets the house and the shop decide what to hide and fade, then points the see-through circle at Lennie, then draws.
+
 ## Files
 
 - `index.html`, `style.css`: the page, toolbar, score panel, challenge, players board, turn card and help; the import map that loads three.js and cannon-es
