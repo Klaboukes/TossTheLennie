@@ -5,6 +5,7 @@ import { makeDetails, buildNeighbours, LAYOUT, PORCH_Y } from './street.js';
 import { buildClutter } from './clutter.js';
 import { buildTV } from './tv.js';
 import { hangDrawings } from './drawings.js';
+import { createLoose } from './loose.js';
 
 // A Dutch terraced house: two brick storeys and an attic under a steep roof,
 // with a dormer. Footprint x ∈ [-6, 6], z ∈ [-5, 5]; the front door faces +z.
@@ -684,6 +685,8 @@ export function buildHouse(scene, world, physMats) {
   buildNeighbours(kit, details);
   buildUtility();
   buildToiletOut();
+  // the dining chairs and the piano stool, which Lennie knocks over (loose.js)
+  const loose = createLoose(world, physMats.loose);
   buildFurniture();
   // the kids' drawings and paintings on the living room's white walls, and the photos of friends in the toilet (drawings.js)
   const wx = IN.x0 + 0.006; // just off the left and right walls' faces
@@ -1076,16 +1079,14 @@ export function buildHouse(scene, world, physMats) {
       [[-0.4, 0.42, -4.6], [0.6, 1.05, -4.3], SOFA, { soft: true }],
       [[-0.4, 0.42, -4.3], [-0.2, 0.65, -3.5], SOFA_ARM, { soft: true }],
       [[0.4, 0.42, -4.3], [0.6, 0.65, -3.5], SOFA_ARM, { soft: true }],
-      // the dining table with six chairs
+      // the dining table (its six chairs and the piano stool are loose, below)
       ...table(3.0, -2.2, 4.1, -0.3, 0.78, 0xc9a06a),
-      ...[-1.85, -1.25, -0.65].flatMap((z) => [...chair(2.6, z, 1, 0xd95d39), ...chair(4.5, z, -1, 0xd95d39)]),
-      // the piano, its back to the kitchen counter, and its stool
+      // the piano, its back to the kitchen counter
       [[2.95, 0, 0.55], [4.65, 1.25, 1.12], PIANO],
       [[3.0, 0.68, 0.33], [4.6, 0.76, 0.55], PIANO],
       [[3.03, 0.76, 0.36], [4.57, 0.775, 0.5], WHITE, { phys: false }],
       [[3.0, 0, 0.38], [3.08, 0.68, 0.46], PIANO],
       [[4.52, 0, 0.38], [4.6, 0.68, 0.46], PIANO],
-      [[3.4, 0, -0.05], [4.2, 0.5, 0.3], PIANO],
       // kitchen: a U of counters, along the front under the window, along the right wall, and across the back
       [[KITCHEN_FRONT, 0, 4.225], [5.875, 0.85, 4.875], CABINET],
       [[KITCHEN_FRONT, 0.85, 4.2], [5.875, 0.9, 4.875], WORKTOP],
@@ -1133,6 +1134,14 @@ export function buildHouse(scene, world, physMats) {
       [[2.63, 0.04, -6.13], [3.17, 0.17, -6.1], 0x4a7fa8],
       [[2.63, 0.04, -6.52], [3.17, 0.1, -6.13], 0xd8c9a3, { phys: false }],
     ]);
+    // the six dining chairs and the piano stool, loose so Lennie knocks them
+    // over instead of getting stuck between them (loose.js); on the ground floor, so y is as built
+    const knockable = (parts, mass) => loose.add(groups[0], parts.map(([min, max, color]) => [min, max, col(color)]), { mass, surface: { kind: 'furniture' } });
+    for (const z of [-1.85, -1.25, -0.65]) {
+      knockable(chair(2.6, z, 1, 0xd95d39), 5);
+      knockable(chair(4.5, z, -1, 0xd95d39), 5);
+    }
+    knockable([[[3.4, 0, -0.05], [4.2, 0.5, 0.3], PIANO]], 9);
     // burners on the hob
     for (const [x, z] of [[-0.35, 4.43], [0.05, 4.43], [-0.35, 4.67], [0.05, 4.67]]) {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.012, 6, 20).rotateX(Math.PI / 2), col(0x55555a));
@@ -1374,9 +1383,10 @@ export function buildHouse(scene, world, physMats) {
     else door.group.rotation.x = 0.03 * dir;
   }
 
-  /** Fixes the windows and doors, and puts all the mess back where it was. */
+  /** Fixes the windows and doors, and puts all the mess and the knocked-over chairs back where they were. */
   function repairAll() {
     clutter.restock();
+    loose.reset();
     tv.repair();
     for (const piece of [...windows, ...doors]) {
       if (piece.kind === 'door') {
@@ -1409,8 +1419,10 @@ export function buildHouse(scene, world, physMats) {
     crackDoor,
     repairAll,
     tv,
+    loose,
     scatter: clutter.scatter,
     update(dt) {
+      loose.update();
       clutter.update(dt);
       tv.update(dt);
     },

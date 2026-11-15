@@ -171,6 +171,7 @@ const physMats = {
   glass: new CANNON.Material('glass'),
   trampoline: new CANNON.Material('trampoline'),
   ground: new CANNON.Material('ground'),
+  loose: new CANNON.Material('loose'), // furniture Lennie knocks over (loose.js)
 };
 const contact = (m, friction, restitution) => world.addContactMaterial(new CANNON.ContactMaterial(m, lennieMat, { friction, restitution }));
 contact(physMats.hard, 0.55, 0.3);
@@ -179,6 +180,12 @@ contact(physMats.glass, 0.3, 0.15);
 contact(physMats.trampoline, 0.5, 0.97);
 contact(physMats.ground, 0.8, 0.2);
 contact(lennieMat, 0.4, 0.05);
+contact(physMats.loose, 0.55, 0.3);
+// The knocked-over chairs on the floor, the walls and each other: grippy and
+// not bouncy, so they tip over and stay put rather than skating about.
+for (const m of Object.values(physMats)) {
+  world.addContactMaterial(new CANNON.ContactMaterial(physMats.loose, m, { friction: 0.6, restitution: 0.1 }));
+}
 
 const { shop } = buildYard(scene, world, physMats);
 const house = buildHouse(scene, world, physMats);
@@ -265,7 +272,7 @@ addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'touch' || e.pointerType === 'mouse') document.body.classList.toggle('touch', e.pointerType === 'touch');
 }, { capture: true });
 
-const replay = new Replay(lennie);
+const replay = new Replay(lennie, house.loose.items);
 const zap = new Zap(scene, lennie);
 const challenges = new Challenges();
 const hint = { on: true }; // the "Grab me!" bubble over Lennie, until he's first grabbed (and at each turn)
@@ -486,6 +493,21 @@ function touching() {
     if (other?.surface) kinds.add(other.surface.kind);
   }
   return kinds;
+}
+
+// A knocked-over chair or stool clattering onto the floor or into the table
+// (Lennie bumping into one makes its sound in lennie.onCollide).
+let lastChairKnockAt = 0;
+house.loose.watch(lennie.parts.pelvis.body.position);
+for (const { body } of house.loose.items) {
+  body.addEventListener('collide', (e) => {
+    if (lennieBodies.has(e.body)) return;
+    const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
+    const now = performance.now();
+    if (v < 1.5 || now - lastChairKnockAt < 70) return;
+    lastChairKnockAt = now;
+    sfx.impact('furniture', Math.min(1, v / 8));
+  });
 }
 
 /**
@@ -1882,7 +1904,7 @@ function resetAll(say = true) {
   shop.repairAll();
   clearShards();
   dropLennie(0);
-  if (say) toast('Windows, doors and TV fixed, shelves stocked, the mess back where it was, Lennie back downstairs', 1900);
+  if (say) toast('Windows, doors and TV fixed, shelves stocked, the mess and the chairs back where they were, Lennie back downstairs', 1900);
 }
 
 function toggleFollow() {

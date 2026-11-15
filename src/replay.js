@@ -1,5 +1,6 @@
 // Instant replay: records Lennie's pose during a toss, then plays it back in
-// slow motion by moving his visible parts (the physics stays paused).
+// slow motion by moving his visible parts (the physics stays paused). Things
+// he knocks over (the dining chairs) are recorded and replayed with him.
 import * as THREE from 'three';
 
 const SAMPLE_DT = 1 / 60; // one pose per 1/60 s of game time, whatever the screen's refresh rate
@@ -8,9 +9,10 @@ const LEAD_IN = 0.4; // the replay starts this long (game time) before Lennie is
 const EXPRESSIONS = ['normal', 'ouch', 'whee', 'dizzy'];
 
 export class Replay {
-  constructor(ragdoll) {
+  /** `extras`: other moving things, as { body, group }, to record and replay along with Lennie. */
+  constructor(ragdoll, extras = []) {
     this.ragdoll = ragdoll;
-    this.parts = Object.values(ragdoll.parts);
+    this.parts = [...Object.values(ragdoll.parts), ...extras];
     this.frames = [];
     this.recording = false;
     this.clip = null; // the last finished toss
@@ -68,7 +70,7 @@ export class Replay {
     return true;
   }
 
-  /** Stops playing and puts Lennie's visible parts back where his body really is. */
+  /** Stops playing and puts Lennie's visible parts back where his body really is (the extras follow on the next frame). */
   cancel() {
     if (!this.playing) return;
     this.playing = null;

@@ -33,6 +33,7 @@ Lennie's house is a brick rowhouse in a 1970s Dutch terrace, with two floors and
 - Every window has glass that shatters when Lennie hits it hard enough, including the dormer window up in the attic.
 - The TV in the living room is on. Throw Lennie into it hard and the screen cracks where he hit it, flickers and spits sparks, and he gets electrocuted: he flashes between glowing blue and an X-ray of his skeleton while lightning crackles over him, then lies there sooty and smoking. Bump him into the cracked TV again and he gets another shock. R fixes the TV.
 - Every doorway has a closed door. Doors are a bit tougher than windows: a hard hit smashes one straight away, a lighter one only cracks it, and the next knock breaks it.
+- The six dining chairs and the piano stool aren't fixed in place: Lennie shoves them aside or knocks them over (so he doesn't get stuck between them), and they stay where they fell until R puts them back. The replay shows them falling too.
 - **Outside:** two brick storeys with a tall window column and dark panels, small high windows, the toilet sticking out of the front beside the front door, a flat canopy over both, and a steep dark tiled roof with a chimney and the dormer. Lennie can land on the canopy, the roof and the dormer, and slide down the roof into the front garden.
 - **The gardens:** an open front garden with a big dark shrub in front of the window column and a low hedge along the cycle path; a fenced back garden after the floor plan, with bushes along one side and down the other the garage (stuffed full), a lounge set under a striped awning, a round trampoline, and a tree beside the three wheelie bins by the gate.
 
@@ -78,7 +79,7 @@ Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the tra
 | Pan / zoom | Right-drag / scroll |
 | Fly the camera | WASD, Q/E down/up |
 | Drop Lennie on floor 1 / 2 / 3 / the roof / in the supermarket | 1 / 2 / 3 / 4 / 5 |
-| Fix the windows, doors and TV, restock the shop, put the mess back and Lennie downstairs | R |
+| Fix the windows, doors and TV, restock the shop, put the mess and the chairs back and Lennie downstairs | R |
 | Watch the last toss again in slow motion | P (or the button on the score card) |
 | Take turns with 2–4 players | The people button |
 | Focus camera on Lennie | F |
@@ -155,6 +156,7 @@ Each frame, `main.js` moves the camera first, then lets the house and the shop d
 - `src/drawings.js`: the kids' drawings and paintings on the living room walls and the framed photos of friends in the toilet, all drawn on one canvas
 - `src/tv.js`: the living room TV in its corner, its screen cracking where Lennie hits it, flickering and sparking
 - `src/zap.js`: Lennie getting electrocuted: the X-ray skeleton, lightning, the blue flash, the spasms, soot and smoke
+- `src/loose.js`: furniture Lennie can knock over (the dining chairs and the piano stool), which rests ("sleeps") when it stands still so it costs nothing
 - `src/clutter.js`: the mess in the house (dishes, toys, clothes, household stuff) and the board game closet, and sending it flying when Lennie lands in it
 - `src/street.js`: the neighbour houses, and the details every house in the row shares (porch, chimney, dormer, skylight, vents, downpipe)
 - `src/yard.js`: sky, lighting, lawn, the play area's edges and fence, the neighbours' garden trees, front-garden shrubs and the hedge
@@ -170,7 +172,7 @@ Each frame, `main.js` moves the camera first, then lets the house and the shop d
 - `src/ragdoll.js`: Lennie's bodies, joints and look (1.90 m and 100 kg, with a bit of a belly, in a worn hoodie and joggers; his face after the photo in docs: thinning dark hair receding at the temples, rectangular glasses and a short salt-and-pepper beard)
 - `src/scoring.js`: contortion measurement, trick detection and the multiplier
 - `src/challenges.js`: the list of challenges and the progress kept in the browser
-- `src/replay.js`: records each toss and plays it back in slow motion
+- `src/replay.js`: records each toss (and the chairs he knocks over) and plays it back in slow motion
 - `src/guard.js`: safety net that puts Lennie back in one piece if a limb ever ends up inside a wall or floor
 - `src/audio.js`: synthesized sound effects and Lennie's voice
 - `tests/check.mjs`: quick code check (modules parse, imports resolve, files linked from `index.html` exist), run nightly by `.github/workflows/ci.yml`
