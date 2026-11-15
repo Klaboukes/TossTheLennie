@@ -178,6 +178,7 @@ const physMats = {
   ground: new CANNON.Material('ground'),
   loose: new CANNON.Material('loose'), // furniture Lennie knocks over (loose.js)
   car: new CANNON.Material('car'), // the cars driving by (cars.js)
+  branches: new CANNON.Material('branches'), // the garden tree's crown, which catches him (garden.js)
 };
 const contact = (m, friction, restitution) => world.addContactMaterial(new CANNON.ContactMaterial(m, lennieMat, { friction, restitution }));
 contact(physMats.hard, 0.55, 0.3);
@@ -188,6 +189,7 @@ contact(physMats.ground, 0.8, 0.2);
 contact(lennieMat, 0.4, 0.05);
 contact(physMats.loose, 0.55, 0.3);
 contact(physMats.car, 0.3, 0.35);
+contact(physMats.branches, 1.2, 0.02);
 // The knocked-over chairs on the floor, the walls and each other: grippy and
 // not bouncy, so they tip over and stay put rather than skating about.
 for (const m of Object.values(physMats)) {

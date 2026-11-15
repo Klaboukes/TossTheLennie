@@ -172,8 +172,12 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
       leaf.position.set(x + dx * s, dy * s, z + dz * s);
     }
     solid([x - 0.28 * s, 0, z - 0.28 * s], [x + 0.28 * s, 3 * s, z + 0.28 * s], 'tree');
-    const crown = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Sphere(1.9 * s) });
-    crown.position.set(x, 4.0 * s, z);
+    // The crown catches him: a flat-topped tangle of branches hidden in the
+    // leaves, grippy and hardly bouncy. (A round, bouncy ball here sent him
+    // rolling off every time, so nobody ever got him stuck in the tree.)
+    const nest = { r: 1.35, y0: 2.5, y1: 3.9 }; // (the leaves' bottom and middle; their top is at 4.7)
+    const crown = new CANNON.Body({ mass: 0, material: physMats.branches ?? physMats.soft, shape: new CANNON.Cylinder(nest.r, nest.r, nest.y1 - nest.y0, 16) });
+    crown.position.set(x, (nest.y0 + nest.y1) / 2, z);
     crown.surface = { kind: 'leaves' }; // landing up here is "Stuck in a tree!"
     world.addBody(crown);
   }

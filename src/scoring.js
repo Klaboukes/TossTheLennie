@@ -68,8 +68,9 @@ export function detectTricks(ragdoll) {
 
   if (Math.min(footL.distanceTo(head), footR.distanceTo(head)) < 0.42) tricks.push({ id: 'footface', label: 'Foot in face!', value: 200 });
 
-  // Three of the big ones at once; the small crossed leg and tangled arm don't count.
-  if (tricks.filter((t) => !t.small).length >= 3) tricks.push({ id: 'knot', label: 'Human knot!', value: 400 });
+  // Two of the big ones at once; the small crossed leg and tangled arm don't count.
+  // (Three at once never happened in ~150 test tosses; two comes up about one toss in twenty.)
+  if (tricks.filter((t) => !t.small).length >= 2) tricks.push({ id: 'knot', label: 'Human knot!', value: 400 });
   return tricks;
 }
 
