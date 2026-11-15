@@ -66,16 +66,18 @@ export class Replay {
 
   play(speed = 0.4) {
     if (!this.clip) return false;
-    this.playing = { t: this.clip.frames[0].t, i: 0, speed };
+    // the face he has now comes back afterwards (it may be a newer toss's, not the clip's)
+    this.playing = { t: this.clip.frames[0].t, i: 0, speed, face: this.ragdoll.expression };
     return true;
   }
 
   /** Stops playing and puts Lennie's visible parts back where his body really is (the extras follow on the next frame). */
   cancel() {
     if (!this.playing) return;
+    const { face } = this.playing;
     this.playing = null;
     this.ragdoll.sync();
-    this.ragdoll.setExpression(this.clip.face);
+    if (face !== this.ragdoll.expression) this.ragdoll.setExpression(face);
   }
 
   /**

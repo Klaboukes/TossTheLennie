@@ -141,9 +141,13 @@ scene.background = new THREE.Color(0xe3f2ff);
 // Nothing is lost: the see-through effect already cuts away scenery within
 // 45 cm of the lens (seethrough.js), and the camera stays 80 cm from Lennie.
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.2, 400);
-// Close enough to Lennie (on the living room floor) that you see him straight
-// away, from just outside the front window.
-camera.position.set(-0.9, 1.9, 5.9);
+// The home view: from the living room's front corner, looking at Lennie on the
+// floor with the garden window behind him, so a pull straight down sends him
+// out into the garden. The game starts here, and R and each new turn come back
+// to it, so every player starts the same way.
+const HOME_CAM = new THREE.Vector3(0.6, 1.8, 1.2);
+const HOME_TARGET = new THREE.Vector3(-0.6, 0.5, -2.5); // where Lennie starts (house.spawnPoint(0))
+camera.position.copy(HOME_CAM);
 
 // ---------------------------------------------------------------- physics
 const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -GRAVITY, 0) });
@@ -1289,6 +1293,12 @@ canvas.addEventListener('pointerdown', (e) => {
     if (aim.on) aim.press = { x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType === 'touch' };
     return;
   }
+  // Grabbed while still rolling from the last toss: that toss scores now. In a
+  // game of turns that was this player's go, so the next one waits for Go.
+  if (toss.state === 'flying' && !isAirborne()) {
+    finishToss();
+    if (turnPending) return;
+  }
   controls.enabled = false;
   // (it can refuse a pointer that's already gone; the grab still works without it)
   try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -1632,6 +1642,12 @@ function aimThrow() {
     toast(t('Wait for Lennie to land, then aim again'), 1400);
     return;
   }
+  // Still rolling from the last toss: that one scores first (and in a game of
+  // turns ends this player's go), rather than being thrown away.
+  if (toss.state === 'flying') {
+    finishToss();
+    if (turnPending) return;
+  }
   const touch = document.body.classList.contains('touch');
   if (!touch) aim.hover = true;
   updateAim();
@@ -1762,7 +1778,7 @@ function lennieOnScreen(out) {
 }
 
 const controls = new OrbitControls(camera, canvas);
-controls.target.set(-0.6, 0.5, -2.5); // where Lennie starts (house.spawnPoint(0))
+controls.target.copy(HOME_TARGET);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 // The camera goes wherever it's turned or zoomed: inside furniture, trees,
@@ -1913,6 +1929,8 @@ function resetAll(say = true) {
   shop.repairAll();
   clearShards();
   dropLennie(0);
+  // back to the home view, wherever the last toss left the camera
+  camAnim = { t: 0, dur: 0.9, fromT: controls.target.clone(), toT: HOME_TARGET.clone(), fromC: camera.position.clone(), toC: HOME_CAM.clone() };
   if (say) toast(t('Windows, doors and TV fixed, shelves stocked, the mess and the chairs back where they were, Lennie back downstairs'), 1900);
 }
 
@@ -1967,7 +1985,13 @@ btn.fullscreen.hidden = !canFullscreen;
 document.addEventListener('fullscreenchange', syncFullscreen);
 document.addEventListener('webkitfullscreenchange', syncFullscreen);
 
-btn.reset.addEventListener('click', () => resetAll());
+/** In a game of turns, putting Lennie back mid-toss would undo a bad throw: wait for him to land. */
+function tossLocked() {
+  if (!match || toss.state !== 'flying') return false;
+  toast(t('Wait for Lennie to land'), 1200);
+  return true;
+}
+btn.reset.addEventListener('click', () => { if (!tossLocked()) resetAll(); });
 btn.focus.addEventListener('click', () => focusLennie());
 btn.follow.addEventListener('click', toggleFollow);
 btn.cutaway.addEventListener('click', toggleCutaway);
@@ -2012,6 +2036,7 @@ ui.dropMenu.querySelectorAll('[data-drop]').forEach((b) => {
   b.addEventListener('click', () => {
     const level = Number(b.dataset.drop);
     setDropMenu(false);
+    if (tossLocked()) return;
     setChallengeMenu(false);
     dropLennie(level);
     toast(t('Lennie dropped on {where}', { where: t(LEVEL_NAMES[level]) }), 1200);
@@ -2062,8 +2087,18 @@ addEventListener('keydown', (e) => {
     return;
   }
   if (replay.playing && e.code !== 'KeyM' && e.code !== 'KeyP') stopReplay();
+  if ((e.code === 'KeyR' || /^Digit[1-5]$/.test(e.code)) && tossLocked()) return;
   switch (e.code) {
-    case 'KeyP': if (replay.playing) stopReplay(); else playReplay(); break;
+    case 'KeyP':
+      if (replay.playing) stopReplay();
+      else if (!ui.turnCard.hidden) {
+        // Only where the card offers the last toss itself (or at the end): it comes back afterwards.
+        if (replay.canPlay && (matchOver() || (!ui.turnAlt.hidden && ui.turnAlt.dataset.action === 'replay'))) {
+          ui.turnCard.hidden = true;
+          playReplay();
+        }
+      } else playReplay();
+      break;
     case 'KeyR': resetAll(); break;
     case 'KeyF': focusLennie(); break;
     case 'KeyG': toggleFollow(); break;
@@ -2270,6 +2305,8 @@ let setupCount = 2;
 let setupTosses = 5;
 let savedNames = [];
 try { savedNames = JSON.parse(localStorage.getItem(NAMES_KEY) ?? '[]'); } catch { /* ignore */ }
+// Older versions saved a blank name as "Player 2" (or "Speler 2"): blank again.
+savedNames = Array.isArray(savedNames) ? savedNames.map((n) => (typeof n !== 'string' || /^(Player|Speler) \d$/.test(n) ? '' : n)) : [];
 try {
   const t = Number(localStorage.getItem(TOSSES_KEY));
   if (TOSS_CHOICES.includes(t)) setupTosses = t;
@@ -2295,8 +2332,12 @@ function renderSetup() {
     input.value = values[i] ?? savedNames[i] ?? '';
     input.setAttribute('aria-label', t(`Name of player ${i + 1}`));
     input.addEventListener('keydown', (e) => {
-      e.stopPropagation(); // typing a name mustn't drive the game
-      if (e.key === 'Enter') ui.setupStart.click();
+      // Typing a name mustn't drive the game (Esc still closes the dialog).
+      if (e.key !== 'Escape') e.stopPropagation();
+      if (e.key === 'Enter') {
+        e.preventDefault(); // or the same Enter also presses Go! on the turn card that opens
+        ui.setupStart.click();
+      }
     });
     label.append(dot, input);
     ui.setupNames.appendChild(label);
@@ -2317,10 +2358,12 @@ function setSetup(open) {
 }
 
 function startMatch() {
-  const names = [...ui.setupNames.querySelectorAll('input')].map((i, n) => i.value.trim() || t(`Player ${n + 1}`));
-  savedNames = names;
+  const typed = [...ui.setupNames.querySelectorAll('input')].map((i) => i.value.trim());
+  const names = typed.map((name, n) => name || t(`Player ${n + 1}`));
+  // (a name left blank stays blank for next time, rather than filling the box with "Player 1")
+  savedNames = typed;
   try {
-    localStorage.setItem(NAMES_KEY, JSON.stringify(names));
+    localStorage.setItem(NAMES_KEY, JSON.stringify(typed));
     localStorage.setItem(TOSSES_KEY, String(setupTosses));
   } catch { /* ignore */ }
   setSetup(false);
@@ -2329,6 +2372,8 @@ function startMatch() {
 
 function newMatch(names, tosses) {
   stopReplay();
+  // A free-play toss still in the air mustn't land as player 1's first score.
+  resetAll(false);
   turnPending = true;
   clearTimeout(turnTimer);
   match = { players: names.map((name, i) => ({ name, color: PLAYER_COLORS[i], scores: [] })), turn: 0, tosses };
@@ -2393,7 +2438,10 @@ function showTurnCard() {
     ui.turnKicker.textContent = t('Game over');
     ui.turnTitle.textContent = winners.length > 1 ? t("It's a tie!") : t('{name} wins!', { name: winners[0].name });
     ui.turnSub.textContent = winners.length > 1
-      ? t('{names} both scored {score}.', { names: winners.map((p) => p.name).join(` ${t('and')} `), score: fmt(top) })
+      ? t(winners.length > 2 ? '{names} all scored {score}.' : '{names} both scored {score}.', {
+        names: `${winners.slice(0, -1).map((p) => p.name).join(', ')} ${t('and')} ${winners.at(-1).name}`,
+        score: fmt(top),
+      })
       : t('With {score} points from {n} tosses.', { score: fmt(top), n: match.tosses });
     ui.turnRanking.innerHTML = '';
     ranked.forEach((p) => {
@@ -2413,12 +2461,16 @@ function showTurnCard() {
     ui.turnAlt.textContent = t('Back to free play');
     ui.turnAlt.hidden = false;
     ui.turnAlt.dataset.action = 'free';
-    sfx.score(3);
-    sfx.voice('cheer');
-    setTimeout(() => sfx.chime(), 450);
-    // confetti in the winner's colour (and gold), from both sides of the card
-    const party = [...winners.map((p) => p.color), ...winners.map((p) => p.color), '#ffc94a', '#ffe08a', '#ffffff'];
-    for (const side of [0.3, 0.7]) setTimeout(() => confettiFrom(innerWidth * side, innerHeight * 0.42, party, 40, true), side > 0.5 ? 180 : 0);
+    // The party once: the card comes back after watching the last toss again.
+    if (!match.cheered) {
+      match.cheered = true;
+      sfx.score(3);
+      sfx.voice('cheer');
+      setTimeout(() => sfx.chime(), 450);
+      // confetti in the winner's colour (and gold), from both sides of the card
+      const party = [...winners.map((p) => p.color), ...winners.map((p) => p.color), '#ffc94a', '#ffe08a', '#ffffff'];
+      for (const side of [0.3, 0.7]) setTimeout(() => confettiFrom(innerWidth * side, innerHeight * 0.42, party, 40, true), side > 0.5 ? 180 : 0);
+    }
   } else {
     const p = match.players[match.turn];
     const first = match.players.every((q) => q.scores.length === 0);
