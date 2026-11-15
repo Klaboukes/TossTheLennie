@@ -436,6 +436,48 @@ export class Sfx {
     this.#burst(t, { filter: 'bandpass', f: rand(220, 400), to: (1600 + strength * 1400) * rand(0.75, 1.25), glide: dur, Q: rand(1.4, 2.8), peak: 0.08 + strength * 0.25, attack: 0.06, release: dur });
   }
 
+  // ------------------------------------------------------------ cars (cars.js)
+
+  /** A car horn: a single toot, a toot-toot, or one long annoyed one. */
+  honk() {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const k = this.#tire('honk', 3);
+    const p = rand(0.85, 1.2); // every car sounds a bit different
+    const pattern = [[[0, 0.16], [0.22, 0.3]], [[0, 0.32]], [[0, 0.12], [0.17, 0.12], [0.34, 0.12]]][this.#pick('honk', 3)];
+    for (const [at, dur] of pattern) {
+      const g = ctx.createGain();
+      const t0 = t + at;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.09 * k, t0 + 0.015);
+      g.gain.setValueAtTime(0.09 * k, t0 + dur);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.05);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 1800;
+      lp.connect(g).connect(this.master);
+      for (const f of [392 * p, 494 * p]) { // the two notes of a car horn, a third apart
+        const osc = ctx.createOscillator();
+        osc.type = 'square';
+        osc.frequency.value = f;
+        osc.connect(lp);
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.08);
+      }
+    }
+  }
+
+  /** A car going by: an engine dropping in pitch as it passes, and the hiss of its tyres. strength 0..1 (how close) */
+  carPass(strength) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const s = strength * this.#tire('car', 4);
+    const f = rand(70, 95);
+    this.#tone(t, { type: 'sawtooth', f: f * 1.15, to: f * 0.8, glide: 1.4, peak: 0.05 + s * 0.12, attack: 0.5, release: 1.0, lowpass: 380 });
+    this.#burst(t, { filter: 'bandpass', f: 500, to: 1500, glide: 0.6, Q: 0.7, peak: 0.03 + s * 0.09, attack: 0.55, release: 0.9 });
+  }
+
   // ------------------------------------------------------------ picking Lennie up
 
   /** Squeaky toy sound, in a few shapes and pitches. */

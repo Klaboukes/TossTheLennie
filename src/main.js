@@ -10,6 +10,7 @@ import { Sfx } from './audio.js';
 import { StuckGuard } from './guard.js';
 import { Replay } from './replay.js';
 import { Zap } from './zap.js';
+import { createCars } from './cars.js';
 import { Challenges, CHALLENGES, CHALLENGE_BONUS } from './challenges.js';
 import { createSeeThrough } from './seethrough.js';
 import { combineScenery } from './batching.js';
@@ -176,6 +177,7 @@ const physMats = {
   trampoline: new CANNON.Material('trampoline'),
   ground: new CANNON.Material('ground'),
   loose: new CANNON.Material('loose'), // furniture Lennie knocks over (loose.js)
+  car: new CANNON.Material('car'), // the cars driving by (cars.js)
 };
 const contact = (m, friction, restitution) => world.addContactMaterial(new CANNON.ContactMaterial(m, lennieMat, { friction, restitution }));
 contact(physMats.hard, 0.55, 0.3);
@@ -185,6 +187,7 @@ contact(physMats.trampoline, 0.5, 0.97);
 contact(physMats.ground, 0.8, 0.2);
 contact(lennieMat, 0.4, 0.05);
 contact(physMats.loose, 0.55, 0.3);
+contact(physMats.car, 0.3, 0.35);
 // The knocked-over chairs on the floor, the walls and each other: grippy and
 // not bouncy, so they tip over and stay put rather than skating about.
 for (const m of Object.values(physMats)) {
@@ -193,6 +196,7 @@ for (const m of Object.values(physMats)) {
 
 const { shop } = buildYard(scene, world, physMats);
 const house = buildHouse(scene, world, physMats);
+const cars = createCars(scene, world, physMats.car);
 const lennie = new Ragdoll(world, scene, lennieMat);
 // A little shove so he flops over instead of landing on his feet.
 function nudge() {
@@ -276,7 +280,7 @@ addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'touch' || e.pointerType === 'mouse') document.body.classList.toggle('touch', e.pointerType === 'touch');
 }, { capture: true });
 
-const replay = new Replay(lennie, house.loose.items);
+const replay = new Replay(lennie, [...house.loose.items, ...cars.items]);
 const zap = new Zap(scene, lennie);
 const challenges = new Challenges();
 const hint = { on: true }; // the "Grab me!" bubble over Lennie, until he's first grabbed (and at each turn)
@@ -437,6 +441,7 @@ const toss = {
   products: 0, // knocked off the supermarket's shelves
   mess: 0, // dishes, toys and clothes in the house sent flying
   games: 0, // board games knocked out of the closet
+  cars: 0, // times a passing car sent him flying
   stairs: new Set(),
   startLevel: null,
   startInside: false,
@@ -453,6 +458,7 @@ function resetChain() {
   toss.products = 0;
   toss.mess = 0;
   toss.games = 0;
+  toss.cars = 0;
   toss.stairs = new Set();
   toss.startLevel = null;
   toss.startInside = false;
@@ -552,6 +558,10 @@ function houseBonuses(center) {
     const n = Math.min(toss.zaps, 3);
     add('zapped', n > 1 ? `Electrocuted ×${n}` : 'Electrocuted!', 250 * n);
   }
+  if (toss.cars) {
+    const n = Math.min(toss.cars, 3);
+    add('car', n > 1 ? `Hit by a car ×${n}` : 'Hit by a car!', 500 * n);
+  }
   if (toss.trampoline) {
     const n = Math.min(toss.trampoline, 5);
     add('trampoline', n > 1 ? `Trampoline ×${n}` : 'Trampoline!', 80 * n);
@@ -567,7 +577,7 @@ function houseBonuses(center) {
 }
 
 function finishToss() {
-  if (toss.maxSpeed < MIN_TOSS_SPEED && !toss.smashed && !toss.doors && !toss.tv && !toss.zaps) {
+  if (toss.maxSpeed < MIN_TOSS_SPEED && !toss.smashed && !toss.doors && !toss.tv && !toss.zaps && !toss.cars) {
     toss.state = 'idle';
     replay.stop(false);
     resetChain();
@@ -702,6 +712,10 @@ lennie.onCollide = (partName, e) => {
     }
     return;
   }
+  if (surf.kind === 'car') {
+    hitCar(surf.car, v, now);
+    return;
+  }
   if (surf.kind === 'tv') hitTV(surf.piece, e, v, now);
   if (surf.kind === 'door' && !surf.piece.broken && v > DOOR_CRACK_SPEED) {
     const door = surf.piece;
@@ -781,6 +795,45 @@ function hitTV(tv, e, v, now) {
   toss.zaps += 1;
   const head = lennie.parts.head.group.position;
   setTimeout(() => popAt(head.clone().setY(head.y + 0.5), pickLine(ZAP_LINES), 'good'), 250);
+}
+
+// A car driving by (cars.js): one that's moving sends him flying, up and
+// along the road. The launch itself happens after the physics step (subStep).
+const CAR_LINES = ['Look both ways!', 'Beep beep!', 'Speed bump!', 'Hitchhiker!', 'Use the zebra crossing!', 'Mind the car!', 'Vroom vroom!'];
+const HONK_LINES = ['TOOT TOOT!', 'Move it, Lennie!', 'Out of the road!', 'TOOT!'];
+let carHit = null;
+function hitCar(car, v, now) {
+  if (car.speed < 2 || now - car.hitAt < 800 || grab || sling) {
+    // a car that's standing still is just something to bump into
+    if (v > 1.5 && now - lastSoundAt > 60) {
+      lastSoundAt = now;
+      sfx.impact('metal', Math.min(1, v / 14));
+    }
+    return;
+  }
+  car.hitAt = now;
+  carHit = car;
+}
+
+function launchByCar(car) {
+  const c = lennie.center(_center);
+  const side = Math.sign(c.z - car.z) || (Math.random() < 0.5 ? -1 : 1);
+  const vx = car.dir * (car.speed * 1.3 + 2);
+  const vy = 5 + Math.random() * 2;
+  const vz = side * (1 + Math.random() * 1.5);
+  const r = (a) => (Math.random() - 0.5) * 2 * a;
+  for (const b of bodies) {
+    b.velocity.set(vx + r(0.8), vy + r(0.8), vz + r(0.8));
+    b.angularVelocity.set(r(9), r(9), r(9));
+  }
+  cars.hit(car);
+  if (toss.state === 'flying') toss.cars += 1;
+  sfx.impact('metal', 1);
+  sfx.honk();
+  sfx.voice('hit');
+  lastVoiceAt = performance.now();
+  lennie.setExpression('ouch', 1);
+  popAt(c.setY(c.y + 0.8), pickLine(CAR_LINES), 'big');
 }
 
 let lastMessAt = 0;
@@ -2580,6 +2633,7 @@ function updateHud(dt, now) {
     if (toss.doors) bits.push(plural(toss.doors, 'door'));
     if (toss.tv) bits.push(t('TV'));
     if (toss.zaps) bits.push(plural(toss.zaps, 'zap'));
+    if (toss.cars) bits.push(plural(toss.cars, 'car'));
     if (toss.stairs.size) bits.push(plural(toss.stairs.size, 'step'));
     status = t('Flying! {bits}', { bits: bits.join(' · ') }) + combo;
   } else {
@@ -2629,6 +2683,10 @@ function subStep(h) {
     pendingBreaks.clear();
     aim.guide = null;
     if (aimed) aim.through = null;
+  }
+  if (carHit) {
+    launchByCar(carHit);
+    carHit = null;
   }
   if (aim.guide) guideLaunch();
   const guarded = guard.check();
@@ -2778,6 +2836,28 @@ function standAt(x, ground, z, from) {
   return true;
 }
 
+// What the cars need to know about Lennie, and the sounds they make.
+const carWatch = {
+  bodies,
+  get flying() {
+    return toss.state === 'flying' && !grab && !sling;
+  },
+};
+let lastHonkPopAt = 0;
+const carSounds = {
+  honk(car, at) {
+    sfx.honk();
+    const now = performance.now();
+    if (now - lastHonkPopAt > 1500) {
+      lastHonkPopAt = now;
+      popAt(at, pickLine(HONK_LINES));
+    }
+  },
+  pass(car, strength) {
+    sfx.carPass(strength);
+  },
+};
+
 function frame(now) {
   requestAnimationFrame(frame);
   const seconds = (now - last) / 1000;
@@ -2824,6 +2904,7 @@ function tick(dt, now) {
   if (!replay.playing) {
     shop.update(dt * timeScale);
     house.update(dt * timeScale);
+    cars.update(dt * timeScale, carWatch, camera.position, carSounds);
   }
   updateHud(dt, now);
   renderer.render(scene, camera);
@@ -2833,7 +2914,7 @@ requestAnimationFrame(frame);
 // Handy for debugging from the console. advance() runs the game loop by hand,
 // e.g. when the tab is in the background and requestAnimationFrame is paused.
 window.lennie = {
-  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap,
+  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, cars, replay,
   advance(seconds) {
     for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60, performance.now());
   },

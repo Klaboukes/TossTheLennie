@@ -32,6 +32,7 @@ export const CHALLENGES = [
   { id: 'pastry', text: 'Crash Lennie into the pastry case', test: (r) => r.ids.has('pastry') },
   { id: 'shopout', text: 'Get Lennie kicked out of the supermarket', test: (r) => r.ids.has('shopout') },
   { id: 'tree', text: 'Get Lennie stuck in a tree', test: (r) => r.ids.has('tree') },
+  { id: 'car', text: 'Throw Lennie in front of a car', test: (r) => r.ids.has('car') },
   { id: 'knot', text: 'Tie Lennie in a human knot', test: (r) => r.ids.has('knot') },
   { id: 'score2500', text: 'Score 2,500 points in one toss', test: (r) => r.total >= 2500 },
 ];
