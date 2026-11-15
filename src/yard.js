@@ -56,8 +56,8 @@ export function buildYard(scene, world, physMats) {
   ground.surface = { kind: 'ground' };
   world.addBody(ground);
 
-  // garden path from the front door (house.js FRONT_DOOR is x −2.2 … −1.1) to the cycle path
-  const path = new THREE.Mesh(floorGeometry(-2.3, 5.15, -1.0, STREET.cycle[0]), std({ map: tex.stone }));
+  // a small garden path from the front door (house.js FRONT_DOOR is x −2.2 … −1.1) to the cycle path
+  const path = new THREE.Mesh(floorGeometry(-2.15, 5.15, -1.15, STREET.cycle[0]), std({ map: tex.stone }));
   path.position.y = 0.006;
   path.receiveShadow = true;
   scene.add(path);
@@ -153,9 +153,10 @@ export function buildYard(scene, world, physMats) {
     scene.add(mesh);
   };
 
-  // The big dark lumpy shrub in front of the window column, as in the photo:
-  // a cluster of blobs in a few greens, bouncy all over.
-  const SHRUB = { x: 2.7, z: 6.6 };
+  // Lennie's front garden, after the sketch: the big dark lumpy bush on the
+  // right, out by the hedge (a cluster of blobs in a few greens, bouncy all
+  // over), and low bushes all along the left, beside the neighbours' garden.
+  const SHRUB = { x: 2.9, z: 10.0 };
   for (const [dx, dy, dz, r, c] of [
     [-1.9, 0.55, 0.15, 0.8, 0x2f6b34], [-0.9, 0.8, -0.1, 1.05, 0x3b7d3a], [0.3, 0.9, 0.2, 1.1, 0x2f6b34],
     [1.5, 0.75, -0.05, 0.95, 0x285e2e], [2.5, 0.5, 0.25, 0.7, 0x3b7d3a], [-0.4, 1.6, 0.05, 0.75, 0x46893a],
@@ -163,9 +164,18 @@ export function buildYard(scene, world, physMats) {
   ]) blob(SHRUB.x + dx, dy, SHRUB.z + dz, r, c, 0.85);
   for (const [dx, y, r] of [[-1.5, 0.6, 0.8], [0, 0.85, 1.0], [1.6, 0.6, 0.8]]) leaves(SHRUB.x + dx, y, SHRUB.z, r);
 
+  const lowR = rng(29);
+  for (let z = 6.65; z < 11.5; z += 0.5) {
+    const r = 0.42 + lowR() * 0.14;
+    blob(-5.45 + (lowR() - 0.5) * 0.2, r * 0.5, z, r, [0x2f6b34, 0x3b7d3a, 0x46893a][Math.floor(lowR() * 3)], 0.75);
+  }
+  const lowB = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Box(new CANNON.Vec3(0.45, 0.4, 2.6)) });
+  lowB.position.set(-5.45, 0.4, 9.05);
+  lowB.surface = { kind: 'leaves' };
+  world.addBody(lowB);
+
   // smaller shrubs in the neighbours' front gardens (yellow-green ones on the right, like the photo)
   for (const [x, z, r, c] of [
-    [-4.2, 7.4, 0.6, 0x3f8a3a],
     [9.4, 6.9, 0.9, 0x8db843], [16.9, 7.4, 0.65, 0x8db843], [19.2, 7.8, 0.5, 0x3f8a3a],
     [-15.0, 6.9, 1.0, 0x2f6b34], [-12.6, 7.7, 0.6, 0x3f8a3a], [-20.6, 6.9, 0.85, 0x3f8a3a],
   ]) {
