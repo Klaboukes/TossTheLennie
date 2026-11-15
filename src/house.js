@@ -70,22 +70,22 @@ const HOLES = {
 };
 
 // White painted walls (no wallpaper) for the living room, the kitchen, the
-// toilet, the utility room, the bedrooms and the attic: a lived-in, slightly
+// toilet, the hallway and the landing, the utility room, the bedrooms and the attic: a lived-in, slightly
 // grubby white (textures.js), and in the living room with the kids' handprints
 // and crayon on it too.
 const WHITE_PAINT = { wall: 0xf4f1ea, wallTex: 'paint' };
 const ROOMS = [
   {
-    hall: { name: 'Hallway', wall: 0xeadfc8, floor: 'wood' },
+    hall: { name: 'Hallway', floor: 'wood', ...WHITE_PAINT },
     left: { name: 'Living room', floor: 'wood', ...WHITE_PAINT, wallTex: 'kids' },
     right: { name: 'Kitchen', floor: 'tiles', floorTint: 0xf1ece2, ...WHITE_PAINT },
     toilet: { name: 'Toilet', floor: 'tiles', floorTint: 0xd9d4cc, ...WHITE_PAINT }, // white walls, tiles only on the floor
-    storage: { name: 'Storage cupboard', wall: 0xeadfc8, floor: 'wood' },
+    storage: { name: 'Storage cupboard', floor: 'wood', ...WHITE_PAINT },
     utility: { name: 'Utility room', floor: 'tiles', floorTint: 0xc9c2b6, ...WHITE_PAINT },
     garage: { name: 'Garage', wall: 0xd6d2c9, wallTex: 'paint', floor: 'stone', floorTint: 0x9d9a94 },
   },
   {
-    hall: { name: 'Landing', wall: 0xeadfc8, floor: 'wood' },
+    hall: { name: 'Landing', floor: 'wood', ...WHITE_PAINT },
     left: { name: 'Bedroom', floor: 'wood', ...WHITE_PAINT },
     right: { name: 'Kids room', floor: 'carpet', floorTint: 0x9fcf9a, ...WHITE_PAINT },
   },
@@ -214,6 +214,8 @@ export function buildHouse(scene, world, physMats) {
     frontDoorGlass: std({ color: 0xa9d3ea, roughness: 0.15 }),
     handle: std({ color: 0xc9a74a, roughness: 0.3, metalness: 0.8 }),
   };
+  // the garage's green door (buildGarage)
+  const GARAGE_DOOR = { slab: std({ color: 0x2f5d4a, roughness: 0.6 }), panel: std({ color: 0x29523f, roughness: 0.6 }), color: 0x2f5d4a };
   const wallpaperCache = new Map();
   const wallpaper = (room) => {
     const key = `${room.wall}-${room.wallTex ?? 'paper'}`;
@@ -450,8 +452,9 @@ export function buildHouse(scene, world, physMats) {
       mesh.receiveShadow = true;
       group.add(mesh);
     };
-    const slab = o.front ? M.frontDoor : M.door;
-    const panel = o.front ? M.frontDoorPanel : M.doorPanel;
+    // (a door of its own colour, like the garage's, brings its own materials)
+    const slab = o.leaf?.slab ?? (o.front ? M.frontDoor : M.door);
+    const panel = o.leaf?.panel ?? (o.front ? M.frontDoorPanel : M.doorPanel);
     if (o.glazed) {
       // a glass door: two see-through panes, one above and one below the middle rail
       const [ga, gb] = [o.a + 0.14, o.b - 0.14];
@@ -474,7 +477,7 @@ export function buildHouse(scene, world, physMats) {
     } else {
       part(o.a + 0.01, o.b - 0.01, o.bottom + 0.01, o.top - 0.01, 0.06, slab);
       // raised panels on both faces
-      part(o.a + 0.14, o.b - 0.14, o.bottom + 1.15, o.top - 0.16, 0.08, o.front ? M.frontDoorGlass : panel);
+      part(o.a + 0.14, o.b - 0.14, o.bottom + 1.15, o.top - 0.16, 0.08, o.front && !o.leaf ? M.frontDoorGlass : panel);
       part(o.a + 0.14, o.b - 0.14, o.bottom + 0.18, o.bottom + 0.98, 0.08, panel);
     }
     // a lever handle on each side
@@ -488,7 +491,7 @@ export function buildHouse(scene, world, physMats) {
       broken: false,
       cracked: false,
       story,
-      color: o.front ? DOOR_COLORS.front : DOOR_COLORS.inside,
+      color: o.leaf?.color ?? (o.front ? DOOR_COLORS.front : DOOR_COLORS.inside),
       center,
       normal: run === 'x' ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0),
       width: o.b - o.a,
@@ -705,6 +708,7 @@ export function buildHouse(scene, world, physMats) {
   buildToiletOut();
   // the dining chairs, the piano stool and the small round tables, which Lennie knocks over (loose.js)
   const loose = createLoose(world, physMats.loose);
+  const garage = {}; // the garage's shelves, table and pegboard, whose stuff clutter.js makes loose
   buildFurniture();
   // the kids' drawings and paintings on the living room's white walls, and the photos of friends in the toilet (drawings.js)
   const wx = IN.x0 + 0.006; // just off the left and right walls' faces
@@ -729,7 +733,7 @@ export function buildHouse(scene, world, physMats) {
   // the TV on its cabinet, which cracks and sparks when Lennie hits it (tv.js)
   const tv = buildTV(kit);
   // the mess: dishes, toys, clothes, household stuff and the board game closet (clutter.js)
-  const clutter = buildClutter({ ...kit, H });
+  const clutter = buildClutter({ ...kit, H, garage });
 
   // ------------------------------------------------------------ the ground floor's own walls
   // The toilet's two walls, the wall between the hallway and the kitchen, the
@@ -827,34 +831,14 @@ export function buildHouse(scene, world, physMats) {
     });
     wall({
       ...ext, run: 'z', at: G.x0, from: zi, to: zu, physOffset: -off, outward: -1, line: 'garage-w',
-      openings: [{ a: G.door[0], b: G.door[1], bottom: 0, top: DOOR_TOP, open: true, slack: DOOR_SLACK }],
+      // its green door is shut; Lennie cracks it, then smashes through it, like the doors in the house
+      openings: [{ a: G.door[0], b: G.door[1], bottom: 0, top: DOOR_TOP, slack: DOOR_SLACK, leaf: GARAGE_DOOR }],
       mats: { pos: paint, neg: M.brick, ends: M.brick },
     });
     wall({
       ...ext, run: 'z', at: G.x1, from: zi, to: zu, physOffset: off, outward: 1, line: 'garage-e',
       mats: { pos: M.brick, neg: paint },
     });
-    // the door's white frame, on the outside
-    const [d0, d1] = G.door;
-    const trim = (min, max) => box(min, max, M.trim, { story: 0, line: 'garage-w' });
-    trim([xo - 0.03, 0, d0 - 0.07], [xo, DOOR_TOP + 0.07, d0]);
-    trim([xo - 0.03, 0, d1], [xo, DOOR_TOP + 0.07, d1 + 0.07]);
-    trim([xo - 0.03, DOOR_TOP, d0], [xo, DOOR_TOP + 0.07, d1]);
-    // the door itself, green, hinged on the far side and swung wide open into the garden
-    const leafMat = std({ color: 0x2f5d4a, roughness: 0.6 });
-    const w = d1 - d0 - 0.02;
-    const swing = 1.75; // radians: a bit past square, so it never stands in the way
-    const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.04, DOOR_TOP - 0.02, w).translate(-0.02, (DOOR_TOP - 0.02) / 2, w / 2), leafMat);
-    leaf.position.set(xo - 0.03, 0.01, d0 + 0.01);
-    leaf.rotation.y = -swing;
-    leaf.castShadow = true;
-    leaf.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.12).translate(-0.06, 1.0, w - 0.1), M.handle));
-    groups[0].add(leaf);
-    const ld = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3(0.05, DOOR_TOP / 2, w / 2)) });
-    ld.position.set(xo - 0.05 - Math.sin(swing) * w / 2, DOOR_TOP / 2, d0 + Math.cos(swing) * w / 2);
-    ld.quaternion.setFromEuler(0, -swing, 0);
-    ld.surface = { kind: 'furniture' };
-    world.addBody(ld);
     // the flat roof, carrying on from the utility room's (they meet, so they don't overlap and flicker)
     const rMin = [xo - 0.1, G.top, zo - 0.1];
     const rMax = [OUT.x1, G.top + 0.2, zu];
@@ -1246,9 +1230,9 @@ export function buildHouse(scene, world, physMats) {
     rug(0, -2.25, 4.2, -1.05, 4.8, 0x6b5a45); // the doormat
 
     // the convector heating trench in the floor along the back window, from the
-    // TV's corner to the comfy chair: a long wooden grille
-    const trench = { a: BACK_GROUND[0].a + 0.15, b: -0.5 };
-    const grille = rug(0, trench.a, IN.z0, trench.b, IN.z0 + 0.26, 0xffffff);
+    // TV's corner to the comfy chair: a long wooden grille, a little way out from the wall
+    const trench = { a: BACK_GROUND[0].a + 0.15, b: -0.5, z0: IN.z0 + 0.15 };
+    const grille = rug(0, trench.a, trench.z0, trench.b, trench.z0 + 0.26, 0xffffff);
     grille.material = std({ map: grilleTexture(trench.b - trench.a), roughness: 0.75, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
 
     // plants on the kitchen window sill, either side of the tap
@@ -1266,67 +1250,32 @@ export function buildHouse(scene, world, physMats) {
     }
 
     // --- the garage (buildGarage): camping shelves along the garden side,
-    // a table piled with stuff on the far side, tool shelves against the utility room
+    // a table on the far side, tool shelves against the utility room with a
+    // pegboard above them. Everything on them is loose (clutter.js), so
+    // crashing into them brings it all down; their bodies go there in `garage`.
     const NO = { phys: false };
     const SHELF = 0x8b8f94; // grey steel shelving
-    const shelving = (x0, z0, x1, z1, levels, color) => {
+    const shelving = (x0, z0, x1, z1, levels, color, name) => {
       const top = levels[levels.length - 1] + 0.03;
       const parts = [];
       for (const [x, z] of [[x0, z0], [x1 - 0.04, z0], [x0, z1 - 0.04], [x1 - 0.04, z1 - 0.04]]) parts.push([[x, 0, z], [x + 0.04, top, z + 0.04], color, NO]);
       for (const y of levels) parts.push([[x0 + 0.005, y, z0 + 0.04], [x1 - 0.005, y + 0.03, z1 - 0.04], color, NO]);
       // one solid block for the lot, so Lennie can't get wedged between the shelves
-      body([x0, 0, z0], [x1, top, z1], physMats.hard, { kind: 'furniture' });
+      garage[name] = body([x0, 0, z0], [x1, top, z1], physMats.hard, { kind: 'furniture' });
       return parts;
     };
     const GZ0 = GARAGE.z0 + EXT / 2; // inner face of its back wall
     const GZ1 = GARAGE.z1 - EXT / 2; // the utility room's wall
     const GX0 = GARAGE.x0 + EXT / 2;
     piece(0, [
-      // shelves with camping stuff
-      ...shelving(GX0, GZ0 + 0.05, GX0 + 0.5, -8.05, [0.08, 0.6, 1.12, 1.64, 2.1], SHELF),
-      [[GX0 + 0.06, 0.11, GZ0 + 0.15], [GX0 + 0.46, 0.5, GZ0 + 0.75], 0x2f6fb5, NO], // cool box
-      [[GX0 + 0.05, 0.5, GZ0 + 0.15], [GX0 + 0.47, 0.56, GZ0 + 0.75], 0xf2f2ee, NO], // its lid
-      [[GX0 + 0.08, 0.11, -8.95], [GX0 + 0.45, 0.45, -8.2], 0x6b7d5a, NO], // a crate of pegs and ropes
-      [[GX0 + 0.1, 1.15, -8.9], [GX0 + 0.42, 1.55, -8.15], 0xd95d39, NO], // the kids' camping chairs, folded
-      [[GX0 + 0.06, 1.67, GZ0 + 0.12], [GX0 + 0.46, 1.92, -8.6], 0x3f4a3a, NO], // the tent poles' bag
-      // the table piled with stuff, and more under it
+      ...shelving(GX0, GZ0 + 0.05, GX0 + 0.5, -8.05, [0.08, 0.6, 1.12, 1.64, 2.1], SHELF, 'camping'),
       ...table(5.05, GZ0 + 0.05, IN.x1 - 0.02, -8.2, 0.85, 0x8a6a48).map((part) => [...part.slice(0, 3), NO]),
-      [[5.12, 0, GZ0 + 0.12], [5.8, 0.42, -9.0], 0xb8895a, NO],
-      [[5.15, 0, -8.95], [5.75, 0.5, -8.3], 0x4a4d52, NO], // a crate of empties
-      [[5.08, 0.85, GZ0 + 0.1], [5.5, 1.25, -9.15], 0xc99d6b, NO],
-      [[5.1, 1.25, GZ0 + 0.15], [5.45, 1.55, -9.3], 0xa47a4d, NO],
-      [[5.5, 0.85, GZ0 + 0.08], [5.86, 1.1, -9.0], 0xc4352f, NO], // the toolbox
-      [[5.15, 0.85, -9.05], [5.55, 1.05, -8.6], 0x6f8fa8, NO], // a plastic tub
-      [[5.6, 0.85, -8.9], [5.86, 1.35, -8.45], 0xb8895a, NO],
-      [[5.12, 0.85, -8.5], [5.4, 0.98, -8.25], 0x2f8a5b, NO], // garden gloves and seed packets
-      // tool shelves against the utility room's wall, with a pegboard of tools above
-      ...shelving(2.7, GZ1 - 0.4, IN.x1, GZ1, [0.1, 0.5, 0.9], SHELF),
+      ...shelving(2.7, GZ1 - 0.4, IN.x1, GZ1, [0.1, 0.5, 0.9], SHELF, 'tools'),
       [[2.75, 0.93, GZ1 - 0.02], [IN.x1 - 0.02, 1.85, GZ1 - 0.005], 0xc9b48f, NO], // the pegboard
-      [[2.9, 1.2, GZ1 - 0.05], [3.25, 1.27, GZ1 - 0.02], 0x4a3020, NO], // a saw
-      [[3.0, 1.27, GZ1 - 0.05], [3.15, 1.6, GZ1 - 0.02], 0x9aa3ad, NO],
-      [[3.5, 1.15, GZ1 - 0.06], [3.56, 1.6, GZ1 - 0.02], 0xd95d39, NO], // a hammer
-      [[3.46, 1.52, GZ1 - 0.07], [3.66, 1.58, GZ1 - 0.02], 0x55595f, NO],
-      [[3.95, 1.1, GZ1 - 0.1], [4.25, 1.4, GZ1 - 0.02], 0xf2c14e, NO], // the drill
-      // a row of screwdrivers (coloured handles) and spanners
-      ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
-        const x = 4.55 + i * 0.11;
-        return i < 4
-          ? [[x, 1.35, GZ1 - 0.04], [x + 0.035, 1.62, GZ1 - 0.02], [0xd95d39, 0xf2c14e, 0x2f6fb5, 0x2f8a5b][i], NO]
-          : [[x, 1.3 + (i - 4) * 0.04, GZ1 - 0.035], [x + 0.03, 1.72, GZ1 - 0.02], 0x9aa3ad, NO];
-      }),
-      [[2.8, 0.53, GZ1 - 0.36], [3.3, 0.8, GZ1 - 0.05], 0x55595f, NO], // tins of paint and screws
-      [[3.4, 0.53, GZ1 - 0.36], [4.1, 0.85, GZ1 - 0.05], 0x2f6fb5, NO],
-      [[4.3, 0.13, GZ1 - 0.36], [5.2, 0.45, GZ1 - 0.05], 0x4a4d52, NO],
-      [[2.8, 0.13, GZ1 - 0.36], [3.7, 0.4, GZ1 - 0.05], 0xb8895a, NO],
     ]);
-    // one solid block for the table and its heap
-    body([5.05, 0, GZ0], [IN.x1, 1.4, -8.2], physMats.hard, { kind: 'furniture' });
-    // rolled-up sleeping bags and the tent on the camping shelves
-    for (const [y, z, r, len, color] of [[0.63, -9.25, 0.13, 0.4, 0x2f8a5b], [0.63, -8.9, 0.13, 0.4, 0xd95d39], [0.63, -8.55, 0.12, 0.4, 0x5d8fb3], [1.15, -9.25, 0.13, 0.42, 0x3f4a3a], [1.67, -8.3, 0.11, 0.42, 0xf2c14e]]) {
-      const roll = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 12).rotateZ(Math.PI / 2), col(color));
-      roll.position.set(GX0 + 0.25, y + r, z);
-      groups[0].add(roll);
-    }
+    // one solid block for the table and what's under it, and the pegboard (so a knock on it brings the tools down)
+    garage.table = body([5.05, 0, GZ0], [IN.x1, 0.85, -8.2], physMats.hard, { kind: 'furniture' });
+    garage.pegboard = body([2.75, 0.96, GZ1 - 0.06], [IN.x1, 1.85, GZ1], physMats.hard, { kind: 'furniture' });
     // a bike against the back wall, between the shelves and the table
     {
       const bike = new THREE.Group();
@@ -1460,7 +1409,7 @@ export function buildHouse(scene, world, physMats) {
     S('piano', 'On the piano!', 350, 'PLINK!', [2.9, 1.2, 0.5], [4.7, 2.0, 1.17]),
     S('loo', 'On the loo!', 500, 'OOPS!', [-4.98, 0.3, 5.12], [-4.38, 1.1, 5.95]),
     S('litter', 'In the cat litter!', 400, 'EWW!', [2.55, 0, -6.6], [3.25, 0.6, -6.05]),
-    S('junk', 'On the junk pile!', 300, 'CLATTER!', [5.0, 1.3, -9.6], [5.9, 2.2, -8.15]),
+    S('junk', 'On the junk pile!', 300, 'CLATTER!', [5.0, 0.8, -9.6], [5.9, 1.9, -8.15]),
     S('camping', 'Up on the camping shelf!', 450, 'CAMPING!', [1.5, 2.05, -9.6], [2.1, 2.6, -8.0]),
     S('lounge', 'Chilling on the lounge set', 200, 'AHH!', [1.55, 0.25, -12.05], [5.98, 1.1, -9.8]),
     ...clutter.spots,
