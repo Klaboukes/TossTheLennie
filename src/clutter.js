@@ -43,7 +43,7 @@ const ROOMS = {
 const ROOM_MESS = {
   living: ['Who left their socks here?', 'Remote? What remote?', 'Movie night is cancelled!', 'Controller down!', 'Living room? Flying room!', 'Crisps for everyone!'],
   hall: ['Shoes everywhere!', 'Welcome home!', 'Wipe your feet!', 'Coming through!'],
-  utility: ['Kitty litter!', 'Meow?!', 'The cat did it!', 'Cool down, Lennie!'],
+  utility: ['Kitty litter!', 'Meow?!', 'The cat did it!', 'Cool down, Lennie!', 'Flying boots!', 'Coats everywhere!'],
   garage: ['Garage sale!', "Where's my hammer?", 'Camping trip cancelled!', 'DIY disaster!', 'Junk everywhere!', 'Tools down!'],
   kitchen: ['Hagelslag avalanche!', "Who's doing the dishes?", 'Breakfast in the air!', 'Pan-demonium!', "Don't cry over spilt milk!", 'Plate-tectonics!'],
   bedroom: ['Laundry day!', 'Sock it to me!', 'Lost a slipper!', 'Wake-up call!', 'Bedtime? Not yet!', 'Bed head!'],
@@ -60,7 +60,7 @@ const FURNITURE = {
   ],
   kitchen: [[-0.81, 5.875, 4.2, 4.875], [5.2, 5.875, 1.85, 4.2], [0.78, 5.875, 1.19, 1.85]],
   hall: [[-5.875, -3.31, 2.96, 4.875], [-4.65, -3.55, 2.7, 2.96]],
-  utility: [[5.15, 5.875, -5.85, -5.125], [2.6, 3.2, -6.55, -6.1]],
+  utility: [[5.15, 5.875, -5.85, -5.125], [2.3, 3.3, -6.575, -5.9], [3.65, 4.95, -6.575, -6.05]], // fridge, litter box, clothes rack
   garage: [[1.555, 2.055, -9.55, -8.05], [5.05, 5.875, -9.55, -8.2], [2.7, 4.5, -9.55, -9.15], [2.7, 5.875, -7.225, -6.825]], // camping shelves, table, bike, tool shelves
   bedroom: [[-4.47, -2.18, 0.5, 3.1], [0.2, 0.91, 2.5, 4.5], [-3.35, -2.6, 3.9, 4.875], [-0.8, -0.1, -2.31, -1.5]],
   kids: [[3.9, 5.875, -2.31, -1.1], [1.9, 3.1, 4.1, 4.875], [3.0, 4.2, 2.4, 3.6]],
@@ -567,6 +567,23 @@ function buildCatalogue() {
   C.sneaker = shoe(0xf4f2ee, 0x2a5bd7);
   C.shoeBlack = shoe(0x2b2522, 0x1b1b1b);
   C.slipper = shoe(0xe86fa0, 0xf4f2ee);
+  C.shoeBrown = shoe(0x7a4a2a, 0x2b2522);
+  // rubber boots (laarzen), standing up: a sole, the foot, the toe and the tall shaft; `s` scales a kid's pair
+  const boot = (color, s = 1) => {
+    const rubber = mat(color, { roughness: 0.45 });
+    return parts([
+      [at(Box(0.28 * s, 0.03 * s, 0.1 * s), 0, 0.015 * s, 0), mat(0x2b2b2b, { roughness: 0.8 })],
+      [at(Box(0.2 * s, 0.08 * s, 0.09 * s), 0, 0.07 * s, 0), rubber],
+      [at(Sph(0.045 * s, 1.3, 0.8, 1), 0.08 * s, 0.045 * s, 0), rubber],
+      [at(Cyl(0.06 * s, 0.055 * s, 0.3 * s, 14), -0.06 * s, 0.24 * s, 0), rubber],
+      [at(Cyl(0.064 * s, 0.064 * s, 0.025 * s, 14), -0.06 * s, 0.38 * s, 0), mat(0x2b2b2b, { roughness: 0.6 })],
+    ]);
+  };
+  C.bootYellow = boot(0xf2c14e);
+  C.bootGreen = boot(0x2f6b3a);
+  C.bootBlack = boot(0x2b2b2b);
+  C.bootRed = boot(0xd8312a, 0.7);
+  C.bootBlue = boot(0x5d8fb3, 0.7);
   // the garage: camping gear, boxes of junk, paint and tools
   const cardboard = (text, w, h, d) => {
     const lid = canvasTexture(128, 128, (g) => { g.fillStyle = '#c9a06a'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#d9b884'; g.fillRect(54, 0, 20, 128); g.strokeStyle = '#8a6a3a'; g.lineWidth = 2; g.strokeRect(1, 1, 126, 126); });
@@ -799,7 +816,17 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   put(utility, 'stroopwafels', 5.4, 1.95, -5.5); // on top of the fridge
   put(utility, 'chocolade', 5.6, 1.95, -5.35, { yaw: 0.6 });
   put(utility, 'waspoeder', 2.0, 0, -6.35, { yaw: 0.2 });
-  pile(utility, 'wcRol', 4.4, 0, -6.35, 3, { jitter: 0.01 });
+  pile(utility, 'wcRol', 5.55, 0, -6.3, 3, { jitter: 0.01 });
+  // the family's boots in a row under the clothes rack, the kids' small ones at the end
+  for (const [id, x, z, yaw] of [
+    ['bootGreen', 3.85, -6.3, 1.62], ['bootGreen', 3.98, -6.28, 1.5], ['bootYellow', 4.17, -6.3, 1.58], ['bootYellow', 4.3, -6.32, 1.66],
+    ['bootRed', 4.5, -6.3, 1.55], ['bootRed', 4.6, -6.28, 1.6], ['bootBlue', 4.75, -6.3, 1.7],
+  ]) put(utility, id, x, 0, z, { yaw });
+  // one blue boot fell over, and the shoes are kicked off all over the floor
+  put(utility, 'bootBlue', 3.6, 0, -5.7, { yaw: 0.4, ...tipped('bootBlue') });
+  put(utility, 'bootBlack', 4.6, 0, -5.55, { yaw: 2.2 });
+  put(utility, 'bootBlack', 4.25, 0, -5.4, { yaw: 0.3, ...tipped('bootBlack') });
+  for (const [id, x, z, yaw] of [['sneaker', 3.9, -5.5, 1.1], ['sneaker', 4.05, -5.8, 2.6], ['shoeBrown', 2.1, -5.55, 0.5], ['shoeBrown', 1.95, -5.85, 1.9], ['slipper', 5.0, -5.95, 0.8]]) put(utility, id, x, 0, z, { yaw });
   strew(utility, ['sockWhite', 'sockBlack', 'heapGrey', 'cola', 'limo'], 5, { how: lying });
 
   // ---------------------------------------------------------------- garage

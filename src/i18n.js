@@ -500,6 +500,8 @@ const NL = {
   'Meow?!': 'Miauw?!',
   'The cat did it!': 'De kat heeft het gedaan!',
   'Cool down, Lennie!': 'Rustig aan, Lennie!',
+  'Flying boots!': 'Vliegende laarzen!',
+  'Coats everywhere!': 'Overal jassen!',
   "Where's my hammer?": 'Waar is mijn hamer?',
   'Camping trip cancelled!': 'Kampeervakantie gaat niet door!',
   'DIY disaster!': 'Klusdrama!',
