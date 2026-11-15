@@ -46,8 +46,9 @@ export function buildYard(scene, world, physMats) {
 
   // ------------------------------------------------------------ ground
   // The grass is nudged back in the depth test, so anything lying exactly at
-  // ground level (the top of the house's foundation, seen when a wall fades)
-  // always draws over it instead of flickering against it.
+  // ground level always draws over it instead of flickering against it. (The
+  // buildings stand on concrete bases a few mm above it, which show under a
+  // faded wall: house.js FOUND_TOP and the supermarket's base.)
   const grass = new THREE.Mesh(floorGeometry(-90, -90, 90, 90), std({ map: tex.grass, roughness: 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 4 }));
   grass.receiveShadow = true;
   scene.add(grass);

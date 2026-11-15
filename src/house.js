@@ -197,6 +197,7 @@ export function buildHouse(scene, world, physMats) {
     cladding: std({ color: 0xf1eee6, roughness: 0.7 }),
     darkRoof: std({ color: 0x35302e, roughness: 0.8 }),
     trim: std({ color: 0xfbfaf6, roughness: 0.6 }),
+    base: std({ color: 0xa9a59d, roughness: 0.9 }), // the concrete top of the foundation, seen under a faded wall
     // Ceilings: a warm off-white, just set apart from the white walls. They face down,
     // where only the lawn's greenish bounce light reaches, so a glow of their own keeps them light.
     // A little grubby, like the walls (the glow too, or it would wash the grime out).
@@ -653,8 +654,12 @@ export function buildHouse(scene, world, physMats) {
 
   // ------------------------------------------------------------ slabs (floor 2 and the attic floor)
   // The ground floor sits on a foundation; the yard's ground plane is its physics.
-  // (Its top is 5 mm under the ground, not level with the grass, which it would flicker against.)
-  box([OUT.x0, -0.3, OUT.z0], [OUT.x1, -0.005, OUT.z1], [M.trim, M.trim, M.ceiling, M.ceiling, M.trim, M.trim], { story: 0 });
+  // Its concrete top is what you see under a faded wall: 4 mm above the grass (any
+  // lower and the grass showed through there) and 6 mm under the floors, so it
+  // lies in one plane with neither.
+  const FOUND = [M.trim, M.trim, M.base, M.base, M.trim, M.trim];
+  const FOUND_TOP = 0.004;
+  box([OUT.x0, -0.3, OUT.z0], [OUT.x1, FOUND_TOP, OUT.z1], FOUND, { story: 0 });
   for (let k = 1; k < HOUSE.stories; k++) {
     const top = k * H;
     const line = `slab-${k}`;
@@ -769,7 +774,7 @@ export function buildHouse(scene, world, physMats) {
     const zo = U.z0 - EXT / 2;
     const zi = U.z0 + EXT / 2; // inner face of its back wall
     const ext = { y0: 0, y1: U.top, story: 0, thick: EXT, physThick: EXT_PHYS };
-    box([xo, -0.3, zo], [OUT.x1, -0.005, OUT.z0], [M.trim, M.trim, M.ceiling, M.ceiling, M.trim, M.trim], { story: 0 }); // foundation
+    box([xo, -0.3, zo], [OUT.x1, FOUND_TOP, OUT.z0], FOUND, { story: 0 }); // foundation
     const floor = new THREE.Mesh(floorGeometry(U.x0 + EXT / 2, zi, IN.x1, OUT.z0), floorMat(room));
     floor.position.y = 0.01;
     floor.receiveShadow = true;
@@ -811,7 +816,7 @@ export function buildHouse(scene, world, physMats) {
     const zi = G.z0 + EXT / 2; // inner face of its back wall
     const zu = G.z1 - EXT / 2; // the utility room's back wall
     const ext = { y0: 0, y1: G.top, story: 0, thick: EXT, physThick: EXT_PHYS };
-    box([xo, -0.3, zo], [OUT.x1, -0.005, zu], [M.trim, M.trim, M.ceiling, M.ceiling, M.trim, M.trim], { story: 0 }); // foundation
+    box([xo, -0.3, zo], [OUT.x1, FOUND_TOP, zu], FOUND, { story: 0 }); // foundation
     const floor = new THREE.Mesh(floorGeometry(G.x0 + EXT / 2, zi, IN.x1, zu), floorMat(room));
     floor.position.y = 0.01;
     floor.receiveShadow = true;
@@ -869,7 +874,7 @@ export function buildHouse(scene, world, physMats) {
     const off = (EXT_PHYS - EXT) / 2;
     const zi = T.z1 - EXT; // inner face of its front
     const ext = { y0: 0, y1: T.top, story: 0, thick: EXT, physThick: EXT_PHYS };
-    box([T.x0, -0.3, OUT.z1], [T.x1, 0, T.z1], [M.trim, M.trim, M.ceiling, M.ceiling, M.trim, M.trim], { story: 0 }); // foundation
+    box([T.x0, -0.3, OUT.z1], [T.x1, FOUND_TOP, T.z1], FOUND, { story: 0 }); // foundation
     const floor = new THREE.Mesh(floorGeometry(IN.x0, IN.z1, T.x1 - EXT, zi), floorMat(ROOMS[0].toilet));
     floor.position.y = 0.01;
     floor.receiveShadow = true;

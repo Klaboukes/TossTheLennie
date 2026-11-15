@@ -439,6 +439,12 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   // ---------------------------------------------------------------- inside: floor, lights, a band of text
   const floor = add(new THREE.Mesh(floorGeometry(IN.x0, IN.z0, IN.x1, IN.z1), std({ map: tex.tiles, color: 0xe9e5dc, roughness: 0.45 })));
   floor.position.y = 0.012;
+  // A concrete base under the whole building and its glass entrance, so a faded
+  // wall shows that instead of the grass (4 mm above the grass, under the floor and the carpet).
+  const base = std({ color: 0xa9a59d, roughness: 0.9 });
+  for (const [x0, z0, x1, z1] of [[SHOP.x0, SHOP.z0, SHOP.x1, SHOP.z1], [E.x0, E.z0, E.x1, SHOP.z0]]) {
+    add(new THREE.Mesh(floorGeometry(x0, z0, x1, z1), base)).position.y = 0.004;
+  }
   const lamp = std({ color: 0xffffff, emissive: 0xfff6e0, emissiveIntensity: 0.9 });
   for (let x = IN.x0 + 2.5; x < IN.x1 - 1; x += 5) boxAt([x - 0.15, IN.y1 - 0.04, IN.z0 + 1.5], [x + 0.15, IN.y1, IN.z1 - 1.5], lamp, { fade: 'roof' });
   const bandTex = labelTexture('LEKKER VERS  •  ELKE DAG VOORDELIG  •  LEKKER VERS', '#3fae3a', '#ffffff', 2048, 96);
