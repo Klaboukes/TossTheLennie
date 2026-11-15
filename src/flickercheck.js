@@ -52,14 +52,20 @@ const lookOf = (m) => [m.type, hex(m.color), hex(m.emissive), m.emissiveIntensit
   m.normalMap?.uuid, m.vertexColors, m.flatShading, m.transparent ? Math.round(m.opacity * 100) : 100].join('|');
 
 /**
- * Notes down where every scenery mesh is. Call it before combineScenery()
- * glues the meshes together, so the check can still name each part.
+ * Notes down where every scenery mesh is and how its materials look. Call it
+ * before combineScenery() glues the meshes together, so the check can still
+ * name each part, and before any wall fades out of the camera's way (a faded
+ * wall would no longer count as solid).
  */
 export function sceneryParts(scene, skip = () => false) {
   scene.updateMatrixWorld(true);
   const parts = [];
+  parts.materials = new Map(); // material -> { solid, look, opacity } as built
   scene.traverse((o) => {
     if (!o.isMesh || o.isBatchedMesh || o.isSkinnedMesh || !shown(o) || skip(o) || !o.geometry.attributes.position) return;
+    for (const m of [].concat(o.material)) {
+      if (m && !parts.materials.has(m)) parts.materials.set(m, { solid: opaque(m), look: lookOf(m), opacity: m.opacity });
+    }
     const count = o.isInstancedMesh ? o.count : 1;
     for (let i = 0; i < count; i++) {
       const matrix = o.matrixWorld.clone();
@@ -155,11 +161,11 @@ function lift(u, v, plane, out) {
  * It is inside a part when the first of that part's surfaces a ray from it
  * along `dir` meets is seen from within.
  */
-function solidTest(parts) {
+function solidTest(parts, built) {
   const grid = new Map();
   const big = [];
   for (const part of parts) {
-    if (![].concat(part.mesh.material).every((m) => m && opaque(m))) continue;
+    if (![].concat(part.mesh.material).every((m) => m && built(m).solid)) continue;
     const geo = part.mesh.geometry;
     if (!geo.boundingBox) geo.computeBoundingBox();
     const solid = { part, bounds: geo.boundingBox.clone().applyMatrix4(part.matrix), mirrored: part.matrix.determinant() < 0 };
@@ -219,6 +225,8 @@ function pauser(ms = 15) {
  */
 export async function findFlicker(parts) {
   const breathe = pauser();
+  /** A material as it was built (see sceneryParts). */
+  const built = (m) => parts.materials?.get(m) ?? { solid: opaque(m), look: lookOf(m), opacity: m.opacity };
   const sources = []; // what each triangle belongs to: { id, part, material, color, look, offset }
   const planes = new Map(); // facing -> height -> triangles
   let triangles = 0;
@@ -266,7 +274,7 @@ export async function findFlicker(parts) {
       let src = mine.get(mat);
       if (!src) {
         src = {
-          id: sources.length, part, material: mat, color, look: `${lookOf(mat)}#${color}`,
+          id: sources.length, part, material: mat, color, look: `${built(mat).look}#${color}`, opacity: built(mat).opacity,
           offset: mat.polygonOffset ? `${mat.polygonOffsetFactor},${mat.polygonOffsetUnits}` : '',
         };
         mine.set(mat, src);
@@ -328,7 +336,7 @@ export async function findFlicker(parts) {
   }
 
   // How much of each overlap can be seen: look at its biggest pieces.
-  const inside = solidTest(parts);
+  const inside = solidTest(parts, built);
   const probe = new THREE.Vector3();
   const spots = [];
   for (const group of groups.values()) {
@@ -372,7 +380,7 @@ function describe(src) {
   const at = new THREE.Vector3().setFromMatrixPosition(matrix);
   const bits = [`${what} #${src.color || hex(m.color) || '?'}`];
   if (m.map) bits.push('textured');
-  if (m.transparent && m.opacity < 1) bits.push(`see-through ${f2(m.opacity)}`);
+  if (m.transparent && src.opacity < 1) bits.push(`see-through ${f2(src.opacity)}`);
   if (instance >= 0) bits.push(`copy ${instance} of ${mesh.count}`);
   if (mesh.name) bits.push(`"${mesh.name}"`);
   return `${bits.join(' ')} centred at (${f2(at.x)}, ${f2(at.y)}, ${f2(at.z)})`;
