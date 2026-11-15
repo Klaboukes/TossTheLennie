@@ -343,6 +343,21 @@ export class Sfx {
     }
   }
 
+  /** Plates and mugs smashing on the floor: a sharp crack each and a clink of china; more for more. */
+  smash(count) {
+    if (!this.ready) return;
+    const t0 = this.ctx.currentTime;
+    const k = this.#tire('smash', 0.6);
+    const n = Math.min(5, count);
+    for (let i = 0; i < n; i++) {
+      const t = t0 + (i ? Math.random() * 0.12 : 0);
+      this.#burst(t, { filter: 'bandpass', f: rand(2200, 4200), Q: 1.2, peak: rand(0.18, 0.3) * k, attack: 0.001, release: rand(0.06, 0.12) });
+      for (let j = 0; j < 3; j++) {
+        this.#tone(t + 0.01 + Math.random() * 0.15, { type: 'triangle', f: rand(1800, 4500), peak: rand(0.03, 0.07) * k, attack: 0.002, release: 0.08 });
+      }
+    }
+  }
+
   /** A door giving way: a sharp crack, the boom of the panel and snapping wood. */
   splinter() {
     if (!this.ready) return;

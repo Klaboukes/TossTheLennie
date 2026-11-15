@@ -912,6 +912,25 @@ function buildCatalogue() {
     [at(Box(0.18, 0.015, 0.03), 0.22, 0.01, 0), mat(0x5a3a1c)],
   ]);
   C.cutlery = item(Box(0.18, 0.004, 0.018), mat(0xc9ced3, { roughness: 0.25, metalness: 0.8 }));
+  // the clean ones, in the hanging cupboard
+  C.plateClean = plate([]);
+  C.bowlClean = item(new THREE.LatheGeometry(bowlProf, 20), china);
+  C.glassClean = parts([[Cyl(0.035, 0.03, 0.11, 14, true), glassM], [new THREE.CircleGeometry(0.03, 14).rotateX(Math.PI / 2).translate(0, -0.052, 0), glassM]]); // its bottom 3 mm up, so it doesn't flicker against the shelf
+  // Crockery smashes (products.js): each piece breaks into a few shards,
+  // hidden in it until then. White china, the mugs' shards in their colour.
+  C.shard = item(flat([[0, 0], [0.07, 0.012], [0.055, 0.05], [0.012, 0.062]], 0.004), china);
+  C.shardB = item(flat([[0, 0], [0.09, 0.02], [0.03, 0.048]], 0.004), china);
+  C.shardGlass = item(flat([[0, 0], [0.055, 0.008], [0.02, 0.065]], 0.003), glassM);
+  C.shardRed = tint('shard', 0xd8312a);
+  C.shardBlue = tint('shardB', 0x2a5bd7);
+  C.shardYellow = tint('shard', 0xf2c14e);
+  for (const id of ['plate', 'plateB', 'plateC', 'plateClean']) C[id].breaks = ['shard', 'shardB', 'shard', 'shardB'];
+  for (const id of ['bowl', 'bowlClean']) C[id].breaks = ['shardB', 'shard', 'shardB'];
+  for (const id of ['glass', 'glassClean']) C[id].breaks = ['shardGlass', 'shardGlass', 'shardGlass'];
+  C.mugRed.breaks = ['shardRed', 'shardRed', 'shardRed'];
+  C.mugBlue.breaks = ['shardBlue', 'shardBlue', 'shardBlue'];
+  C.mugYellow.breaks = ['shardYellow', 'shardYellow', 'shardYellow'];
+  C.mugWhite.breaks = ['shard', 'shardB', 'shard'];
   const pizzaLid = canvasTexture(128, 128, (g) => { g.fillStyle = '#d9b48a'; g.fillRect(0, 0, 128, 128); g.fillStyle = 'rgba(120,70,20,0.35)'; g.beginPath(); g.ellipse(84, 80, 22, 15, 0.5, 0, TAU); g.fill(); g.fillStyle = '#c0392b'; circle(g, 64, 54, 28); g.fill(); label(g, 'PIZZA', 64, 56, 48, 18, '#ffffff'); label(g, 'LEKKER WARM!', 64, 104, 100, 14, '#c0392b'); });
   C.pizzaBox = { w: 0.33, h: 0.04, d: 0.33, look: () => { const b = mat(0xd9b48a); return { geo: Box(0.33, 0.04, 0.33), material: [b, b, texMat(pizzaLid), b, b, b] }; } };
   C.afwas = { shape: 'bottle', r: 0.04, h: 0.24, body: '#3fae3a', cap: '#ffffff', face: { bg: '#ffffff', fg: '#2e8b57', text: 'AFWAS' } };
@@ -1098,12 +1117,17 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     const sec = rooms[room];
     if (y < 0.35) y += FLOOR;
     if (!opts.on && !opts.inside && Math.min(...half(id)) < 0.012) opts.layer = 'free';
-    return stocks[sec.k].place(id, x, sec.k * H + y, z, yaw, sec, 0, opts);
+    return breakable(stocks[sec.k].place(id, x, sec.k * H + y, z, yaw, sec, 0, opts), id, sec);
+  }
+  /** Gives a plate, bowl, mug or glass the shards it smashes into. */
+  function breakable(item, id, sec) {
+    for (const s of C[id].breaks ?? []) stocks[sec.k].place(s, 0, 0, 0, 0, sec, 0, { shardOf: item });
+    return item;
   }
   /** A pile of the same thing (plates, books), each resting on the one below. */
-  function pile(room, id, x, y, z, n, { yaw = rnd() * TAU, jitter = 0.012 } = {}) {
+  function pile(room, id, x, y, z, n, { yaw = rnd() * TAU, jitter = 0.012, on = null } = {}) {
     const h = 2 * half(id)[1];
-    let below = null;
+    let below = on;
     for (let i = 0; i < n; i++) below = put(room, id, x + (rnd() - 0.5) * jitter, y + i * h, z + (rnd() - 0.5) * jitter, { yaw: yaw + (rnd() - 0.5) * 0.3, on: below });
     return below;
   }
@@ -1179,10 +1203,44 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   pile(kitchen, 'plateC', 1.3, 0.9, 1.5, 5);
   put(kitchen, 'pot', -0.35, 0.912, 4.43);
   put(kitchen, 'pan', 0.05, 0.912, 4.67, { yaw: Math.PI + 0.3 });
-  put(kitchen, 'afwas', 2.6, 0.9, 4.75);
-  put(kitchen, 'allesreiniger', 2.8, 0.9, 4.72);
-  for (const [id, x, z] of [['mugRed', 3.0, 4.45], ['mugYellow', 3.3, 4.55], ['mugWhite', 4.9, 1.5], ['glass', 3.6, 4.4], ['glass', 2.2, 1.55], ['mugBlue', 5.5, 3.7]]) put(kitchen, id, x, 0.9, z);
-  for (const [x, z] of [[1.0, 4.5], [3.9, 4.6], [4.2, 1.55], [4.5, 1.45], [5.55, 3.95]]) put(kitchen, 'cutlery', x, 0.9, z);
+  for (const [id, x, z] of [['mugWhite', 4.9, 1.5], ['glass', 2.2, 1.55], ['mugBlue', 5.5, 3.7]]) put(kitchen, id, x, 0.9, z);
+  for (const [x, z] of [[4.2, 1.55], [4.5, 1.45], [5.55, 3.95]]) put(kitchen, 'cutlery', x, 0.9, z);
+  // The washing-up nobody has done, heaped on the counter either side of the
+  // sink and in it: towers of dirty plates with bowls, mugs and glasses on
+  // top, more mugs and glasses in between. Lennie landing in it smashes the lot (products.js).
+  {
+    const Y = 0.9;
+    /** A pile of plates with something on top. */
+    const tower = (id, x, z, n, top = null, topN = 1, y0 = Y) => {
+      const below = pile(kitchen, id, x, y0, z, n);
+      if (!top) return;
+      const y = y0 + n * 2 * half(id)[1];
+      pile(kitchen, top, x + (rnd() - 0.5) * 0.03, y, z + (rnd() - 0.5) * 0.03, topN, { jitter: 0.01, on: below });
+    };
+    // right of the sink
+    tower('plate', 2.45, 4.36, 7, 'bowl', 2);
+    tower('plateB', 2.47, 4.63, 5, 'mugRed');
+    tower('plateC', 2.72, 4.37, 9, 'glass');
+    tower('plate', 2.74, 4.64, 4, 'bowl', 3);
+    tower('plateB', 2.99, 4.38, 6, 'mugYellow');
+    pile(kitchen, 'bowl', 3.0, Y, 4.63, 4, { jitter: 0.015 });
+    tower('plateC', 3.25, 4.4, 3);
+    put(kitchen, 'pot', 3.26, Y, 4.7);
+    for (const [id, x, z] of [['mugBlue', 3.47, 4.33], ['mugWhite', 3.5, 4.5], ['glass', 3.47, 4.7], ['mugRed', 3.66, 4.4], ['glass', 3.7, 4.58], ['mugYellow', 3.86, 4.36]]) put(kitchen, id, x, Y, z);
+    for (const [x, z, yaw] of [[3.2, 4.24, 0.2], [3.75, 4.75, 1.4], [3.95, 4.55, 2.6]]) put(kitchen, 'cutlery', x, Y, z, { yaw });
+    put(kitchen, 'afwas', 2.36, Y, 4.82);
+    // in the sink, on its bottom (just above it, which is above the worktop)
+    const SINK = 0.909;
+    tower('plateB', 1.88, 4.46, 3, 'mugBlue', 1, SINK);
+    put(kitchen, 'bowl', 2.1, SINK, 4.62);
+    // left of the sink
+    tower('plate', 1.55, 4.4, 5, 'bowl');
+    tower('plateC', 1.53, 4.66, 4, 'mugWhite');
+    pile(kitchen, 'bowl', 1.3, Y, 4.42, 3, { jitter: 0.015 });
+    for (const [id, x, z] of [['glass', 1.27, 4.62], ['mugRed', 1.1, 4.4], ['glass', 1.08, 4.66], ['mugYellow', 0.9, 4.5]]) put(kitchen, id, x, Y, z);
+    put(kitchen, 'allesreiniger', 1.28, Y, 4.8);
+    for (const [x, z, yaw] of [[1.05, 4.27, 0.3], [0.85, 4.3, 2.0]]) put(kitchen, 'cutlery', x, Y, z, { yaw });
+  }
   put(kitchen, 'pindakaas', 3.2, 0.9, 1.6);
   put(kitchen, 'hagelslag', 3.5, 0.9, 1.45, { yaw: -Math.PI / 2 });
   put(kitchen, 'witbrood', 4.6, 0.9, 4.55, { yaw: -Math.PI / 2 });
@@ -1374,6 +1432,8 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   const closet = buildCloset();
   // ---------------------------------------------------------------- the TV cabinet, full of toys
   const tvCabinet = buildTVCabinet();
+  // ---------------------------------------------------------------- the kitchen's hanging cupboard, full of crockery
+  const wallCupboard = buildWallCupboard();
 
   for (const s of stocks) s.build();
 
@@ -1667,6 +1727,172 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     return { update, reset };
   }
 
+  // The hanging cupboard on the kitchen's side wall, above the counter: four
+  // blue doors, and behind them the clean plates, bowls, mugs and glasses and
+  // the breakfast things. Crash Lennie into a door hard enough (from the front
+  // or from below) and it flies off into the kitchen, and what's behind it
+  // comes tumbling down onto the counter and the floor, where the crockery
+  // smashes; a really hard hit takes the doors next to it along. Once a door
+  // is off, the next knock brings down more. "Fix everything" puts it all back.
+  function buildWallCupboard() {
+    const k = 0;
+    const [X0, X1, Y0, Y1, Z0, Z1] = [5.525, 5.875, 1.5, 2.25, 1.9, 4.875];
+    const T = 0.018; // the carcass's boards
+    const DOOR_T = 0.016;
+    const W = (Z1 - Z0) / 4; // one door, and the compartment behind it
+    const SHELF = 1.86; // the middle shelf's underside
+    const BREAK = 5; // m/s: a hit this hard sends a door flying
+    const ALL = 10; // ... and this hard, the doors next to it too
+    const OUT = new THREE.Vector3(-1, 0, 0);
+    const blue = std({ color: 0x5d8fb3, roughness: 0.55 });
+    const inside = std({ color: 0xe9e6df, roughness: 0.7 });
+    const b = (min, max, m) => box(min, max, m, { story: k, cast: true });
+    // the boards fit between each other, so no two faces lie in one plane
+    b([X0, Y0, Z0], [X1, Y0 + T, Z1], blue); // bottom
+    b([X0, Y1 - T, Z0], [X1, Y1, Z1], blue); // top
+    b([X0, Y0 + T, Z0], [X1, Y1 - T, Z0 + T], blue); // the two ends
+    b([X0, Y0 + T, Z1 - T], [X1, Y1 - T, Z1], blue);
+    const BACK = X1 - 0.01;
+    b([BACK, Y0 + T, Z0 + T], [X1, Y1 - T, Z1 - T], inside); // the back
+    for (let i = 1; i < 4; i++) b([X0, Y0 + T, Z0 + i * W - 0.008], [BACK, Y1 - T, Z0 + i * W + 0.008], blue); // dividers
+    for (let i = 0; i < 4; i++) {
+      const a = i ? Z0 + i * W + 0.008 : Z0 + T;
+      const c = i < 3 ? Z0 + (i + 1) * W - 0.008 : Z1 - T;
+      b([X0 + 0.015, SHELF, a], [BACK, SHELF + 0.015, c], inside); // the middle shelf, set back a little
+    }
+    const solid = body([X0 - DOOR_T, Y0, Z0], [X1, Y1, Z1], physMats.hard, { kind: 'furniture' });
+
+    // what's inside, on the bottom (LOW) and on the middle shelf (MID) of each compartment
+    const LOW = Y0 + T;
+    const MID = SHELF + 0.015;
+    const XM = (X0 + BACK) / 2;
+    const secs = [0, 1, 2, 3].map(() => {
+      const sec = stocks[k].section({ bounds: ROOMS.kitchen, floorY: 0.012, k, name: 'kitchen', fresh: false });
+      sections[k].push(sec);
+      return sec;
+    });
+    const inCupboard = (i, id, x, y, z, opts = {}) => breakable(stocks[k].place(id, x, y, z, opts.yaw ?? rnd() * TAU, secs[i], 0, opts), id, secs[i]);
+    const stack = (i, id, x, y, z, n) => {
+      let below = null;
+      for (let j = 0; j < n; j++) below = inCupboard(i, id, x + (rnd() - 0.5) * 0.01, y + j * 2 * half(id)[1], z + (rnd() - 0.5) * 0.01, { on: below });
+    };
+    const zOf = (i, f) => Z0 + i * W + f * W; // f across the compartment, 0 to 1
+    // 1: the plates and the bowls
+    stack(0, 'plateClean', XM, LOW, zOf(0, 0.3), 9);
+    stack(0, 'plateClean', XM, LOW, zOf(0, 0.7), 7);
+    stack(0, 'bowlClean', XM, MID, zOf(0, 0.22), 5);
+    stack(0, 'bowlClean', XM, MID, zOf(0, 0.5), 4);
+    stack(0, 'bowlClean', XM, MID, zOf(0, 0.78), 5);
+    // 2: the mugs in front, the glasses behind them; the breakfast things above
+    const mugs = ['mugRed', 'mugBlue', 'mugYellow', 'mugWhite'];
+    for (let j = 0; j < 5; j++) {
+      inCupboard(1, mugs[j % 4], X0 + 0.07, LOW, zOf(1, 0.12 + j * 0.19));
+      inCupboard(1, 'glassClean', BACK - 0.06, LOW, zOf(1, 0.14 + j * 0.18));
+    }
+    inCupboard(1, 'vlokken', XM, MID, zOf(1, 0.2), { yaw: -Math.PI / 2 });
+    inCupboard(1, 'hagelslag', XM, MID, zOf(1, 0.48), { yaw: -Math.PI / 2 });
+    inCupboard(1, 'chocopasta', XM - 0.05, MID, zOf(1, 0.7));
+    inCupboard(1, 'pindakaas', XM + 0.05, MID, zOf(1, 0.86));
+    // 3: more glasses, and more plates above
+    for (let j = 0; j < 4; j++) for (const x of [X0 + 0.07, XM + 0.03, BACK - 0.05]) inCupboard(2, 'glassClean', x, LOW, zOf(2, 0.14 + j * 0.24));
+    stack(2, 'plateClean', XM, MID, zOf(2, 0.3), 6);
+    stack(2, 'bowlClean', XM, MID, zOf(2, 0.72), 4);
+    // 4: a pot and a few mugs, the coffee, the tea and the sprinkles
+    inCupboard(3, 'pot', XM, LOW, zOf(3, 0.3));
+    for (let j = 0; j < 3; j++) inCupboard(3, mugs[j], XM, LOW, zOf(3, 0.62 + j * 0.15));
+    inCupboard(3, 'koffie', XM, MID, zOf(3, 0.18), { yaw: -Math.PI / 2 });
+    inCupboard(3, 'thee', XM, MID, zOf(3, 0.42), { yaw: -Math.PI / 2 });
+    inCupboard(3, 'muisjesRoze', XM, MID, zOf(3, 0.62), { yaw: -Math.PI / 2 });
+    inCupboard(3, 'jam', XM, MID, zOf(3, 0.82));
+
+    // the doors: blue, a little lighter than the carcass, with a steel handle along the bottom
+    const doorMat = std({ color: 0x6b9cc0, roughness: 0.5 });
+    const steel = std({ color: 0x9aa3ad, roughness: 0.35, metalness: 0.5 });
+    const DOOR_H = Y1 - Y0 - 0.01;
+    const doors = [0, 1, 2, 3].map((i) => {
+      const zc = Z0 + (i + 0.5) * W;
+      const group = new THREE.Group();
+      group.rotation.order = 'YXZ'; // when it falls: tipped over (z) first, then turned (y)
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(DOOR_T, DOOR_H, W - 0.008), doorMat);
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.14), steel);
+      handle.position.set(-DOOR_T / 2 - 0.01, -DOOR_H / 2 + 0.045, 0);
+      for (const m of [panel, handle]) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+        group.add(m);
+      }
+      const home = new THREE.Vector3(X0 - DOOR_T / 2, (Y0 + Y1) / 2, zc);
+      group.position.copy(home);
+      groups[k].add(group);
+      // lying on the floor: each door a little higher than the last, in case they land across each other
+      return { group, home, zc, sec: secs[i], state: 'shut', t: 0, T: 1, vel: new THREE.Vector3(), yaw: 0, restY: 0.012 + DOOR_T / 2 + 0.004 + i * 0.003 };
+    });
+
+    /**
+     * Knocks a door off: it flies out over the counter into the kitchen,
+     * turning over to land flat on its back on the floor, handle up, clear of the counters.
+     */
+    function fling(door, v) {
+      const p = Math.min(1, v / 14);
+      door.state = 'flying';
+      door.t = 0;
+      const vy = 0.8 + p * 1.0 + rnd() * 0.4;
+      const G = 9.8;
+      door.T = (vy + Math.sqrt(vy * vy + 2 * G * (door.home.y - door.restY))) / G; // till it hits the floor
+      const land = THREE.MathUtils.clamp(door.zc + (rnd() - 0.5) * 0.3, 2.3, 3.8); // the floor between the front and back counters
+      door.vel.set(-(1.7 + p * 0.8 + rnd() * 0.4), vy, (land - door.zc) / door.T);
+      door.yaw = (rnd() - 0.5) * 0.8;
+    }
+
+    solid.surface.tally = 'mess';
+    solid.surface.mess = ROOM_MESS.kitchen;
+    solid.surface.onHit = (point, v, push) => {
+      // a hit on the doors, or from below; landing on top leaves them shut
+      if (point.x > X0 + 0.05 && point.y > Y0 + 0.03) return 0;
+      const i = Math.max(0, Math.min(3, Math.floor((point.z - Z0) / W)));
+      let n = 0;
+      for (const j of v > ALL ? [i, i - 1, i + 1] : [i]) {
+        const door = doors[j];
+        if (!door) continue;
+        if (door.state === 'shut') {
+          if (v < BREAK) continue;
+          fling(door, v);
+          // most of what's behind it comes out, the rest with the next knock
+          // (it breaks when it lands, not in the cupboard)
+          n += stocks[k].knock(door.sec, new THREE.Vector3(X0, (Y0 + Y1) / 2, door.zc), OUT, v, push, { radius: 0.6, chance: 1, power: 0.9, shatter: false });
+        } else {
+          n += stocks[k].knock(door.sec, point, OUT, v, push, { radius: 0.6, chance: 0.9, power: 0.9, shatter: false });
+        }
+      }
+      return n;
+    };
+
+    function update(dt) {
+      for (const door of doors) {
+        if (door.state !== 'flying') continue;
+        door.t = Math.min(door.t + dt, door.T);
+        const { t, T, vel, home, group } = door;
+        group.position.set(home.x + vel.x * t, home.y + vel.y * t - 4.9 * t * t, home.z + vel.z * t);
+        const p = t / T;
+        group.rotation.set(0, door.yaw * p, (-Math.PI / 2) * (1 - (1 - p) ** 2)); // easing out, so it's flat when it lands
+        if (t >= T) {
+          group.position.y = door.restY;
+          door.state = 'down';
+        }
+      }
+    }
+
+    function reset() {
+      for (const door of doors) {
+        door.state = 'shut';
+        door.group.position.copy(door.home);
+        door.group.rotation.set(0, 0, 0);
+      }
+    }
+
+    return { update, reset };
+  }
+
   function decorate() {
     const add = (k, mesh, cast = true) => {
       mesh.castShadow = cast;
@@ -1788,10 +2014,25 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     update: (dt) => {
       for (const s of stocks) s.update(dt);
       tvCabinet.update(dt);
+      wallCupboard.update(dt);
+    },
+    /** How many plates, mugs and glasses smashed since the last call, and where the last one did. */
+    takeSmashes: () => {
+      let n = 0;
+      let point = null;
+      for (const s of stocks) {
+        const m = s.takeSmashes();
+        if (m.n) {
+          n += m.n;
+          point = m.point;
+        }
+      }
+      return { n, point };
     },
     restock: () => {
       for (const s of stocks) s.restock();
       tvCabinet.reset();
+      wallCupboard.reset();
     },
   };
 }

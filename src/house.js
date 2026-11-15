@@ -1206,16 +1206,7 @@ export function buildHouse(scene, world, physMats) {
       [[5.2, 0.85, 1.85], [5.875, 0.9, 4.2], WORKTOP],
       [[0.8, 0, 1.2], [5.875, 0.85, 1.85], CABINET],
       [[0.78, 0.85, 1.18], [5.875, 0.9, 1.85], WORKTOP],
-      // the hanging cupboards on the side wall, above the counter, four doors with handles
-      [[5.525, 1.5, 1.9], [5.875, 2.25, 4.875], CABINET],
-      ...[0, 1, 2, 3].flatMap((i) => {
-        const z0 = 1.9 + i * 0.74375;
-        const zc = z0 + 0.372;
-        return [
-          [[5.51, 1.51, z0 + 0.008], [5.525, 2.24, z0 + 0.736], 0x6b9cc0, { phys: false }],
-          [[5.49, 1.54, zc - 0.07], [5.51, 1.56, zc + 0.07], 0x9aa3ad, { phys: false }],
-        ];
-      }),
+      // (the hanging cupboard on the side wall, above the counter, is in clutter.js: Lennie smashes its doors)
       // the cooker: a black hob on the counter and the oven under it
       [[-0.55, 0.9, 4.3], [0.25, 0.912, 4.8], 0x18181a, { phys: false }],
       [[-0.5, 0.1, 4.205], [0.2, 0.75, 4.225], 0x2b2b2e, { phys: false }],
@@ -1655,6 +1646,7 @@ export function buildHouse(scene, world, physMats) {
     tv,
     loose,
     scatter: clutter.scatter,
+    takeSmashes: clutter.takeSmashes,
     update(dt) {
       loose.update();
       clutter.update(dt);

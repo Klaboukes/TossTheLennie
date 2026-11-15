@@ -312,6 +312,7 @@ const NL = {
   'Board game avalanche! ({n} games)': 'Spelletjeslawine! ({n} spellen)',
   'Toy avalanche! ({n} toys)': 'Speelgoedlawine! ({n} stuks speelgoed)',
   'Made the mess even worse ({n} things)': 'Nog meer rommel gemaakt ({n} dingen)',
+  'Smashed the dishes! ({n} pieces)': 'Servies aan diggelen! ({n} stuks)',
   'Full flight! ({n} steps)': 'De hele trap af! ({n} treden)',
   'Stair tumble ({n} steps)': 'Van de trap gerold ({n} treden)',
   'Broke the TV!': 'Tv kapot!',
@@ -494,6 +495,10 @@ const NL = {
   'Positively charged!': 'Positief geladen!',
   'WHAT A MESS!': 'WAT EEN ZOOI!',
   'KABOOM!': 'KABOEM!',
+  'Not the good plates!': 'Niet het mooie servies!',
+  "Who's doing the dishes now?": 'Wie doet nu de afwas?',
+  'Smashing!': 'Aan gruzelementen!',
+  'Break time!': 'Breektijd!',
   // the mess in the house (clutter.js)
   'Who left their socks here?': 'Wie heeft hier zijn sokken laten liggen?',
   'Remote? What remote?': 'Afstandsbediening? Welke afstandsbediening?',

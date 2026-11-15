@@ -747,9 +747,17 @@ const lookOf = (p) => oneMaterial(buildLook(p));
 
 // ---------------------------------------------------------------- the stock: placing, knocking off, restocking
 const GRAVITY = 9.8;
+const TAU_ = Math.PI * 2;
 const _m = new THREE.Matrix4();
 const _rm = new THREE.Matrix4();
 const _one = new THREE.Vector3(1, 1, 1);
+const _none = new THREE.Vector3(0, 0, 0); // a hidden instance (a shard not broken off yet, a smashed plate)
+// Crockery smashes when it hits the floor or a counter at least this fast
+// (falling about 25 cm), or straight away when Lennie lands on it at least
+// SMASH_NEAR hard (the pieces right under him) or SMASH_HIT (everything he knocks).
+const SMASH_FALL = 2.2;
+const SMASH_NEAR = 3;
+const SMASH_HIT = 6;
 const _v = new THREE.Vector3();
 const _q = new THREE.Quaternion();
 const _axis = new THREE.Vector3();
@@ -801,9 +809,11 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
    * box): it isn't knocked itself, but comes flying out when that one is.
    * With `on` it rests on another product (a pile of plates, a stack of
    * games), so it falls when that one is knocked away from under it.
+   * With `shardOf` it's a piece of that product (a plate, a mug), hidden
+   * until that one smashes (see smash()).
    */
   function place(id, x, y, z, yaw, section, row = 0, opts = {}) {
-    const { slope = 0, tilt = null, lift = null, inside = null, on = null, layer: asked = 0 } = typeof opts === 'number' ? { slope: opts } : opts;
+    const { slope = 0, tilt = null, lift = null, inside = null, on = null, shardOf = null, layer: asked = 0 } = typeof opts === 'number' ? { slope: opts } : opts;
     const k = kind(id);
     const tint = catalogue[id].base ? catalogue[id].color : null;
     if (tint !== null) k.tinted = true;
@@ -833,8 +843,20 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
       layer,
       // where its top is and what it covers while it lies still, if it's flat
       rest, homeRest: rest,
+      shardOf,
     };
     if (on) (on.above ??= []).push(item);
+    if (shardOf) {
+      // hidden in the whole one; once broken off it lies about like anything else
+      (shardOf.shards ??= []).push(item);
+      item.state = 'hidden';
+      item.home.copy(shardOf.home);
+      item.rest = item.homeRest = null;
+      k.items.push(item);
+      items.push(item);
+      section.items.push(item);
+      return item;
+    }
     k.items.push(item);
     items.push(item);
     if (rest) lyingFlat.add(item);
@@ -902,22 +924,23 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
   }
 
   function write(item) {
-    _m.compose(item.pos, item.quat, _one);
+    _m.compose(item.pos, item.quat, item.state === 'hidden' || item.state === 'broken' ? _none : _one);
     item.k.mesh.setMatrixAt(item.idx, _m);
     item.k.mesh.instanceMatrix.needsUpdate = true;
   }
 
   function restock() {
     flying.clear();
+    smashes.n = 0;
     for (const item of items) {
-      item.state = 'home';
+      item.state = item.shardOf ? 'hidden' : 'home';
       item.ground = floorOf(item);
       item.pos.copy(item.home);
       item.quat.copy(item.homeQ);
       item.rest = item.homeRest;
       if (item.rest) lyingFlat.add(item);
       else lyingFlat.delete(item);
-      _m.compose(item.pos, item.quat, _one);
+      _m.compose(item.pos, item.quat, item.shardOf ? _none : _one);
       item.k.mesh.setMatrixAt(item.idx, _m);
     }
     for (const k of kinds.values()) k.mesh.instanceMatrix.needsUpdate = true;
@@ -931,9 +954,10 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
    * floor or table that he lands among); with `again` the ones that already
    * fell get kicked about again too (they don't count a second time).
    * `power` makes them fly further (or less far). With `fresh: false` only the
-   * ones already knocked down move.
+   * ones already knocked down move. Crockery he hits smashes on the spot,
+   * unless `shatter` is false (then it only breaks when it lands).
    */
-  function knock(section, point, out, strength, push = null, { radius = null, chance = 1, radial = false, again = false, fresh = true, power: boost = 1 } = {}) {
+  function knock(section, point, out, strength, push = null, { radius = null, chance = 1, radial = false, again = false, fresh = true, power: boost = 1, shatter = true } = {}) {
     const r = radius ?? Math.min(0.7, 0.15 + strength * 0.05);
     const power = Math.min(1.6, 0.5 + strength / 10) * boost;
     let n = 0;
@@ -955,8 +979,43 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
       }
       if (home) n += launch(item, dir, power, push);
       else launch(item, dir, power * 0.6, push);
+      // right where he lands, or hit that hard anywhere, a plate or a mug breaks right there
+      if (shatter && item.shards && item.state === 'flying' && (strength >= SMASH_HIT || (strength >= SMASH_NEAR && d < r * 0.7))) smash(item);
     }
     return n;
+  }
+
+  /**
+   * A plate, bowl, mug or glass breaks: it disappears and its pieces (placed
+   * with `shardOf`) fly off from where it was, every which way.
+   */
+  const smashes = { n: 0, point: new THREE.Vector3() };
+  function smash(item) {
+    item.state = 'broken';
+    flying.delete(item);
+    lyingFlat.delete(item);
+    write(item);
+    smashes.n += 1;
+    smashes.point.copy(item.pos);
+    const v = item.vel;
+    for (const s of item.shards) {
+      s.state = 'flying';
+      s.t = 0;
+      s.layer = 0;
+      s.rest = null;
+      s.ground = item.ground;
+      s.pos.set(item.pos.x + (rnd() - 0.5) * 0.08, item.pos.y + 0.02, item.pos.z + (rnd() - 0.5) * 0.08);
+      s.quat.setFromEuler(new THREE.Euler(rnd() * TAU_, rnd() * TAU_, rnd() * TAU_));
+      // bouncing up off whatever it hit, spraying out sideways
+      const a = rnd() * TAU_;
+      const out = 0.6 + rnd() * 1.4;
+      s.vel.set(v.x * 0.4 + Math.cos(a) * out, 0.8 + Math.abs(v.y) * 0.25 + rnd() * 1.2, v.z * 0.4 + Math.sin(a) * out);
+      s.spin.set((rnd() - 0.5) * 30, (rnd() - 0.5) * 20, (rnd() - 0.5) * 30);
+      flying.add(s);
+      write(s);
+    }
+    // a pile of plates comes down with it, most of it in pieces too
+    for (const a of item.above ?? []) if (a.shards && a.state === 'flying' && rnd() < 0.8) smash(a);
   }
 
   /** Sends a product flying, and whatever rests on it or is inside it. Returns how many of those were home. */
@@ -1105,6 +1164,11 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
         if (item.pos.y - low < ground + item.layer) {
           item.pos.y = ground + low + item.layer;
           item.ground = ground;
+          if (item.shards && item.vel.y < -SMASH_FALL) {
+            smash(item);
+            landed++;
+            continue;
+          }
           if (item.vel.y < -1.4 && item.t < 3) {
             item.vel.y *= -0.3;
             item.vel.x *= 0.6;
@@ -1178,6 +1242,12 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
   return {
     place, fillRow, build, restock, knock, update,
     section: (opts = {}) => ({ items: [], ...opts }),
+    /** How many things smashed since the last call, and where the last one did. */
+    takeSmashes() {
+      const n = smashes.n;
+      smashes.n = 0;
+      return { n, point: smashes.point };
+    },
     get falling() { return flying.size; },
   };
 }

@@ -446,6 +446,7 @@ const toss = {
   mess: 0, // dishes, toys and clothes in the house sent flying
   games: 0, // board games knocked out of the closet
   toys: 0, // toys knocked out of the TV cabinet
+  dishes: 0, // plates, mugs and glasses smashed
   cars: 0, // times a passing car sent him flying
   stairs: new Set(),
   startLevel: null,
@@ -464,6 +465,7 @@ function resetChain() {
   toss.mess = 0;
   toss.games = 0;
   toss.toys = 0;
+  toss.dishes = 0;
   toss.cars = 0;
   toss.stairs = new Set();
   toss.startLevel = null;
@@ -557,6 +559,7 @@ function houseBonuses(center) {
   if (toss.games >= 3) add('games', `Board game avalanche! (${toss.games} games)`, Math.min(500, 20 * toss.games));
   if (toss.toys >= 5) add('toys', `Toy avalanche! (${toss.toys} toys)`, Math.min(500, 8 * toss.toys));
   if (toss.mess >= 5) add('housemess', `Made the mess even worse (${toss.mess} things)`, Math.min(300, 6 * toss.mess));
+  if (toss.dishes >= 3) add('dishes', `Smashed the dishes! (${toss.dishes} pieces)`, Math.min(400, 12 * toss.dishes));
   const steps = toss.stairs.size;
   if (steps >= 10) add('fullflight', `Full flight! (${steps} steps)`, 400);
   else if (steps >= 3) add('stairs', `Stair tumble (${steps} steps)`, 200);
@@ -915,6 +918,25 @@ function knockClutter(e, v) {
 }
 // said anywhere in the house, mixed in with the lines for the room he's in (clutter.js)
 const MESS_WORDS = ['CRASH!', 'WHAT A MESS!', 'OOPS!', 'KABOOM!'];
+
+// Plates, mugs and glasses smashing on the counter or the floor (products.js).
+const SMASH_LINES = ['SMASH!', 'Not the good plates!', "Who's doing the dishes now?", 'Smashing!', 'Plate-tectonics!', 'Break time!'];
+let lastSmashAt = 0;
+let lastSmashLineAt = 0;
+function smashedDishes() {
+  const { n, point } = house.takeSmashes();
+  if (!n) return;
+  if (toss.state === 'flying' || toss.state === 'held') toss.dishes += n;
+  const now = performance.now();
+  if (now - lastSmashAt > 60) {
+    lastSmashAt = now;
+    sfx.smash(n);
+  }
+  if (toss.dishes >= 4 && now - lastSmashLineAt > 2500) {
+    lastSmashLineAt = now;
+    popAt(point.clone().setY(point.y + 0.5), pickLine(SMASH_LINES), 'good');
+  }
+}
 
 // Lennie's velocities before each physics step, so that smashing through a
 // window or door doesn't also bounce him off it.
@@ -2942,6 +2964,7 @@ function tick(dt, now) {
   if (!replay.playing) {
     shop.update(dt * timeScale);
     house.update(dt * timeScale);
+    smashedDishes();
     cars.update(dt * timeScale, carWatch, camera.position, carSounds);
   }
   updateHud(dt, now);
