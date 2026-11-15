@@ -1620,8 +1620,10 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     solid.surface.tally = 'toys';
     solid.surface.mess = ['Toy avalanche!', 'Toy story!', 'Playtime!', 'Who put all that in there?', 'Tidy up time!'];
     solid.surface.onHit = (point, v, push) => {
-      // only a hit on the front counts; landing on top, by the TV, leaves the doors shut
-      if (point.x < X1 - 0.1 || point.y > LID) return 0;
+      // only a hit on the front counts, coming at it more sideways than down (its top
+      // edge too); dropping onto the top, by the TV, leaves the doors shut
+      const sideways = push ? -push.x > Math.abs(push.y) * 0.6 : point.y < LID;
+      if (point.x < X1 - 0.1 || !sideways) return 0;
       const i = Math.max(0, Math.min(2, Math.floor((Z1 - point.z) / W)));
       let n = 0;
       for (const j of v > ALL ? [i, i - 1, i + 1] : [i]) {
