@@ -310,7 +310,7 @@ export function buildHouse(scene, world, physMats) {
       const mid = f.reduce((sum, i) => sum.vadd(verts[i]), new CANNON.Vec3()).scale(1 / f.length);
       return n.dot(mid) < 0 ? [...f].reverse() : f; // normals point away from the centre
     });
-    const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.ConvexPolyhedron({ vertices: verts, faces: oriented }) });
+    const b = new CANNON.Body({ mass: 0, material: surface.kind === 'roof' ? physMats.roof ?? physMats.hard : physMats.hard, shape: new CANNON.ConvexPolyhedron({ vertices: verts, faces: oriented }) });
     b.position.set(...c);
     b.surface = surface;
     world.addBody(b);
@@ -983,7 +983,7 @@ export function buildHouse(scene, world, physMats) {
         const zs = [side * zA, side * zB].sort((p, q) => p - q);
         addToLine(mesh, line, [x0, underside(zB), zs[0]], [x1, underside(zA) + thick * hyp, zs[1]]);
       }
-      const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3((x1 - x0) / 2, (thick + inner) / 2, L / 2)) });
+      const b = new CANNON.Body({ mass: 0, material: physMats.roof ?? physMats.hard, shape: new CANNON.Box(new CANNON.Vec3((x1 - x0) / 2, (thick + inner) / 2, L / 2)) });
       const c = mid.clone().addScaledVector(normal, (thick - inner) / 2);
       b.position.set(c.x, c.y, c.z);
       b.quaternion.setFromEuler(side * angle, 0, 0);
@@ -1013,6 +1013,19 @@ export function buildHouse(scene, world, physMats) {
       // white fascia boards along the eave
       const z = side * (runOut + 0.05);
       for (const [x0, x1, story] of sections) box([past(x0), fy - 0.15, z - 0.07], [past(x1), fy + 0.3, z + 0.07], M.trim, { story, cast: true, line: story === 3 ? line : null });
+      // The gutter along the eave, in front of the fascia. Its rim sticks up
+      // past the tiles, so a Lennie sliding down the roof gets caught in it
+      // (stranded on the roof) rather than always sliding off the edge.
+      const g0 = runOut + 0.13; // plan distance of its back, just clear of the fascia
+      const gz = [side * g0, side * (g0 + 0.22)].sort((p, q) => p - q);
+      const gTop = fy + thick * hyp + 0.25;
+      for (const [x0, x1, story] of sections) {
+        const [a, b] = [x0 === ends[0] ? x0 - 0.04 : x0, x1 === ends[1] ? x1 + 0.04 : x1];
+        box([a, fy + 0.05, gz[0]], [b, gTop, gz[1]], M.pipe, { story, cast: true, line: story === 3 ? line : null });
+      }
+      const lip = [side * (runOut - 0.02), side * (g0 + 0.22)].sort((p, q) => p - q);
+      const gb = body([ends[0], fy + thick * hyp - 0.1, lip[0]], [ends[1], gTop, lip[1]], physMats.roof ?? physMats.hard, { kind: 'roof' });
+      gb.surface.sound = 'metal';
     }
     const ry = HOUSE.ridgeY + thick * hyp;
     for (const [x0, x1, story] of sections) box([past(x0), ry - 0.15, -0.2], [past(x1), ry + 0.1, 0.2], ridgeMat, { story, cast: true, line: story === 3 ? LINES[1] : null });
