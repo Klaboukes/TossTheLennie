@@ -36,7 +36,14 @@ const WIN = { sill: 0.9, top: 2.2 };
 export const DORMER = { x0: 1.0, x1: 4.7, back: HOUSE.ridgeY - 8.4, front: 4.0, top: 8.4, wallT: 0.2 };
 const DOOR_TOP = 2.15;
 const DOOR_COLORS = { inside: 0xf4f2ee, front: 0x3b3735 }; // the inside doors are white
+// A wall faded out of the camera's way keeps this faint ghost of itself, but
+// only with the camera well back from it: from close by, the ghost would lie
+// over most of the picture like a grey haze. So it's fully see-through with
+// the camera within CLEAR_NEAR metres of it, and the ghost only comes back
+// gradually up to CLEAR_FAR. (supermarket.js does the same.)
 const FADED = 0.12;
+export const CLEAR_NEAR = 1.5;
+export const CLEAR_FAR = 5;
 
 // The ground floor follows the owner's sketch (docs/floorplan-floor1.png),
 // stretched to the house's width: the toilet in the front left corner, the
@@ -1485,7 +1492,7 @@ export function buildHouse(scene, world, physMats) {
         const p = a[i] + (b[i] - a[i]) * t;
         inside = p > entry.min[i] - FADE_MARGIN && p < entry.max[i] + FADE_MARGIN;
       }
-      if (inside) entry.target = FADED;
+      if (inside) entry.target = FADED * THREE.MathUtils.smoothstep(Math.abs(db), CLEAR_NEAR, CLEAR_FAR);
     }
 
     const k = 1 - Math.exp(-dt * 10);

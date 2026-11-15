@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { floorGeometry, meterBoxUVs } from './textures.js';
 import { createStock, ASSORTMENT, PRODUCTS, halfSize } from './products.js';
+import { CLEAR_NEAR, CLEAR_FAR } from './house.js';
 
 // The supermarket across the road, after the real one: a long orange box
 // under a zigzag of grey gables, with a brick-and-glass entrance and a big
@@ -1330,7 +1331,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
         const p = a[i] + (b[i] - a[i]) * t;
         inside = p > entry.min[i] - FADE_MARGIN && p < entry.max[i] + FADE_MARGIN;
       }
-      if (inside) entry.target = FADED;
+      // no grey ghost with the camera close to the wall (see house.js)
+      if (inside) entry.target = FADED * THREE.MathUtils.smoothstep(Math.abs(db), CLEAR_NEAR, CLEAR_FAR);
     }
     const k = 1 - Math.exp(-dt * 10);
     for (const entry of lines.values()) {
