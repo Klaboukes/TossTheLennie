@@ -1235,16 +1235,21 @@ export function buildHouse(scene, world, physMats) {
   }
   const FADE_MARGIN = 0.8;
   let level = 3;
+  // How close under a ceiling the camera counts as up at it. The camera draws
+  // nothing nearer than its near plane (main.js), so this close the ceiling
+  // gets clipped off at the top of the picture and you'd see through it.
+  const underCeiling = (camera, k) => (k + 1) * H - T - camera.near;
 
   /**
    * Hides storeys above the one the camera target is on when the camera looks
-   * down into it, and fades any wall/floor between the camera and the target.
+   * down into it (or is right up against its ceiling), and fades any
+   * wall/floor between the camera and the target.
    */
   function updateView(camera, target, dt, cutaway) {
     level = 3;
     if (cutaway && isInside(target)) {
       const k = storyAt(target.y);
-      if (camera.position.y > (k + 1) * H - T) level = k;
+      if (camera.position.y > underCeiling(camera, k)) level = k;
     }
     groups.forEach((g, k) => (g.visible = k <= level));
 
@@ -1291,16 +1296,15 @@ export function buildHouse(scene, world, physMats) {
    * The underside of the ceiling over `p` (Lennie) while the camera is below
    * it too, else Infinity. The see-through window around him leaves that
    * ceiling whole: a hole in it would show the floor above, which the cutaway
-   * only hides once the camera rises past the ceiling. The attic has no floor
-   * above, just the roof, so that may still be cut.
+   * only hides once the camera rises (almost) to the ceiling. The attic has
+   * no floor above, just the roof, so that may still be cut.
    */
   function ceilingOver(p, camera) {
     if (!isInside(p)) return Infinity;
     const k = storyAt(p.y);
     if (k >= HOUSE.stories - 1) return Infinity;
-    const under = (k + 1) * H - T;
     // a little under it, so rounding never counts the ceiling's own face as below
-    return camera.position.y < under ? under - 0.02 : Infinity;
+    return camera.position.y < underCeiling(camera, k) ? (k + 1) * H - T - 0.02 : Infinity;
   }
 
   /** True when a mesh is hidden by the cutaway or faded out of the way, so aiming looks past it. */
