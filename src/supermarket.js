@@ -274,7 +274,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   boxAt([SHOP.x0, 0, SHOP.z0], [SHOP.hall, SHOP.h, SHOP.z1], faces(orange, orange, roofGrey, orange, orange, orange), { cast: true });
   solid([SHOP.x0, 0, SHOP.z0], [SHOP.hall, SHOP.h, SHOP.z1], 'wall');
   // (the white rims along the top stick out 2 cm above the roof, so their tops never flicker against it)
-  boxAt([SHOP.x0 - 0.05, SHOP.h - 0.15, SHOP.z0 - 0.06], [SHOP.hall, SHOP.h + 0.02, SHOP.z0 + 0.02], white);
+  // (it runs 1 cm into the next rim, so its end isn't in one plane with the side of the hall)
+  boxAt([SHOP.x0 - 0.05, SHOP.h - 0.15, SHOP.z0 - 0.06], [SHOP.hall + 0.01, SHOP.h + 0.02, SHOP.z0 + 0.02], white);
 
   // ---------------------------------------------------------------- walls of the shop floor
   // The walls stop under the roof slab (at the ceiling), which forms the top
@@ -287,7 +288,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     boxAt([a, 0, SHOP.z0], [b, IN.y1, SHOP.z0 + SHOP.t], frontMats, { cast: true, fade: 'front' });
     solid([a, 0, SHOP.z0], [b, SHOP.h, SHOP.z0 + SHOP.t], 'wall');
   }
-  boxAt([SHOP.hall, SHOP.h - 0.15, SHOP.z0 - 0.06], [SHOP.x1 + 0.05, SHOP.h + 0.02, SHOP.z0 + 0.02], white, { fade: 'front' });
+  boxAt([SHOP.hall - 0.01, SHOP.h - 0.15, SHOP.z0 - 0.06], [SHOP.x1 + 0.05, SHOP.h + 0.02, SHOP.z0 + 0.02], white, { fade: 'front' });
 
   boxAt([IN.x1, 0, SHOP.z0], [SHOP.x1, IN.y1, SHOP.z1], faces(orange, innerWall, orange, orange, orange, orange), { cast: true, fade: 'east' });
   solid([IN.x1, 0, SHOP.z0], [SHOP.x1, SHOP.h, SHOP.z1], 'wall');
@@ -864,7 +865,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   // canopy, so no two faces lie on top of each other and flicker)
   cpart(CH.u0 + 0.06, 0, 0, CH.u1 - 0.06, 0.3, CH.depth, darkFrame);
   cpart(CH.u0 + 0.06, 0.3, CH.depth - 0.05, CH.u1 - 0.06, 0.42, CH.depth, cabinetWhite);
-  cpart(CH.u0 + 0.06, 0, 0, CH.u1 - 0.06, CH.top, 0.05, coldLight);
+  cpart(CH.u0 + 0.06, 0.3, 0, CH.u1 - 0.06, CH.top, 0.05, coldLight);
   for (const u of [CH.u0, CH.u1 - 0.06]) cpart(u, 0, 0, u + 0.06, CH.roof, CH.depth, cabinetWhite, true);
   cpart(CH.u0, CH.top, 0, CH.u1, CH.roof, 0.8, cheeseF.withFront(cabinetWhite, std({ map: labelTexture('HOLLANDSE KAAS  •  HOLLANDSE KAAS  •  HOLLANDSE KAAS', '#3fae3a', '#ffffff', 2048, 96) })), true);
   cpart(CH.u0 + 0.06, CH.top - 0.03, 0.1, CH.u1 - 0.06, CH.top, 0.16, lightStrip);
@@ -875,7 +876,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   [[1.0, 0.42], [0.9, 0.78], [0.8, 1.12], [0.7, 1.46]].forEach(([wf, yf], i) => {
     // the shelf: a sloping wire shelf from its front edge back to the wall, with a price rail
     const len = (wf - 0.06) / Math.cos(tilt);
-    const m = add(new THREE.Mesh(new THREE.BoxGeometry(len, 0.02, CH.u1 - CH.u0 - 0.12), wireShelf));
+    // (2 mm short of the ends at each side, so its ends aren't in one plane with the price rail's)
+    const m = add(new THREE.Mesh(new THREE.BoxGeometry(len, 0.02, CH.u1 - CH.u0 - 0.124), wireShelf));
     const [mx] = cheeseF.P(0, 0, wf - (wf - 0.06) / 2);
     m.position.set(mx, yf + Math.tan(tilt) * (wf - 0.06) / 2 - 0.01, (CH.u0 + CH.u1) / 2);
     m.rotation.z = -tilt; // rising towards the wall (−x is the back)
@@ -1000,7 +1002,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
       for (const l of layers) if (!l.body.world) world.addBody(l.body);
     });
     // the offer: buy one, get one free
-    boxAt([P0.x + 0.56, base, P0.z + 0.46], [P0.x + 0.6, 2.1, P0.z + 0.5], darkFrame);
+    boxAt([P0.x + 0.56, base - 0.01, P0.z + 0.46], [P0.x + 0.6, 2.1, P0.z + 0.5], darkFrame); // (its foot sunk into the pallet)
     const card = std({ map: offerTexture('1+1') });
     boxAt([P0.x + 0.28, 1.5, P0.z + 0.45], [P0.x + 0.88, 2.25, P0.z + 0.48], card);
     spotsExtra.push(['pindakaas', 'In the pindakaas!', 550, 'PINDAKAAS!', [P0.x - 0.75, base - 0.1, P0.z - 0.65], [P0.x + 0.75, 1.9, P0.z + 0.65]]);
@@ -1168,7 +1170,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     });
     bpart(B.u0, 0.92, 0, B.u1, 2.65, 0.02, F.withFront(cabinetWhite, std({ map: tiles })));
     bpart(B.u0 + 0.1, 2.38, 0.2, B.u1 - 0.1, 2.41, 0.23, steel);
-    for (const u of [B.u0 + 0.1, B.u1 - 0.13]) bpart(u, 2.38, 0, u + 0.03, 2.41, 0.23, steel);
+    for (const u of [B.u0 + 0.1, B.u1 - 0.13]) bpart(u, 2.38, 0.02, u + 0.03, 2.41, 0.23, steel); // (from the tiles out)
     const hanging = stock.section();
     const upright = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
     const [, , hw] = F.P(0, 0, 0.215);

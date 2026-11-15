@@ -857,10 +857,12 @@ export function buildClutter({ box, body, groups, std, physMats, H }) {
     b([X0, 0, Z0], [X0 + T, TOP, Z1], oak);
     b([X1 - T, 0, Z0], [X1, TOP, Z1], oak);
     b([X0 + T, 0, Z0], [X1 - T, TOP, Z0 + 0.02], inside); // between the sides, or its edges flicker through them
-    b([(X0 + X1) / 2 - T / 2, 0.08, Z0], [(X0 + X1) / 2 + T / 2, TOP - T, Z1 - 0.01], oak);
+    // the divider and the shelves start in front of the back, or their backs flicker against its back
+    const ZB = Z0 + 0.02;
+    b([(X0 + X1) / 2 - T / 2, 0.08, ZB], [(X0 + X1) / 2 + T / 2, TOP - T, Z1 - 0.01], oak);
     b([X0, 0, Z1 - 0.04], [X1, 0.08, Z1], oak); // plinth
     const shelves = [0.08, 0.47, 0.86, 1.25, 1.64];
-    for (const y of [...shelves, TOP - T]) b([X0, y - (y === 0.08 ? 0.08 : 0), Z0], [X1, y + (y === 0.08 ? 0 : T), Z1], oak);
+    for (const y of [...shelves, TOP - T]) b([X0, y - (y === 0.08 ? 0.08 : 0), ZB], [X1, y + (y === 0.08 ? 0 : T), Z1], oak);
     b([X0 - 0.02, TOP, Z0], [X1 + 0.02, TOP + 0.04, Z1 + 0.03], oak); // the crown on top
     const solid = body([X0, 0, Z0], [X1, TOP + 0.12, Z1], physMats.hard, { kind: 'furniture' });
 

@@ -441,7 +441,8 @@ export function buildHouse(scene, world, physMats) {
       for (const [gy0, gy1] of panes) {
         // glazing beads around the pane
         for (const [a, b, ya, yb] of [[ga, gb, gy0, gy0 + 0.025], [ga, gb, gy1 - 0.025, gy1], [ga, ga + 0.025, gy0, gy1], [gb - 0.025, gb, gy0, gy1]]) part(a, b, ya, yb, 0.075, panel);
-        const [min, max] = extents(run, at, ga, gb, gy0, gy1, 0.02);
+        // 2 mm inside the beads, so the pane's edges don't lie in one plane with theirs
+        const [min, max] = extents(run, at, ga + 0.002, gb - 0.002, gy0 + 0.002, gy1 - 0.002, 0.02);
         const pane = new THREE.Mesh(new THREE.BoxGeometry(max[0] - min[0], max[1] - min[1], max[2] - min[2]), M.glass);
         pane.position.set((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2).sub(center);
         pane.userData.line = line; // like the windows' glass
@@ -477,7 +478,8 @@ export function buildHouse(scene, world, physMats) {
 
   function addWindow(run, at, o, hole, physThick, physOffset, story, outward, line) {
     const group = new THREE.Group();
-    const [min, max] = extents(run, at, o.a, o.b, o.bottom, o.top, 0.03);
+    // the glass stops 2 mm inside the frame, so its edges don't lie in one plane with the bars' ends
+    const [min, max] = extents(run, at, o.a + 0.002, o.b - 0.002, o.bottom + 0.002, o.top - 0.002, 0.03);
     const pane = new THREE.Mesh(new THREE.BoxGeometry(max[0] - min[0], max[1] - min[1], max[2] - min[2]), M.glass);
     pane.position.set((min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2);
     pane.userData.line = line; // the glass has its own material but fades out of the way with its wall
@@ -592,9 +594,10 @@ export function buildHouse(scene, world, physMats) {
       const yb = y0 + WIN.top + 0.07;
       const yt = y0 + H + (above.sill ?? WIN.sill) - 0.05;
       const line = `south-${k}`;
-      box([a, yb, OUT.z1 - 0.01], [b, yt, OUT.z1 + 0.03], M.spandrel, { story: k, line });
-      box([a - 0.07, yb, OUT.z1 - 0.01], [a, yt, OUT.z1 + 0.05], M.trim, { story: k, line });
-      box([b, yb, OUT.z1 - 0.01], [b + 0.07, yt, OUT.z1 + 0.05], M.trim, { story: k, line });
+      // (just in front of the brick, not sunk into it: their ends lay in one plane with the wall's and flickered)
+      box([a, yb, OUT.z1 + 0.001], [b, yt, OUT.z1 + 0.03], M.spandrel, { story: k, line });
+      box([a - 0.07, yb, OUT.z1 + 0.001], [a, yt, OUT.z1 + 0.05], M.trim, { story: k, line });
+      box([b, yb, OUT.z1 + 0.001], [b + 0.07, yt, OUT.z1 + 0.05], M.trim, { story: k, line });
     }
 
     // Floor finishes (visual), sharing the fade line of this storey's slab.
@@ -627,7 +630,8 @@ export function buildHouse(scene, world, physMats) {
 
   // ------------------------------------------------------------ slabs (floor 2 and the attic floor)
   // The ground floor sits on a foundation; the yard's ground plane is its physics.
-  box([OUT.x0, -0.3, OUT.z0], [OUT.x1, 0, OUT.z1], [M.trim, M.trim, M.ceiling, M.ceiling, M.trim, M.trim], { story: 0 });
+  // (Its top is 5 mm under the ground, not level with the grass, which it would flicker against.)
+  box([OUT.x0, -0.3, OUT.z0], [OUT.x1, -0.005, OUT.z1], [M.trim, M.trim, M.ceiling, M.ceiling, M.trim, M.trim], { story: 0 });
   for (let k = 1; k < HOUSE.stories; k++) {
     const top = k * H;
     const line = `slab-${k}`;
@@ -731,7 +735,7 @@ export function buildHouse(scene, world, physMats) {
     const zo = U.z0 - EXT / 2;
     const zi = U.z0 + EXT / 2; // inner face of its back wall
     const ext = { y0: 0, y1: U.top, story: 0, thick: EXT, physThick: EXT_PHYS };
-    box([xo, -0.3, zo], [OUT.x1, 0, OUT.z0], [M.trim, M.trim, M.ceiling, M.ceiling, M.trim, M.trim], { story: 0 }); // foundation
+    box([xo, -0.3, zo], [OUT.x1, -0.005, OUT.z0], [M.trim, M.trim, M.ceiling, M.ceiling, M.trim, M.trim], { story: 0 }); // foundation
     const floor = new THREE.Mesh(floorGeometry(U.x0 + EXT / 2, zi, IN.x1, OUT.z0), floorMat(room));
     floor.position.y = 0.01;
     floor.receiveShadow = true;
@@ -861,16 +865,21 @@ export function buildHouse(scene, world, physMats) {
     // At the two ends of the row, the fascia boards and the ridge stick out 2 cm
     // past the roof, so their ends don't flicker against the roof's ends.
     const past = (x) => (x === ends[0] ? x - 0.02 : x === ends[1] ? x + 0.02 : x);
+    // Lennie's part of the roof stops 1 cm short of the party walls, where the
+    // neighbours' parts take over, and 2 cm inside the dormer's sides. So its
+    // ends never lie in one plane with the ends of the walls, the attic floor,
+    // the fascia boards or the ridge (they'd flicker; see flickercheck.js).
+    const [L0, L1] = [OUT.x0 + 0.01, OUT.x1 - 0.01];
     for (const side of [1, -1]) {
       const line = LINES[side];
-      for (const [x0, x1] of [[ends[0], OUT.x0], [OUT.x1, ends[1]]]) slope(side, x0, x1, 0, runOut, { story: 0 });
+      for (const [x0, x1] of [[ends[0], L0], [L1, ends[1]]]) slope(side, x0, x1, 0, runOut, { story: 0 });
       const own = { story: 3, line, inner: inward };
       if (side > 0) {
-        slope(side, OUT.x0, DORMER.x0, 0, runOut, own);
-        slope(side, DORMER.x1, OUT.x1, 0, runOut, own);
+        slope(side, L0, DORMER.x0 - 0.02, 0, runOut, own);
+        slope(side, DORMER.x1 + 0.02, L1, 0, runOut, own);
         slope(side, DORMER.x0, DORMER.x1, 0, DORMER.back, own);
         slope(side, DORMER.x0, DORMER.x1, DORMER.front + DORMER.wallT / 2, runOut, own);
-      } else slope(side, OUT.x0, OUT.x1, 0, runOut, own);
+      } else slope(side, L0, L1, 0, runOut, own);
       // white fascia boards along the eave
       const z = side * (runOut + 0.05);
       for (const [x0, x1, story] of sections) box([past(x0), fy - 0.15, z - 0.07], [past(x1), fy + 0.3, z + 0.07], M.trim, { story, cast: true, line: story === 3 ? line : null });

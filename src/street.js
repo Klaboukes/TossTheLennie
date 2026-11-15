@@ -66,7 +66,7 @@ export function makeDetails(kit) {
     box([x0 + 0.25, wy0, D.z1], [x1 - 0.25, wy1, D.z1 + 0.03], frame, { story });
     box([x0 + 0.33, wy0 + 0.08, D.z1 + 0.03], [x1 - 0.33, wy1 - 0.08, D.z1 + 0.04], M.glassSky, { story });
     const mx = (x0 + x1) / 2;
-    box([mx - 0.04, wy0, D.z1 + 0.03], [mx + 0.04, wy1, D.z1 + 0.06], frame, { story });
+    box([mx - 0.04, wy0, D.z1 + 0.035], [mx + 0.04, wy1, D.z1 + 0.06], frame, { story }); // (its back not in one plane with the glass's)
     body([x0 - 0.15, D.y0, D.z0 - 0.15], [x1 + 0.15, D.y1 + 0.16, D.z1 + 0.15], physMats.hard, { kind: 'roof' });
   }
 
