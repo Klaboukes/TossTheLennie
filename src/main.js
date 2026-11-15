@@ -664,6 +664,8 @@ const BUMP = {
   // soft things don't hurt, so they get only their own lines
   cushion: ['Comfy!', 'Soft landing!', 'Pillow fight!', 'Ahh, cosy!'],
   leaves: ['Hedgehog!', 'Rustle rustle!', 'Leaf me alone!'],
+  bike: ['Ring ring!', 'Flat tyre!', 'Bike pile-up!', 'Off his bike!'],
+  moped: ['Vroom vroom!', 'Beep beep!', 'Helmet on!', 'Mind the paintwork!'],
 };
 function bumpLine(partName, kind, soft) {
   if (soft && BUMP[kind]) return pickLine(BUMP[kind]);

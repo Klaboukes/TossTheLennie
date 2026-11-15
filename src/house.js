@@ -6,6 +6,7 @@ import { buildClutter } from './clutter.js';
 import { buildTV } from './tv.js';
 import { hangDrawings, hangPainting } from './drawings.js';
 import { createLoose } from './loose.js';
+import { parkBikes } from './bikes.js';
 
 // A Dutch terraced house: two brick storeys and an attic under a steep roof,
 // with a dormer. Footprint x ∈ [-6, 6], z ∈ [-5, 5]; the front door faces +z.
@@ -1262,6 +1263,8 @@ export function buildHouse(scene, world, physMats) {
         [[x - r * 0.65, 0, z - r * 0.65], [x + r * 0.65, h - 0.04, z + r * 0.65], col(0x7d7368), { round: true }],
       ], { mass: 8, surface: { kind: 'furniture' } });
     }
+    // and the bikes and the moped by the garden's back fence (bikes.js), loose too
+    parkBikes(loose, groups[0], std);
 
     // --- the garage (buildGarage): camping shelves along the garden side,
     // a table on the far side, tool shelves against the utility room with a

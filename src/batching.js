@@ -130,9 +130,11 @@ export function combineScenery(scene, keep) {
     for (const mesh of meshes) {
       if (mesh.matrixAutoUpdate) mesh.updateMatrix();
       const mirrored = mesh.matrix.determinant() < 0;
-      const c = new THREE.Vector3().setFromMatrixPosition(mesh.matrix);
+      // the patch of ground it's on goes by where it is in the world, not in its group
+      // (a loose bike's parts lie all round its group's centre, but on one patch)
       if (mesh.geometry.boundingSphere === null) mesh.geometry.computeBoundingSphere();
-      c.copy(mesh.geometry.boundingSphere.center).applyMatrix4(mesh.matrix);
+      mesh.updateWorldMatrix(true, false);
+      const c = mesh.geometry.boundingSphere.center.clone().applyMatrix4(mesh.matrixWorld);
       const cell = `${Math.floor(c.x / CELL)},${Math.floor(c.z / CELL)}`;
       for (const [geo, mat] of pieces(mesh)) {
         const material = shared(mat);

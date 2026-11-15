@@ -10,6 +10,7 @@ import { GARAGE as GARAGE_WALLS } from './house.js';
 // corner lounge set with its little round table under a flat plastic canopy, the
 // round trampoline, and a tree beside the three wheelie bins by the gate in
 // the back fence. A wooden fence runs round it, with the alley behind.
+// The bikes and the moped along the back fence are loose (bikes.js, built with house.js's loose furniture).
 // Lennie bounces off all of it; the bushes, the lounge set, the canopy and the
 // trampoline are bouncy.
 export const GARDEN = { x0: -6, x1: 6, back: -17.5 };
