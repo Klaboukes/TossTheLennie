@@ -467,6 +467,13 @@ const NL = {
   'Beep beep!': 'Tuut tuut!',
   'Helmet on!': 'Helm op!',
   'Mind the paintwork!': 'Pas op de lak!',
+  'Junk corner!': 'Rommelhoek!',
+  'Out with the rubbish!': 'Bij het grofvuil!',
+  'Bin day!': 'Vuilnisdag!',
+  'Recycled!': 'Gerecycled!',
+  'Bin bag!': 'Vuilniszak!',
+  'Pee-yew!': 'Bah, dat stinkt!',
+  'Smells like Lennie!': 'Ruikt naar Lennie!',
   // the cars driving by (main.js)
   'Look both ways!': 'Eerst links en rechts kijken!',
   'Speed bump!': 'Verkeersdrempel!',

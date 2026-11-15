@@ -8,12 +8,13 @@ import { GARAGE as GARAGE_WALLS } from './house.js';
 // bushes all along the left fence, and down the right-hand side, behind the
 // garage (house.js builds it, as a room Lennie can be thrown into), the
 // corner lounge set with its little round table under a flat plastic canopy, the
-// round trampoline, and a tree beside the three wheelie bins by the gate in
-// the back fence. A wooden fence runs round it, with the alley behind.
-// The bikes and the moped along the back fence are loose (bikes.js, built with house.js's loose furniture).
+// round trampoline, and a tree beside the three wheelie bins, with a stretch
+// of lawn behind them to the gate in the back fence, where old plywood boards,
+// bin bags, boxes and tyres lie about. A wooden fence runs round it, with the alley behind.
+// The bikes and the moped parked along the left-hand bushes are loose (bikes.js, built with house.js's loose furniture).
 // Lennie bounces off all of it; the bushes, the lounge set, the canopy and the
 // trampoline are bouncy.
-export const GARDEN = { x0: -6, x1: 6, back: -17.5 };
+export const GARDEN = { x0: -6, x1: 6, back: -19.5 }; // the back fence, 3.5 m of lawn behind the bins
 const GARAGE = { x0: GARAGE_WALLS.x0 - 0.125, z0: GARAGE_WALLS.z0 - 0.125, top: GARAGE_WALLS.top }; // its outer faces
 
 export function buildGarden(scene, world, physMats, { std, tex }) {
@@ -182,11 +183,118 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
     world.addBody(crown);
   }
 
+  // ------------------------------------------------------------ junk against the back fence
+  // Old plywood boards leaning on the fence (between two of its posts), black
+  // bin bags heaped by the bushes, a couple of cardboard boxes by the gate, and
+  // old tyres on the other side of it. Lennie bounces off all of it; the bags are soft.
+  {
+    const face = back + 0.07; // just in front of the planks (back + 0.03) and posts (back + 0.06)
+    // weathered: wood grain, grey-brown water stains, and dark damp where they stand in the grass
+    let rs = 7;
+    const r = () => ((rs = (rs * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const worn = canvasTexture(128, 128, (g, w, h) => {
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 40; i++) {
+        g.strokeStyle = `rgba(120, 95, 60, ${0.08 + r() * 0.14})`;
+        g.lineWidth = 1 + r() * 2;
+        const x = r() * w;
+        g.beginPath();
+        g.moveTo(x, 0);
+        g.bezierCurveTo(x + (r() - 0.5) * 20, h / 3, x + (r() - 0.5) * 20, (2 * h) / 3, x + (r() - 0.5) * 12, h);
+        g.stroke();
+      }
+      for (let i = 0; i < 5; i++) {
+        const [x, y, rad] = [r() * w, h * (0.3 + r() * 0.7), 10 + r() * 22];
+        const st = g.createRadialGradient(x, y, 0, x, y, rad);
+        st.addColorStop(0, 'rgba(70, 60, 45, 0.35)');
+        st.addColorStop(0.8, 'rgba(70, 60, 45, 0.18)');
+        st.addColorStop(1, 'rgba(70, 60, 45, 0)');
+        g.fillStyle = st;
+        g.fillRect(0, 0, w, h);
+      }
+      const damp = g.createLinearGradient(0, h, 0, h * 0.72);
+      damp.addColorStop(0, 'rgba(40, 32, 22, 0.75)');
+      damp.addColorStop(1, 'rgba(40, 32, 22, 0)');
+      g.fillStyle = damp;
+      g.fillRect(0, h * 0.72, w, h * 0.28);
+    });
+    const ply = [0xbfa67c, 0xa68d66, 0xcbb48c].map((c) => std({ color: c, map: worn, roughness: 0.95 }));
+    const T = 0.018; // the boards' thickness
+    // Each board leans back onto the one behind it (the first onto the fence),
+    // its top back edge resting on that one's front face, and each leans a bit
+    // further than the last, so their bottoms stand apart. surface(y): the z of
+    // the face behind, at height y.
+    let surface = () => face;
+    for (const [x0, x1, h, a, mi] of [[-1.9, -0.7, 1.7, 0.13, 0], [-1.5, -0.35, 1.45, 0.2, 1], [-0.95, -0.15, 1.05, 0.3, 2]]) {
+      const top = surface(h * Math.cos(a)) + 0.004;
+      const zb = top + h * Math.sin(a); // the back face's bottom edge
+      const centre = new THREE.Vector3((x0 + x1) / 2, 0, zb)
+        .addScaledVector(new THREE.Vector3(0, Math.cos(a), -Math.sin(a)), h / 2)
+        .addScaledVector(new THREE.Vector3(0, Math.sin(a), Math.cos(a)), T / 2);
+      const board = add(new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, h, T), ply[mi]));
+      board.position.copy(centre);
+      board.rotation.x = -a;
+      const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3((x1 - x0) / 2, h / 2, 0.04)) });
+      b.position.set(centre.x, centre.y, centre.z);
+      b.quaternion.setFromEuler(-a, 0, 0);
+      b.surface = { kind: 'junk', sound: 'fence' };
+      world.addBody(b);
+      surface = (y) => zb + T / Math.cos(a) - y * Math.tan(a);
+    }
+
+    // cardboard boxes between the boards and the gate, one knocked askew
+    const card = std({ color: 0xb08a5a, roughness: 1 });
+    both([0.25, 0, face + 0.01], [0.85, 0.45, face + 0.51], card, 'junk');
+    const askew = add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.4), card));
+    askew.position.set(1.35, 0.175, -19.05);
+    askew.rotation.y = 0.35;
+    const ab = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3(0.25, 0.175, 0.2)) });
+    ab.position.set(1.35, 0.175, -19.05);
+    ab.quaternion.setFromEuler(0, 0.35, 0);
+    ab.surface = { kind: 'junk' };
+    world.addBody(ab);
+
+    // black bin bags heaped in the corner by the bushes, each tied at the top
+    const bag = std({ color: 0x1f1f22, roughness: 0.6, metalness: 0.1, flatShading: true });
+    for (const [x, y, z, r] of [[-3.45, 0, -18.95, 0.36], [-2.85, 0, -19.02, 0.33], [-2.38, 0, -18.92, 0.29], [-3.05, 0, -18.5, 0.3], [-3.15, 0.5, -19.0, 0.27]]) {
+      const yc = y + r * 0.78;
+      const m = add(new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), bag));
+      m.scale.set(1, 0.82, 0.92);
+      m.position.set(x, yc, z);
+      const knot = add(new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 5), bag));
+      knot.position.set(x + 0.03, yc + r * 0.82 + 0.03, z);
+      knot.rotation.z = -0.3;
+      const b = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Sphere(r * 0.85) });
+      b.position.set(x, yc, z);
+      b.surface = { kind: 'trash', sound: 'cushion' };
+      world.addBody(b);
+    }
+
+    // old tyres right of the gate: two lying stacked, one leaning on the fence
+    for (const y of [0.11, 0.33]) {
+      const m = add(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.11, 6, 18).rotateX(Math.PI / 2), tyre));
+      m.position.set(4.7, y, -18.75);
+    }
+    const tb = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Cylinder(0.41, 0.41, 0.44, 12) });
+    tb.position.set(4.7, 0.22, -18.75);
+    tb.surface = { kind: 'junk' };
+    world.addBody(tb);
+    const lean = add(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.11, 6, 18), tyre));
+    lean.position.set(5.45, 0.4, -19.2);
+    lean.rotation.x = -0.25;
+    const lb = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3(0.41, 0.41, 0.11)) });
+    lb.position.set(5.45, 0.4, -19.2);
+    lb.quaternion.setFromEuler(-0.25, 0, 0);
+    lb.surface = { kind: 'junk' };
+    world.addBody(lb);
+  }
+
   // ------------------------------------------------------------ the bushes along the left-hand fence
   const greens = [0x3b7d3a, 0x2f6b34, 0x4f9a3c, 0x46893a].map((c) => std({ color: c, flatShading: true }));
   let seed = 23;
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-  for (const [zc, half, r] of [[-6.6, 1.0, 0.75], [-9.6, 1.1, 0.8], [-13.2, 1.6, 0.9], [-16.3, 0.6, 0.7]]) {
+  for (const [zc, half, r] of [[-6.6, 1.0, 0.75], [-9.6, 1.1, 0.8], [-13.2, 1.6, 0.9], [-17.1, 1.6, 0.75]]) {
     for (let z = zc - half; z <= zc + half + 0.01; z += 0.55) {
       const rr = r * (0.75 + rnd() * 0.35);
       const blob = add(new THREE.Mesh(new THREE.IcosahedronGeometry(rr, 1), greens[Math.floor(rnd() * greens.length)]));

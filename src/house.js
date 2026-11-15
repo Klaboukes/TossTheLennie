@@ -1329,7 +1329,7 @@ export function buildHouse(scene, world, physMats) {
         [[x - r * 0.65, 0, z - r * 0.65], [x + r * 0.65, h - 0.04, z + r * 0.65], col(0x7d7368), { round: true }],
       ], { mass: 8, surface: { kind: 'furniture' } });
     }
-    // and the bikes and the moped by the garden's back fence (bikes.js), loose too
+    // and the bikes and the moped along the garden's left-hand bushes (bikes.js), loose too
     parkBikes(loose, groups[0], std);
 
     // --- the garage (buildGarage): camping shelves along the garden side,

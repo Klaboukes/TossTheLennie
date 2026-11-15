@@ -76,7 +76,7 @@ const DOOR_AIM_LOW = 0.8; // aimed at a door, he goes for no lower than this abo
 const AIM_GUIDE_TIME = 0.12;
 const AIM_LOFT = { start: 0.9, min: 0.1, max: 8, step: 0.3 }; // arc top, metres above the higher end
 const AIM_CLICK_PX = 6; // a press that moves further than this orbits the camera instead of throwing
-const SOFT = new Set(['cushion', 'leaves', 'trampoline']);
+const SOFT = new Set(['cushion', 'leaves', 'trampoline', 'trash']);
 const AIM_TAP_PX = 44; // on a touch screen, a second tap this close to the first one throws
 // The slingshot: grab Lennie and pull back, away from where he should go.
 const SLING = {
@@ -683,6 +683,8 @@ const BUMP = {
   leaves: ['Hedgehog!', 'Rustle rustle!', 'Leaf me alone!'],
   bike: ['Ring ring!', 'Flat tyre!', 'Bike pile-up!', 'Off his bike!'],
   moped: ['Vroom vroom!', 'Beep beep!', 'Helmet on!', 'Mind the paintwork!'],
+  junk: ['Junk corner!', 'Out with the rubbish!', 'Bin day!', 'Recycled!'],
+  trash: ['Bin bag!', 'Pee-yew!', 'Smells like Lennie!'],
 };
 function bumpLine(partName, kind, soft) {
   if (soft && BUMP[kind]) return pickLine(BUMP[kind]);
