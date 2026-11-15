@@ -719,7 +719,7 @@ export function buildHouse(scene, world, physMats) {
   const ux = ([u0, u1]) => [OUT.x0 + u0, OUT.x0 + u1];
   buildRoof();
   details.porch({ x0: ux(LAYOUT.porch)[0], x1: ux(LAYOUT.porch)[1], fascia: M.canopy }); // over the toilet's bump-out (built below) and the door
-  details.houseNumber(HOUSE_NUMBERS[0], OUT.x0 + (LAYOUT.door[0] + LAYOUT.door[1]) / 2, '#f4f2ee');
+  details.houseNumber(HOUSE_NUMBERS[0], OUT.x0 + LAYOUT.number, 'south-0');
   details.downpipe(OUT.x0 + LAYOUT.pipe, 2.55, (k) => ({ story: k, line: `south-${k}` }));
   buildNeighbours(kit, details);
   buildUtility();
@@ -871,7 +871,7 @@ export function buildHouse(scene, world, physMats) {
   // ------------------------------------------------------------ the toilet's bump-out
   // The toilet carries on through a gap in the front wall into a little brick
   // bump-out under the canopy, whose underside is its ceiling. Its front has
-  // the toilet's small high window. Each wall fades on its own line.
+  // the toilet's window of two breeze blocks. Each wall fades on its own line.
   function buildToiletOut() {
     const T = TOILET_OUT;
     const tiles = wallpaper(ROOMS[0].toilet);
@@ -883,12 +883,14 @@ export function buildHouse(scene, world, physMats) {
     floor.position.y = 0.01;
     floor.receiveShadow = true;
     groups[0].add(floor);
-    const cx = (T.x0 + T.x1) / 2;
     wall({
       ...ext, run: 'x', at: T.z1 - EXT / 2, from: T.x0, to: T.x1, physOffset: off, outward: 1, line: 'toiletout-0',
-      openings: [{ a: cx - 0.55, b: cx + 0.55, bottom: 1.3, top: 2.0, glass: true, bars: { v: [], h: [] }, slack: SLACK }],
       mats: { pos: M.brick, neg: tiles, ends: M.brick },
     });
+    // its window: two breeze blocks in the wall, too small for Lennie to fly through (street.js)
+    const cx = (T.x0 + T.x1) / 2;
+    details.toiletWindow(cx, T.z1, 1, 'toiletout-0');
+    details.toiletWindow(cx, zi, -1, 'toiletout-0');
     // the side on the party wall, and the one beside the front door
     wall({ ...ext, run: 'z', at: HOUSE.x0, from: IN.z1, to: zi, physOffset: -off, outward: -1, line: 'toiletoutw-0', mats: { pos: tiles, neg: M.brick } });
     wall({ ...ext, run: 'z', at: T.x1 - EXT / 2, from: OUT.z1, to: zi, physOffset: off, outward: 1, line: 'toiletoute-0', mats: { pos: M.brick, neg: tiles } });

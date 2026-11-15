@@ -97,9 +97,9 @@ export function makeDetails(kit) {
   /**
    * Flat canopy over the front door (fascia material `fascia`), optionally
    * over a neighbour's toilet, which sticks out of the front beside the door:
-   * a solid brick block with a small window (Lennie's own is a real room, house.js).
+   * a solid brick block with the toilet's window (Lennie's own is a real room, house.js).
    */
-  function porch({ x0, x1, toilet = null, frame = M.trim, fascia = M.trim }) {
+  function porch({ x0, x1, toilet = null, fascia = M.trim }) {
     const c = { y0: PORCH_Y, y1: PORCH_TOP, z1: PORCH_FRONT };
     box([x0, c.y0, OUT.z1], [x1, c.y1, c.z1], [fascia, fascia, M.darkRoof, M.soffit, fascia, fascia], { story: 0, cast: true });
     // thicker downwards in physics, so a fast Lennie doesn't slip through it
@@ -109,44 +109,89 @@ export function makeDetails(kit) {
     const zf = LAYOUT.toiletFront;
     box([t0, 0, OUT.z1], [t1, c.y0, zf], M.brick, { story: 0, cast: true });
     body([t0, 0, OUT.z1], [t1, c.y0, zf], physMats.hard, { kind: 'wall' });
-    // its small high window, in the middle of the front
-    const [a, b] = [(t0 + t1) / 2 - 0.55, (t0 + t1) / 2 + 0.55];
-    box([a - 0.07, 1.25, zf - 0.01], [b + 0.07, 2.07, zf + 0.04], frame, { story: 0 });
-    box([a, 1.3, zf + 0.04], [b, 2.0, zf + 0.05], M.glassSky, { story: 0 });
-    box([a - 0.1, 1.2, zf - 0.01], [b + 0.1, 1.25, zf + 0.12], M.trim, { story: 0 });
+    toiletWindow((t0 + t1) / 2, zf, 1);
   }
 
-  /**
-   * The house number on the front edge of the door canopy, centred over the
-   * door at x: big digits in `color` (white on Lennie's dark canopy, dark on
-   * the neighbours' white ones). Pulled in front in the depth test, like a road marking.
-   */
-  function houseNumber(n, x, color) {
+  // The toilet's window, as in the photo of the real house: two square concrete
+  // breeze blocks set in the brick, one above the other, each with four
+  // L-shaped holes in its corners and one in the middle. Dark holes seen from
+  // the street; from inside the toilet (side -1) daylight shines through them.
+  const BLOCK = 0.3; // each block is 30 cm square
+  const blockMats = {};
+  function blockMat(side) {
+    if (blockMats[side]) return blockMats[side];
     const c = document.createElement('canvas');
-    c.width = 256;
-    c.height = 128;
+    c.width = 128;
+    c.height = 256;
     const g = c.getContext('2d');
-    g.fillStyle = color;
-    g.font = 'bold 112px "Trebuchet MS", sans-serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(String(n), 128, 70);
+    g.fillStyle = '#b3ada1';
+    g.fillRect(0, 0, 128, 256);
+    const hole = side > 0 ? '#15130f' : '#eef3f2';
+    for (const y0 of [0, 128]) {
+      g.strokeStyle = '#8a8478'; // the mortar joint around the block
+      g.lineWidth = 5;
+      g.strokeRect(2.5, y0 + 2.5, 123, 123);
+      g.fillStyle = hole;
+      const [m, arm, t] = [16, 36, 14]; // margin, length and thickness of the corner Ls
+      for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+        const x = sx ? 128 - m - arm : m;
+        const y = y0 + (sy ? 128 - m - arm : m);
+        g.fillRect(x, sy ? y + arm - t : y, arm, t); // the L's flat stroke
+        g.fillRect(sx ? x + arm - t : x, y, t, arm); // its upright stroke
+      }
+      g.fillRect(64 - 13, y0 + 64 - 19, 26, 38); // the hole in the middle, a bit taller than wide
+    }
     const map = new THREE.CanvasTexture(c);
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = 8;
-    const mat = std({ map, alphaTest: 0.5, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.26), mat);
-    mesh.position.set(x, (PORCH_Y + PORCH_TOP) / 2, PORCH_FRONT + 0.004);
-    addMesh(mesh, 0);
+    const look = side > 0 ? { roughness: 0.9 } : { emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.25, roughness: 0.9 };
+    blockMats[side] = std({ map, ...look, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+    return blockMats[side];
   }
 
-  return { roofTop, angle, chimney, vent, dormer, skylight, downpipe, porch, houseNumber };
+  /** The toilet's breeze-block window on a wall face at z, centred on x, facing +z (side 1) or -z (side -1). */
+  function toiletWindow(x, z, side, line = null) {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(BLOCK, 2 * BLOCK), blockMat(side));
+    mesh.position.set(x, 1.25 + BLOCK, z + side * 0.004);
+    if (side < 0) mesh.rotation.y = Math.PI;
+    addMesh(mesh, 0, line);
+  }
+
+  /**
+   * The house number on a little white plaque on the wall beside the front
+   * door, at x, about shoulder height, as on the real house. Fades with `line`.
+   */
+  function houseNumber(n, x, line = null) {
+    const c = document.createElement('canvas');
+    c.width = 128;
+    c.height = 104;
+    const g = c.getContext('2d');
+    g.fillStyle = '#f2f1ec';
+    g.fillRect(0, 0, 128, 104);
+    g.strokeStyle = '#9c9a94';
+    g.lineWidth = 4;
+    g.strokeRect(2, 2, 124, 100);
+    g.fillStyle = '#1d2433';
+    g.font = 'bold 72px "Trebuchet MS", sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(String(n), 64, 56);
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 8;
+    const mat = std({ map, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.146), mat);
+    mesh.position.set(x, 1.7, OUT.z1 + 0.006);
+    addMesh(mesh, 0, line);
+  }
+
+  return { roofTop, angle, chimney, vent, dormer, skylight, downpipe, porch, toiletWindow, houseNumber };
 }
 
 // The front door's canopy: its underside, which is also the top of the toilet's bump-out.
 export const PORCH_Y = 2.26;
 const PORCH_TOP = 2.55;
-const PORCH_FRONT = 6.4; // z of the canopy's front edge, where the house number is
+const PORCH_FRONT = 6.4; // z of the canopy's front edge
 
 // House numbers along the row, by index (0 is Lennie's), as in the real street.
 export const HOUSE_NUMBERS = { [-1]: 12, 0: 10, 1: 8, 2: 6, 3: 4 };
@@ -162,6 +207,7 @@ export const LAYOUT = {
   toilet: [0, 2.885],
   toiletFront: 6.2,
   door: [3.925, 5.025],
+  number: 5.3, // the house number's plaque, on the wall just past the door's frame, away from the toilet
   column: [7.325, 10.625],
   small: [[0.425, 1.525], [2.125, 3.525]],
   pipe: 1.825,
@@ -262,8 +308,8 @@ export function buildNeighbours(kit, details) {
     details.downpipe(X(LAYOUT.pipe), 2.55, () => ({ story: 0, line: front }));
     // the house on Lennie's right has no toilet sticking out in the photo
     const [p0, p1] = span(style.noToilet ? LAYOUT.porchNoToilet : LAYOUT.porch);
-    details.porch({ x0: p0, x1: p1, toilet: style.noToilet ? null : span(LAYOUT.toilet), frame: frameMat });
-    details.houseNumber(HOUSE_NUMBERS[i], (d0 + d1) / 2, '#2a2a2a');
+    details.porch({ x0: p0, x1: p1, toilet: style.noToilet ? null : span(LAYOUT.toilet) });
+    details.houseNumber(HOUSE_NUMBERS[i], X(LAYOUT.number), front);
 
     // ---- roof details
     for (const what of style.roof) {
