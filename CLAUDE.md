@@ -24,6 +24,14 @@ Two surfaces facing the same way in (almost) the same place flicker as the camer
 - The camera's near plane stays at 20 cm (`main.js`). The depth precision everywhere scales with it, and the see-through effect already cuts away anything closer to the lens than 45 cm. Don't lower it.
 - `src/flickercheck.js` scans the built scene when the game runs on localhost and prints a `Flicker check:` warning in the browser console listing every visible spot, with the parts' sizes, colours and positions; the file says how to fix them. Build parts so they fit between each other instead of into each other.
 
+The check only lists spots that can be seen as built. A clean check isn't the goal by itself: hidden overlaps show up once a wall fades, the cutaway lifts a floor, or the camera goes inside something (the garden door's jamb was one). So build every part so that no face of it lies in one plane with a face of another part, hidden or not:
+
+- **Ends and seams:** where two parts meet, their ends don't line up with the ends of a third. Stagger them by a centimetre (the roof stops 1 cm short of the party walls, where the walls, attic floor, fascia and ridge end), or tuck one end inside the next part.
+- **Glass:** a pane stops 2 mm inside its frame or beads, and glazing bars start in front of the glass, not level with its back.
+- **Things on a surface:** a sill sits above the worktop it reaches over, a panel sits just in front of the brick, not sunk into it with its ends level with the wall's. Lay flat decals with `polygonOffset` (see `flickercheck.js`).
+- **A box's faces** go +x, −x, +y, −y, +z, −z, so the far end of a run comes first. Getting that backwards put brick where white trim belonged.
+- **The near plane** means anything closer than 20 cm to the lens isn't drawn. A surface the camera can get that close to (a ceiling, a wall) gets a hole, so either the see-through cut or the cutaway must already handle it (see `underCeiling()` in `house.js`).
+
 ## Commands
 ```bash
 python -m http.server 5173   # serve the game, then open http://localhost:5173 (.claude/launch.json does the same)
