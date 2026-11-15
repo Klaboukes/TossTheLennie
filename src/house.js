@@ -69,9 +69,12 @@ export const GARAGE = { x0: UTILITY.x0, x1: UTILITY.x1, z0: -9.675, z1: UTILITY.
 
 // Stairs: flight A climbs storey 0→1 along −z against the left party wall,
 // from the hallway over the storage cupboard; flight B climbs 1→2 along −x in
-// the landing at the back.
-const STAIR = { steps: 12, rise: 0.25, run: 0.3, xLow: -1.8, xHigh: 1.8, stripB: [-3.7, HALL_Z - INT / 2], a: { x0: IN.x0, x1: -4.65, zLow: 2.9 } };
-STAIR.a.zHigh = STAIR.a.zLow - STAIR.steps * STAIR.run;
+// the landing at the back. Flight A is a steep Dutch stair: its top stays at
+// the back of the storage cupboard (the couch is right behind it), so its
+// shorter steps leave room in the hallway to walk onto its bottom step,
+// instead of that step butting against the toilet wall.
+const STAIR = { steps: 12, rise: 0.25, run: 0.3, xLow: -1.8, xHigh: 1.8, stripB: [-3.7, HALL_Z - INT / 2], a: { x0: IN.x0, x1: -4.65, zHigh: GF.storeZ, run: 0.23 } };
+STAIR.a.zLow = STAIR.a.zHigh + STAIR.steps * STAIR.a.run;
 const HOLES = {
   1: { x0: STAIR.a.x0, x1: STAIR.a.x1, z0: STAIR.a.zHigh, z1: STAIR.a.zLow },
   2: { x0: STAIR.xLow, x1: STAIR.xHigh, z0: STAIR.stripB[0], z1: STAIR.stripB[1] },
@@ -697,8 +700,8 @@ export function buildHouse(scene, world, physMats) {
   const stairMats = [M.stairSide, M.stairSide, M.wood, M.stairSide, M.stairSide, M.stairSide];
   for (let i = 0; i < STAIR.steps; i++) {
     const A = STAIR.a;
-    const minA = [A.x0, 0, A.zLow - (i + 1) * STAIR.run];
-    const maxA = [A.x1, (i + 1) * STAIR.rise, A.zLow - i * STAIR.run];
+    const minA = [A.x0, 0, A.zLow - (i + 1) * A.run];
+    const maxA = [A.x1, (i + 1) * STAIR.rise, A.zLow - i * A.run];
     box(minA, maxA, stairMats, { story: 0, cast: true });
     stairBodies.push(body(minA, maxA, physMats.hard, { kind: 'stair', id: `A${i}` }));
 
