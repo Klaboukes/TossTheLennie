@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 
-// Furniture Lennie can knock over: the six dining chairs and the piano stool.
+// Furniture Lennie can knock over: the six dining chairs, the piano stool, and
+// the small round tables (in front of the couch and at the lounge set).
 // As fixed blocks they left only narrow gaps around the dining table, and
 // Lennie kept getting wedged in them. Now they're light physics bodies: he
 // shoves them aside or sends them tumbling, and they stay where they fall
 // until everything is put back (repairAll).
 //
-// Each piece is one body made of boxes, drawn by a group of matching boxes
-// that follows it. The instant replay records them along with Lennie (they
+// Each piece is one body made of boxes (or upright cylinders, for round
+// parts), drawn by a group of matching shapes that follows it. The instant replay records them along with Lennie (they
 // have the same { body, group } shape as his parts).
 
 // A piece that has stood still this long, with Lennie not close by, goes to
@@ -34,15 +35,16 @@ export function createLoose(world, material) {
   });
 
   /**
-   * Adds a piece. `parts` are [min, max, meshMaterial] boxes in world space;
+   * Adds a piece. `parts` are [min, max, meshMaterial, { round }] boxes in
+   * world space; a `round` part is the upright cylinder that fits in its box.
    * `parent` is the storey group it's drawn in.
    */
   function add(parent, parts, { mass, surface }) {
     // The body's origin is its centre of mass (by volume), as cannon expects.
     const centre = new THREE.Vector3();
     let volume = 0;
-    for (const [min, max] of parts) {
-      const v = (max[0] - min[0]) * (max[1] - min[1]) * (max[2] - min[2]);
+    for (const [min, max, , opts] of parts) {
+      const v = (max[0] - min[0]) * (max[1] - min[1]) * (max[2] - min[2]) * (opts?.round ? Math.PI / 4 : 1);
       centre.x += ((min[0] + max[0]) / 2) * v;
       centre.y += ((min[1] + max[1]) / 2) * v;
       centre.z += ((min[2] + max[2]) / 2) * v;
@@ -52,11 +54,13 @@ export function createLoose(world, material) {
 
     const body = new CANNON.Body({ mass, material, linearDamping: 0.05, angularDamping: 0.1 });
     const group = new THREE.Group();
-    for (const [min, max, mat] of parts) {
+    for (const [min, max, mat, opts] of parts) {
       const size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
       const at = [(min[0] + max[0]) / 2 - centre.x, (min[1] + max[1]) / 2 - centre.y, (min[2] + max[2]) / 2 - centre.z];
-      body.addShape(new CANNON.Box(new CANNON.Vec3(size[0] / 2, size[1] / 2, size[2] / 2)), new CANNON.Vec3(...at));
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), mat);
+      const r = Math.min(size[0], size[2]) / 2;
+      // (cannon's cylinders stand upright, like three's)
+      body.addShape(opts?.round ? new CANNON.Cylinder(r, r, size[1], 12) : new CANNON.Box(new CANNON.Vec3(size[0] / 2, size[1] / 2, size[2] / 2)), new CANNON.Vec3(...at));
+      const mesh = new THREE.Mesh(opts?.round ? new THREE.CylinderGeometry(r, r, size[1], r > 0.1 ? 28 : 8) : new THREE.BoxGeometry(...size), mat);
       mesh.position.set(...at);
       mesh.castShadow = true;
       mesh.receiveShadow = true;

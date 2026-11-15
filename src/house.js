@@ -695,7 +695,7 @@ export function buildHouse(scene, world, physMats) {
   buildUtility();
   buildGarage();
   buildToiletOut();
-  // the dining chairs and the piano stool, which Lennie knocks over (loose.js)
+  // the dining chairs, the piano stool and the small round tables, which Lennie knocks over (loose.js)
   const loose = createLoose(world, physMats.loose);
   buildFurniture();
   // the kids' drawings and paintings on the living room's white walls, and the photos of friends in the toilet (drawings.js)
@@ -1065,21 +1065,15 @@ export function buildHouse(scene, world, physMats) {
       [[x1 - t, 0, z1 - t], [x1, h, z1], color],
     ];
     const table = (x0, z0, x1, z1, h, color) => [[[x0, h - 0.06, z0], [x1, h, z1], color], ...legs(x0, z0, x1, z1, h - 0.06, color)];
-    // A small round table: a top on three thin legs, solid as a block.
-    const roundTable = (x, z, r, h, topColor, legColor, story = 0) => {
-      const y = story * H;
-      const top = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.03, 28), col(topColor));
-      top.position.set(x, y + h - 0.015, z);
-      top.castShadow = true;
-      groups[story].add(top);
-      for (let i = 0; i < 3; i++) {
+    // A small round table Lennie knocks over (loose.js): a top on three thin legs.
+    const roundTable = (x, z, r, h, topColor, legColor) => {
+      const ROUND = { round: true };
+      const legs = [0, 1, 2].map((i) => {
         const a = (i / 3) * Math.PI * 2 + 0.4;
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, h - 0.03, 6), col(legColor));
-        leg.position.set(x + Math.cos(a) * r * 0.7, y + (h - 0.03) / 2, z + Math.sin(a) * r * 0.7);
-        leg.rotation.set(Math.sin(a) * 0.12, 0, -Math.cos(a) * 0.12);
-        groups[story].add(leg);
-      }
-      body([x - r * 0.75, y, z - r * 0.75], [x + r * 0.75, y + h, z + r * 0.75], physMats.hard, { kind: 'furniture' });
+        const [lx, lz] = [x + Math.cos(a) * r * 0.65, z + Math.sin(a) * r * 0.65];
+        return [[lx - 0.016, 0, lz - 0.016], [lx + 0.016, h - 0.03, lz + 0.016], col(legColor), ROUND];
+      });
+      loose.add(groups[0], [[[x - r, h - 0.03, z - r], [x + r, h, z + r], col(topColor), ROUND], ...legs], { mass: 4, surface: { kind: 'furniture' } });
     };
     const chair = (x, z, facing, color) => {
       // facing: +1 → sitter faces +x, −1 → faces −x
@@ -1252,6 +1246,14 @@ export function buildHouse(scene, world, physMats) {
 
     // the small round side table in front of the couch: an oak top on three black legs
     roundTable(-2.5, -2.3, 0.3, 0.45, 0xc8a172, 0x26262a);
+    // and the low round table at the lounge set in the garden (garden.js), on a rattan stand
+    {
+      const [x, z, r, h] = [3.3, -11.25, 0.42, 0.42];
+      loose.add(groups[0], [
+        [[x - r, h - 0.04, z - r], [x + r, h, z + r], col(0xd8d2c4), { round: true }],
+        [[x - r * 0.65, 0, z - r * 0.65], [x + r * 0.65, h - 0.04, z + r * 0.65], col(0x7d7368), { round: true }],
+      ], { mass: 8, surface: { kind: 'furniture' } });
+    }
 
     // --- the garage (buildGarage): camping shelves along the garden side,
     // a table piled with stuff on the far side, tool shelves against the utility room

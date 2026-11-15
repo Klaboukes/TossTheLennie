@@ -117,13 +117,7 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
   both([side, 0.35, L.end], [L.x1 - 0.25, 0.58, L.end + 0.18], rattan, 'cushion', physMats.soft); // its arm
   for (const [a, b] of [[1.88, 3.08], [3.13, 4.33], [4.38, 5.64]]) boxMesh([a, 0.35, front + 0.05], [b, 0.47, L.z1 - 0.28], cushion);
   for (const [a, b] of [[front - 0.6, front - 0.05], [L.end + 0.23, front - 0.65]]) boxMesh([side + 0.05, 0.35, a], [L.x1 - 0.28, 0.47, b], cushion);
-  // the low round table in front of it
-  const T0 = { x: 3.3, z: -11.25, r: 0.42, h: 0.42 };
-  const top = add(new THREE.Mesh(new THREE.CylinderGeometry(T0.r, T0.r, 0.04, 28), std({ color: 0xd8d2c4, roughness: 0.5 })));
-  top.position.set(T0.x, T0.h - 0.02, T0.z);
-  const stem = add(new THREE.Mesh(new THREE.CylinderGeometry(T0.r * 0.75, T0.r * 0.55, T0.h - 0.04, 16), rattan));
-  stem.position.set(T0.x, (T0.h - 0.04) / 2, T0.z);
-  solid([T0.x - T0.r * 0.8, 0, T0.z - T0.r * 0.8], [T0.x + T0.r * 0.8, T0.h, T0.z + T0.r * 0.8], 'furniture');
+  // (the low round table in front of it can be knocked over, so house.js builds it with the other loose furniture)
 
   // ------------------------------------------------------------ the trampoline (round, behind the lounge set)
   const pole = std({ color: 0x8a9099, metalness: 0.6, roughness: 0.4 });
