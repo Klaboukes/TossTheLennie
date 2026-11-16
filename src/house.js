@@ -1167,6 +1167,129 @@ export function buildHouse(scene, world, physMats) {
         }
       }
     }
+    // The kitchen cupboards' doors: 4 mm apart, 10 cm above the floor (the
+    // plinth) and 1.5 cm under the worktop, sitting on the carcass's front,
+    // each with a steel handle near its top. A drawer above the oven.
+    function kitchenDoors() {
+      const NO = { phys: false };
+      const GAP = 0.004;
+      const DT = 0.018; // a door's thickness
+      const parts = [];
+      // `axis` the run's direction, `face` where the carcass's front is, `out` which way it faces (±1)
+      const slab = (axis, u0, u1, y0, y1, w0, w1, color, opts) => {
+        const [a, b] = [Math.min(w0, w1), Math.max(w0, w1)];
+        parts.push(axis === 'x' ? [[u0, y0, a], [u1, y1, b], color, opts] : [[a, y0, u0], [b, y1, u1], color, opts]);
+      };
+      const door = (axis, face, out, u0, u1, y0 = 0.1, y1 = 0.835, hy = 0.775) => {
+        const front = face + out * (0.001 + DT);
+        slab(axis, u0, u1, y0, y1, face + out * 0.001, front, KITCHEN_DOOR, NO);
+        const c = (u0 + u1) / 2;
+        const l = Math.min(0.12, u1 - u0 - 0.04) / 2;
+        slab(axis, c - l, c + l, hy - 0.006, hy + 0.006, front, front + out * 0.016, null, { ...STEEL, phys: false });
+      };
+      const run = (axis, face, out, u0, u1, n) => {
+        const w = (u1 - u0) / n;
+        for (let i = 0; i < n; i++) door(axis, face, out, u0 + i * w + GAP / 2, u0 + (i + 1) * w - GAP / 2);
+      };
+      // along the front, either side of the oven, and the drawer above it
+      run('x', 4.225, -1, KITCHEN_FRONT + 0.006, -0.156, 1);
+      run('x', 4.225, -1, 0.556, 3.2, 5);
+      door('x', 4.225, -1, -0.15, 0.55, 0.758, 0.835, 0.8);
+      // along the right wall, and the kitchen side of the counter across the back
+      run('z', 3.225, -1, 1.875, 4.2, 4);
+      run('x', 1.85, 1, 0.97, 3.2, 4);
+      return parts;
+    }
+
+    // The piano's 52 white keys are one strip with the gaps between them
+    // painted on (pianoKeys()); the 36 black keys sit on it, 3 mm sunk in.
+    const KEYS = { x0: 1.93, x1: 3.47, n: 52, y0: 0.76, y: 0.775, z0: 0.36, z1: 0.5 };
+    function blackKeys() {
+      const kw = (KEYS.x1 - KEYS.x0) / KEYS.n;
+      const parts = [];
+      // from the bottom A: a black key after every A, C, D, F and G
+      for (let i = 0; i < KEYS.n - 1; i++) {
+        if (!'ACDFG'.includes('ABCDEFG'[i % 7])) continue;
+        const x = KEYS.x0 + (i + 1) * kw;
+        parts.push([[x - kw * 0.3, KEYS.y - 0.003, KEYS.z0 + 0.055], [x + kw * 0.3, KEYS.y + 0.012, KEYS.z1 - 0.005], 0x121113, { phys: false }]);
+      }
+      // the cheeks at either end of the keyboard
+      parts.push([[KEYS.x0 - 0.03, KEYS.y0, 0.33], [KEYS.x0, 0.8, 0.55], PIANO], [[KEYS.x1, KEYS.y0, 0.33], [KEYS.x1 + 0.03, 0.8, 0.55], PIANO]);
+      return parts;
+    }
+    function pianoKeys() {
+      const c = document.createElement('canvas');
+      [c.width, c.height] = [1024, 32];
+      const g = c.getContext('2d');
+      g.fillStyle = '#fbfaf5';
+      g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = '#8d8a84';
+      for (let i = 1; i < KEYS.n; i++) g.fillRect(Math.round((i / KEYS.n) * c.width) - 1, 0, 2, c.height);
+      const map = new THREE.CanvasTexture(c);
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.anisotropy = 4;
+      const keys = new THREE.Mesh(new THREE.BoxGeometry(KEYS.x1 - KEYS.x0, KEYS.y - KEYS.y0, KEYS.z1 - KEYS.z0), std({ map, roughness: 0.35 }));
+      keys.position.set((KEYS.x0 + KEYS.x1) / 2, (KEYS.y0 + KEYS.y) / 2, (KEYS.z0 + KEYS.z1) / 2);
+      keys.receiveShadow = true;
+      groups[0].add(keys);
+    }
+    // An open book of piano music on the music desk, leaning back against the piano.
+    function sheetMusic() {
+      const [W, Hh] = [512, 352];
+      const c = document.createElement('canvas');
+      [c.width, c.height] = [W, Hh];
+      const g = c.getContext('2d');
+      g.fillStyle = '#f7f1e1';
+      g.fillRect(0, 0, W, Hh);
+      g.fillStyle = '#d9d0b8';
+      g.fillRect(W / 2 - 2, 0, 4, Hh); // the fold
+      g.strokeStyle = '#2b2b2b';
+      g.fillStyle = '#2b2b2b';
+      let s = 5;
+      const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+      for (const px of [0, W / 2]) {
+        g.fillRect(px + 70, 22, 116, 7); // the title, as a squiggle-free bar
+        for (let row = 0; row < 6; row++) {
+          const top = 50 + row * 49;
+          g.lineWidth = 1.2;
+          for (let l = 0; l < 5; l++) {
+            g.beginPath();
+            g.moveTo(px + 16, top + l * 6);
+            g.lineTo(px + W / 2 - 16, top + l * 6);
+            g.stroke();
+          }
+          g.lineWidth = 1.5;
+          for (const bx of [px + 16, px + 82, px + 148, px + 214, px + W / 2 - 16]) {
+            g.beginPath();
+            g.moveTo(bx, top);
+            g.lineTo(bx, top + 24);
+            g.stroke();
+          }
+          for (let n = 0; n < 12; n++) {
+            const x = px + 30 + n * 18 + (n >> 2) * 2;
+            const y = top - 3 + Math.floor(rnd() * 10) * 3;
+            g.beginPath();
+            g.ellipse(x, y, 4, 3, -0.4, 0, Math.PI * 2);
+            g.fill();
+            g.beginPath();
+            g.moveTo(x + 3.5, y);
+            g.lineTo(x + 3.5, y - 17);
+            g.stroke();
+          }
+        }
+      }
+      const map = new THREE.CanvasTexture(c);
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.anisotropy = 4;
+      const paper = std({ color: 0xf7f1e1, roughness: 0.9 });
+      const book = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.32, 0.003), [paper, paper, paper, paper, paper, std({ map, roughness: 0.9 })]);
+      const lean = 0.1;
+      // its bottom edge on the desk, just behind the lip; its top 1 cm clear of the piano's front
+      book.position.set(2.7, 0.9215 + 0.16 * Math.cos(lean), 0.5035 + 0.16 * Math.sin(lean));
+      book.rotation.x = lean;
+      book.receiveShadow = true;
+      groups[0].add(book);
+    }
     const WOOD = 0x9b6a3f;
     const WHITE = 0xf4f2ee;
 
@@ -1174,8 +1297,11 @@ export function buildHouse(scene, world, physMats) {
     const SOFA = 0x4a4d52; // dark grey
     const SOFA_ARM = 0x3f4247;
     const SOFA_CUSHION = 0x585c62;
-    const CABINET = 0x5d8fb3;
-    const WORKTOP = 0xe8e4dc;
+    // the kitchen: white cupboards (the carcass a shade greyer than the doors,
+    // so the gaps between the doors show) under beige worktops
+    const CABINET = 0xe6e4de;
+    const KITCHEN_DOOR = 0xf8f7f3;
+    const WORKTOP = 0xd6c29b;
     const PIANO = 0x1d1a1c;
     const STEEL = { mat: std({ color: 0xc9ced3, roughness: 0.35, metalness: 0.3 }) };
     const KITCHEN_FRONT = GF.hallX + INT / 2;
@@ -1204,16 +1330,22 @@ export function buildHouse(scene, world, physMats) {
       // the piano, its back to the kitchen counter
       [[1.85, 0, 0.55], [3.55, 1.25, 1.12], PIANO],
       [[1.9, 0.68, 0.33], [3.5, 0.76, 0.55], PIANO],
-      [[1.93, 0.76, 0.36], [3.47, 0.775, 0.5], WHITE, { phys: false }],
+      // (the keys are below: pianoKeys())
       [[1.9, 0, 0.38], [1.98, 0.68, 0.46], PIANO],
       [[3.42, 0, 0.38], [3.5, 0.68, 0.46], PIANO],
+      // the music desk above the keys, with a little lip the sheet music stands against (its book is below)
+      [[2.25, 0.9, 0.5], [3.15, 0.92, 0.552], PIANO, { phys: false }],
+      [[2.26, 0.92, 0.494], [3.14, 0.935, 0.5005], PIANO, { phys: false }],
       // kitchen: a U of counters, along the front under the window, along the right wall, and across the back
+      // (the worktops reach 2.5 cm over the cupboard doors, see kitchenDoors())
       [[KITCHEN_FRONT, 0, 4.225], [IN.x1, 0.85, 4.875], CABINET],
       [[KITCHEN_FRONT, 0.85, 4.2], [IN.x1, 0.9, 4.875], WORKTOP],
       [[3.225, 0, 1.85], [IN.x1, 0.85, 4.225], CABINET],
-      [[3.2, 0.85, 1.85], [IN.x1, 0.9, 4.2], WORKTOP],
+      [[3.2, 0.85, 1.875], [IN.x1, 0.9, 4.2], WORKTOP],
       [[0.95, 0, 1.2], [IN.x1, 0.85, 1.85], CABINET],
-      [[0.93, 0.85, 1.18], [IN.x1, 0.9, 1.85], WORKTOP],
+      [[0.93, 0.85, 1.18], [IN.x1, 0.9, 1.875], WORKTOP],
+      ...kitchenDoors(),
+      ...blackKeys(),
       // (the hanging cupboard on the side wall, above the counter, is in clutter.js: Lennie smashes its doors)
       // the cooker: a black hob on the counter and the oven under it
       [[-0.2, 0.9, 4.3], [0.6, 0.912, 4.8], 0x18181a, { phys: false }],
@@ -1246,6 +1378,8 @@ export function buildHouse(scene, world, physMats) {
       [[1.33, 0.03, -6.52], [2.27, 0.1, -5.93], 0xd8c9a3, { phys: false }],
     ]);
     clothesRack(2.35, 3.65, -6.3); // (just clear of the litter tray)
+    pianoKeys();
+    sheetMusic();
     // the six dining chairs and the piano stool, loose so Lennie knocks them
     // over instead of getting stuck between them (loose.js); on the ground floor, so y is as built
     const knockable = (parts, mass) => loose.add(groups[0], parts.map(([min, max, color]) => [min, max, col(color)]), { mass, surface: { kind: 'furniture' } });

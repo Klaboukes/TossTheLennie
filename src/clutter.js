@@ -169,13 +169,19 @@ const ROOM_MESS = {
   bath: ['Rubber duck rescue!', 'Splish splash!', 'Quack attack!', 'Toilet roll tornado!', 'Bath time!', 'Squeaky clean... not!'],
 };
 
+// The little toy cabinet beside the piano, its back to the kitchen counter (buildToyCabinet).
+const TOY_CABINET = { x0: 1.12, x1: 1.72, z0: 0.8, z1: 1.17, top: 0.62 };
+// What pops up when Lennie crashes into the TV cabinet or the toy cabinet and the toys come out.
+const TOY_MESS = ['Toy avalanche!', 'Toy story!', 'Playtime!', 'Who put all that in there?', 'Tidy up time!'];
+
 // Where the furniture stands in each room, so things strewn on the floor stay clear of it.
 const FURNITURE = {
   living: [
     [-3.875, -0.6, -2.4, -0.8], [-3.875, -2.95, -4.75, -2.75], [-1.55, -0.6, -0.75, -0.35], [-3.875, -1.66, -0.79, 1.01], // couch, TV cabinet, low cabinet, stairs and storage
     [-0.25, 0.75, -4.875, -3.5], [1.28, 3.62, -2.2, -0.3], [1.85, 3.55, -0.05, 1.12], [2.175, 3.875, -4.875, -4.3], // comfy chair, dining table, piano, game closet
+    [TOY_CABINET.x0, TOY_CABINET.x1, TOY_CABINET.z0, TOY_CABINET.z1], // the toy cabinet
   ],
-  kitchen: [[-0.31, 3.875, 4.2, 4.875], [3.2, 3.875, 1.85, 4.2], [0.93, 3.875, 1.19, 1.85]],
+  kitchen: [[-0.31, 3.875, 4.2, 4.875], [3.2, 3.875, 1.875, 4.2], [0.93, 3.875, 1.19, 1.875]],
   hall: [[-3.875, -1.66, 2.96, 4.875], [-2.95, -1.95, 2.7, 2.96]], // the toilet, the coat rack
   utility: [[3.15, 3.875, -5.85, -5.125], [1.3, 2.3, -6.575, -5.9], [2.25, 3.55, -6.575, -6.05], [2.1, 3.15, -5.7, -5.125]], // fridge, litter box, clothes rack, trash bags
   garage: [[0.875, 1.375, -9.55, -8.05], [3.05, 3.875, -9.55, -8.2], [1.4, 3.2, -9.55, -9.15], [1.7, 3.875, -7.225, -6.825]], // camping shelves, table, bike, tool shelves
@@ -946,6 +952,122 @@ function buildCatalogue() {
   C.mugBlue.breaks = ['shardBlue', 'shardBlue', 'shardBlue'];
   C.mugYellow.breaks = ['shardYellow', 'shardYellow', 'shardYellow'];
   C.mugWhite.breaks = ['shard', 'shardB', 'shard'];
+  // the blue fruit bowl on the counter across the back
+  const fruitProf = [[0.001, 0], [0.08, 0], [0.15, 0.06], [0.145, 0.065], [0.077, 0.006], [0.001, 0.006]].map(([r, y]) => new THREE.Vector2(r, y));
+  C.fruitBowl = item(new THREE.LatheGeometry(fruitProf, 24), mat(0x2a5bd7, { roughness: 0.3, side: THREE.DoubleSide }));
+  C.fruitBowl.breaks = ['shardBlue', 'shardBlue', 'shardBlue', 'shardBlue'];
+
+  // Plants in pots, on the counter across the back. They smash when they fall:
+  // the pot breaks into shards, and the soil and the plant lie where they land.
+  const potM = mat(0xffffff, { roughness: 0.85, side: THREE.DoubleSide });
+  const terracotta = mat(0xc0643c, { roughness: 0.85, side: THREE.DoubleSide });
+  const whitePot = mat(0xe9e4da, { roughness: 0.6, side: THREE.DoubleSide });
+  const soilM = mat(0x4a3322, { roughness: 1 });
+  const leafM = mat(0x3f8f3a, { roughness: 0.8 });
+  const darkLeaf = mat(0x2f6b2a, { roughness: 0.8 });
+  // an open pot with soil in it (its bottom 3 mm up, so it doesn't flicker against the counter)
+  const pot = (r, h, m) => [
+    [at(Cyl(r, r * 0.78, h, 14, true), 0, h / 2, 0), m],
+    [new THREE.CircleGeometry(r * 0.78, 14).rotateX(Math.PI / 2).translate(0, 0.003, 0), m],
+    [new THREE.CircleGeometry(r * 0.95, 14).rotateX(-Math.PI / 2).translate(0, h - 0.015, 0), soilM],
+  ];
+  /** A leaf: a flat ellipsoid `len` long, pointing out at angle `a`, tilted up by `up`, its base at height y. */
+  const leaf = (len, wide, a, up, y, m = leafM, from = 0.02) => [
+    Sph(len / 2, 1, 0.09, wide / len).translate(len / 2, 0, 0).rotateZ(up).rotateY(a).translate(Math.cos(a) * from, y, -Math.sin(a) * from),
+    m,
+  ];
+  C.plantBig = parts([
+    ...pot(0.1, 0.2, terracotta),
+    ...[0, 1, 2, 3, 4, 5, 6].map((i) => leaf(0.24, 0.13, i * 0.9, 0.35 + (i % 3) * 0.3, 0.2 + (i % 4) * 0.06, i % 2 ? leafM : darkLeaf)),
+    leaf(0.22, 0.12, 0.5, 1.25, 0.3, leafM, 0), leaf(0.2, 0.11, 3.6, 1.3, 0.28, darkLeaf, 0),
+  ]);
+  const cactusM = mat(0x5e9a4a, { roughness: 0.7 });
+  C.plantCactus = parts([
+    ...pot(0.055, 0.09, terracotta),
+    [at(new THREE.CapsuleGeometry(0.035, 0.14, 4, 10), 0, 0.18, 0), cactusM],
+    [at(new THREE.CapsuleGeometry(0.018, 0.05, 4, 8), 0.045, 0.2, 0, 0, 0, -0.5), cactusM],
+    [at(new THREE.CapsuleGeometry(0.016, 0.04, 4, 8), -0.04, 0.23, 0, 0, 0, 0.5), cactusM],
+  ]);
+  const basilM = mat(0x6abf4b, { roughness: 0.8 });
+  C.plantBasil = parts([
+    ...pot(0.065, 0.1, terracotta),
+    ...[[0, 0.16, 0, 0.05], [0.04, 0.14, 0.02, 0.04], [-0.035, 0.145, 0.025, 0.04], [0.01, 0.15, -0.04, 0.042], [-0.02, 0.19, -0.01, 0.038], [0.025, 0.19, 0.01, 0.035]]
+      .map(([x, y, z, r]) => [at(Sph(r, 1, 0.8, 1), x, y, z), basilM]),
+  ]);
+  // a trailing plant in a white pot, its long stems spilling over the rim onto the counter
+  C.plantPothos = parts([
+    ...pot(0.07, 0.11, whitePot),
+    [at(Sph(0.08, 1, 0.45, 1), 0, 0.12, 0), leafM],
+    ...[0.3, 1.9, 3.4, 4.9].flatMap((a) => {
+      const vine = new THREE.CatmullRomCurve3([[0.04, 0.13, 0], [0.09, 0.12, 0], [0.13, 0.07, 0], [0.16, 0.025, 0]].map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+      return [
+        [new THREE.TubeGeometry(vine, 8, 0.004, 5).rotateY(a), darkLeaf],
+        ...[0.4, 0.7, 1].map((t) => {
+          const p = vine.getPoint(t);
+          return [Sph(0.018, 1, 0.3, 0.7).translate(p.x, p.y, 0.012).rotateY(a), leafM];
+        }),
+      ];
+    }),
+  ]);
+  // an orchid: two broad leaves, and a curving stem of pink flowers
+  const orchidPink = mat(0xe86fa0, { roughness: 0.6 });
+  const stemM = mat(0x6b7d3a, { roughness: 0.7 });
+  C.plantOrchid = parts([
+    ...pot(0.055, 0.1, whitePot),
+    leaf(0.16, 0.07, 0.4, 0.25, 0.1, darkLeaf, 0), leaf(0.15, 0.07, 3.5, 0.3, 0.1, darkLeaf, 0),
+    [at(Cyl(0.003, 0.003, 0.3, 6), 0, 0.24, 0), stemM],
+    ...[[0.02, 0.4], [0.055, 0.39], [0.085, 0.37], [0.11, 0.34], [0.13, 0.305]].map(([x, y]) => [at(Sph(0.022, 1, 1, 0.45), x, y, 0.004), orchidPink]),
+  ]);
+  // a glass vase of tulips
+  const tulipHead = () => Cyl(0.022, 0.014, 0.05, 8);
+  const tulipColors = [0xd8312a, 0xf6d04d, 0xf59a23, 0xe86fa0];
+  C.tulips = parts([
+    [Cyl(0.048, 0.042, 0.18, 14, true).translate(0, 0.09, 0), glassM],
+    [new THREE.CircleGeometry(0.042, 14).rotateX(Math.PI / 2).translate(0, 0.003, 0), glassM],
+    ...[0, 1, 2, 3, 4, 5, 6].flatMap((i) => {
+      const a = i * 0.9;
+      const lean = i ? 0.22 : 0;
+      const L = 0.28 + (i % 3) * 0.025; // the stem's length
+      const dir = new THREE.Vector3(Math.cos(a) * Math.sin(lean), Math.cos(lean), -Math.sin(a) * Math.sin(lean));
+      const head = dir.clone().multiplyScalar(L + 0.02).add(new THREE.Vector3(0, 0.01, 0));
+      return [
+        [Cyl(0.0035, 0.0035, L, 5).translate(0, L / 2, 0).rotateZ(-lean).rotateY(a).translate(0, 0.01, 0), stemM],
+        [tulipHead().rotateZ(-lean).rotateY(a).translate(head.x, head.y, head.z), mat(tulipColors[i % 4], { roughness: 0.5 })],
+      ];
+    }),
+  ]);
+  // what's left of them once they've smashed
+  C.potPiece = item(flat([[0, 0], [0.06, 0.01], [0.05, 0.045], [0.008, 0.05]], 0.006), potM);
+  C.potShard = tint('potPiece', 0xc0643c);
+  C.potShardWhite = tint('potPiece', 0xe9e4da);
+  C.soil = item(heap(0.06, 1, 0.3, 0.8, 3), mat(0x4a3322, { roughness: 1, flatShading: true }));
+  C.leafTuft = item(heap(0.09, 1, 0.55, 0.9, 5), mat(0x3f8f3a, { roughness: 0.8, flatShading: true }));
+  C.herbTuft = item(heap(0.05, 1, 0.6, 0.9, 8), mat(0x6abf4b, { roughness: 0.8, flatShading: true }));
+  C.cactusBit = item(new THREE.CapsuleGeometry(0.035, 0.14, 4, 10).rotateZ(Math.PI / 2), cactusM);
+  C.orchidFlower = item(Sph(0.022, 1, 0.45, 1), orchidPink);
+  C.tulip = item(tulipHead().rotateZ(Math.PI / 2), mat(0xffffff, { roughness: 0.5 })); // a flower head, its stem snapped off
+  C.tulipRed = tint('tulip', 0xd8312a);
+  C.tulipYellow = tint('tulip', 0xf6d04d);
+  C.tulipOrange = tint('tulip', 0xf59a23);
+  C.plantBig.breaks = ['potShard', 'potShard', 'potShard', 'soil', 'leafTuft', 'leafTuft'];
+  C.plantCactus.breaks = ['potShard', 'potShard', 'soil', 'cactusBit'];
+  C.plantBasil.breaks = ['potShard', 'potShard', 'soil', 'herbTuft'];
+  C.plantPothos.breaks = ['potShardWhite', 'potShardWhite', 'potShardWhite', 'soil', 'leafTuft'];
+  C.plantOrchid.breaks = ['potShardWhite', 'potShardWhite', 'soil', 'orchidFlower', 'orchidFlower', 'orchidFlower'];
+  C.tulips.breaks = ['shardGlass', 'shardGlass', 'shardGlass', 'tulipRed', 'tulipYellow', 'tulipOrange', 'tulipRed'];
+
+  // the coffee machine on the counter under the hanging cupboard, its front (+x) to the kitchen
+  const machineM = mat(0x26262b, { roughness: 0.35 });
+  const chromeM = mat(0xc9ced3, { roughness: 0.25, metalness: 0.7 });
+  C.coffeeMachine = parts([
+    [at(Box(0.28, 0.025, 0.22), 0.01, 0.0125, 0), machineM], // the foot, with the drip tray
+    [at(Box(0.16, 0.32, 0.22), -0.05, 0.185, 0), machineM], // the body, the water tank at the back
+    [at(Box(0.13, 0.07, 0.2), 0.09, 0.305, 0), machineM], // the head, over the cup
+    [at(Box(0.004, 0.05, 0.16), 0.157, 0.305, 0), chromeM], // its front panel
+    [at(Cyl(0.012, 0.009, 0.03, 8), 0.1, 0.255, 0), chromeM], // the spout
+    [at(Box(0.1, 0.006, 0.16), 0.08, 0.028, 0), chromeM], // the drip grid
+    [at(Cyl(0.012, 0.012, 0.004, 10), 0.1605, 0.32, 0.05, 0, 0, Math.PI / 2), mat(0x3fae3a, { emissive: 0x1d5a1a })], // the "on" light, standing out of the panel
+  ]);
   const pizzaLid = canvasTexture(128, 128, (g) => { g.fillStyle = '#d9b48a'; g.fillRect(0, 0, 128, 128); g.fillStyle = 'rgba(120,70,20,0.35)'; g.beginPath(); g.ellipse(84, 80, 22, 15, 0.5, 0, TAU); g.fill(); g.fillStyle = '#c0392b'; circle(g, 64, 54, 28); g.fill(); label(g, 'PIZZA', 64, 56, 48, 18, '#ffffff'); label(g, 'LEKKER WARM!', 64, 104, 100, 14, '#c0392b'); });
   C.pizzaBox = { w: 0.33, h: 0.04, d: 0.33, look: () => { const b = mat(0xd9b48a); return { geo: Box(0.33, 0.04, 0.33), material: [b, b, texMat(pizzaLid), b, b, b] }; } };
   C.afwas = { shape: 'bottle', r: 0.04, h: 0.24, body: '#3fae3a', cap: '#ffffff', face: { bg: '#ffffff', fg: '#2e8b57', text: 'AFWAS' } };
@@ -1089,9 +1211,10 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     [0, -3.62, -2.9, -2.35, -1.15, 0.52], // the couch's chaise end
     [0, 1.9, 3.0, -2.2, -0.3, 0.78], // dining table
     [0, 1.85, 3.55, 0.55, 1.12, 1.25], // piano
+    [0, TOY_CABINET.x0, TOY_CABINET.x1, TOY_CABINET.z0, TOY_CABINET.z1, TOY_CABINET.top], // the toy cabinet beside it
     [0, -0.31, 3.875, 4.2, 4.875, 0.9], // kitchen counter along the front
-    [0, 3.2, 3.875, 1.85, 4.2, 0.9], // ... along the right wall
-    [0, 0.93, 3.875, 1.18, 1.85, 0.9], // ... and across the back
+    [0, 3.2, 3.875, 1.875, 4.2, 0.9], // ... along the right wall
+    [0, 0.93, 3.875, 1.18, 1.875, 0.9], // ... and across the back
     [0, 3.15, 3.875, -5.85, -5.125, 1.95], // fridge
     [0, 3.05, 3.855, -9.5, -8.2, 0.85], // the garage table
     [1, -2.67, -0.59, 0.6, 2.4, 0.61], // bed
@@ -1195,6 +1318,9 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   // the piano: sheet music and a forgotten mug
   put(living, 'paper', 2.3, 1.25, 0.85, { yaw: 0.1 });
   put(living, 'mugWhite', 3.25, 1.25, 0.8);
+  // on top of the toy cabinet beside it
+  put(living, 'carYellow', 1.3, TOY_CABINET.top, 0.95, { yaw: 0.4 });
+  put(living, 'teddy', 1.58, TOY_CABINET.top, 1.0, { yaw: -Math.PI / 2 - 0.3 });
   // toys, toys, toys
   const toys = ['blockA', 'blockB', 'blockC', 'blockD', 'brickRed', 'brickBlue', 'brickYellow', 'brickWhite', 'carRed', 'carBlue', 'crayonRed', 'crayonGreen'];
   strew(living, toys, 34, { how: lying });
@@ -1222,14 +1348,16 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   // ---------------------------------------------------------------- kitchen
   const kitchen = 'kitchen';
   // the counters: piles of dirty dishes, pans, bottles and jars
-  pile(kitchen, 'plate', 3.55, 0.9, 2.3, 6);
-  pile(kitchen, 'plateB', 3.55, 0.9, 2.75, 4);
+  // the coffee machine, at the left end of the counter under the hanging cupboard, a mug under its spout
+  const coffee = put(kitchen, 'coffeeMachine', 3.62, 0.9, 2.12, { yaw: Math.PI });
+  put(kitchen, 'mugWhite', 3.52, 0.931, 2.12, { on: coffee });
+  pile(kitchen, 'plate', 3.55, 0.9, 2.5, 6);
+  pile(kitchen, 'plateB', 3.55, 0.9, 2.82, 4);
   pile(kitchen, 'bowl', 3.5, 0.9, 3.2, 3, { jitter: 0.02 });
-  pile(kitchen, 'plateC', 1.24, 0.9, 1.5, 5);
   put(kitchen, 'pot', 0.0, 0.912, 4.43); // on the hob
   put(kitchen, 'pan', 0.4, 0.912, 4.67, { yaw: Math.PI + 0.3 });
-  for (const [id, x, z] of [['mugWhite', 3.31, 1.5], ['glass', 1.76, 1.55], ['mugBlue', 3.5, 3.7]]) put(kitchen, id, x, 0.9, z);
-  for (const [x, z] of [[2.91, 1.55], [3.08, 1.45], [3.55, 3.95]]) put(kitchen, 'cutlery', x, 0.9, z);
+  put(kitchen, 'mugBlue', 3.5, 0.9, 3.7);
+  put(kitchen, 'cutlery', 3.55, 0.9, 3.95);
   // The washing-up nobody has done, heaped on the counter either side of the
   // sink and in it: towers of dirty plates with bowls, mugs and glasses on
   // top, more mugs and glasses in between. Lennie landing in it smashes the lot (products.js).
@@ -1266,11 +1394,28 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     put(kitchen, 'allesreiniger', 1.18, Y, 4.8);
     for (const [x, z, yaw] of [[0.95, 4.27, 0.3], [0.75, 4.3, 2.0]]) put(kitchen, 'cutlery', x, Y, z, { yaw });
   }
-  // breakfast things on the counter across the back
-  put(kitchen, 'witbrood', 1.93, 0.9, 1.55, { yaw: -Math.PI / 2 });
-  put(kitchen, 'melk', 2.1, 0.9, 1.5);
-  put(kitchen, 'pindakaas', 2.33, 0.9, 1.6);
-  put(kitchen, 'hagelslag', 2.51, 0.9, 1.45, { yaw: -Math.PI / 2 });
+  // The counter across the back, between the kitchen and the living room, is
+  // full: plants and tulips along the living room side, the breakfast things
+  // and the dishes along the kitchen side. The plants' pots, the vase and the
+  // fruit bowl smash when they fall (products.js).
+  {
+    const Y = 0.9;
+    for (const [id, x, z] of [['plantBig', 1.1, 1.36], ['tulips', 1.5, 1.32], ['plantOrchid', 2.2, 1.3], ['plantCactus', 2.95, 1.29], ['plantBasil', 3.22, 1.32], ['plantPothos', 3.6, 1.36]]) put(kitchen, id, x, Y, z);
+    put(kitchen, 'magazine', 1.86, Y, 1.38, { yaw: 1.45 });
+    const fruit = put(kitchen, 'fruitBowl', 2.6, Y, 1.4);
+    for (const [id, dx, dz, dy] of [['appel', -0.08, -0.04, 0.006], ['sinaasappel', 0.08, -0.03, 0.006], ['peer', 0, 0.08, 0.006], ['citroen', 0.0, -0.01, 0.1]]) put(kitchen, id, 2.6 + dx, Y + dy, 1.4 + dz, { on: fruit });
+    pile(kitchen, 'plateC', 1.2, Y, 1.68, 5);
+    put(kitchen, 'glass', 1.45, Y, 1.72);
+    put(kitchen, 'witbrood', 1.72, Y, 1.66, { yaw: -Math.PI / 2 });
+    put(kitchen, 'melk', 1.98, Y, 1.7);
+    put(kitchen, 'pindakaas', 2.17, Y, 1.66);
+    put(kitchen, 'hagelslag', 2.36, Y, 1.7, { yaw: -Math.PI / 2 });
+    put(kitchen, 'mugWhite', 2.62, Y, 1.7);
+    for (const [x, z, yaw] of [[2.82, 1.72, 0.3], [2.97, 1.6, 1.2]]) put(kitchen, 'cutlery', x, Y, z, { yaw });
+    put(kitchen, 'koffiepads', 3.25, Y, 1.66, { yaw: 0.2 });
+    put(kitchen, 'snoepmix', 3.52, Y, 1.66, { yaw: 1.4, ...onFace('snoepmix') });
+    put(kitchen, 'phone', 3.75, Y, 1.62, { yaw: 0.3 });
+  }
   // the floor
   put(kitchen, 'pizzaBox', 1.15, 0, 3.4, { yaw: 0.3 });
   put(kitchen, 'pizzaBox', 1.19, 0.04, 3.38, { yaw: 0.6 });
@@ -1461,6 +1606,8 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   const tvCabinet = buildTVCabinet();
   // ---------------------------------------------------------------- the kitchen's hanging cupboard, full of crockery
   const wallCupboard = buildWallCupboard();
+  // ---------------------------------------------------------------- the toy cabinet beside the piano
+  buildToyCabinet();
   // ---------------------------------------------------------------- the storage cupboard under the stairs, stuffed full
   const storage = buildStorage();
 
@@ -1713,7 +1860,7 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     }
 
     solid.surface.tally = 'toys';
-    solid.surface.mess = ['Toy avalanche!', 'Toy story!', 'Playtime!', 'Who put all that in there?', 'Tidy up time!'];
+    solid.surface.mess = TOY_MESS;
     solid.surface.onHit = (point, v, push) => {
       // only a hit on the front counts, coming at it more sideways than down (its top
       // edge too); dropping onto the top, by the TV, leaves the doors shut
@@ -1762,24 +1909,25 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     return { update, reset };
   }
 
-  // The hanging cupboard on the kitchen's side wall, above the counter: four
-  // blue doors, and behind them the clean plates, bowls, mugs and glasses and
-  // the breakfast things. Crash Lennie into a door hard enough (from the front
+  // The hanging cupboard on the kitchen's side wall, above the counter, all
+  // the way up to the ceiling: four white doors with glass panes, and behind
+  // them, on three levels, the clean plates, bowls, mugs and glasses and the
+  // breakfast things. Crash Lennie into a door hard enough (from the front
   // or from below) and it flies off into the kitchen, and what's behind it
   // comes tumbling down onto the counter and the floor, where the crockery
   // smashes; a really hard hit takes the doors next to it along. Once a door
   // is off, the next knock brings down more. "Fix everything" puts it all back.
   function buildWallCupboard() {
     const k = 0;
-    const [X0, X1, Y0, Y1, Z0, Z1] = [3.525, 3.875, 1.5, 2.25, 1.9, 4.875]; // against the right-hand wall
+    const [X0, X1, Y0, Y1, Z0, Z1] = [3.525, 3.875, 1.5, 2.595, 1.9, 4.875]; // against the right-hand wall, its top 5 mm under the ceiling (2.6)
     const T = 0.018; // the carcass's boards
     const DOOR_T = 0.016;
     const W = (Z1 - Z0) / 4; // one door, and the compartment behind it
-    const SHELF = 1.86; // the middle shelf's underside
+    const SHELVES = [1.86, 2.225]; // the two shelves' undersides
     const BREAK = 5; // m/s: a hit this hard sends a door flying
     const ALL = 10; // ... and this hard, the doors next to it too
     const OUT = new THREE.Vector3(-1, 0, 0);
-    const blue = std({ color: 0x5d8fb3, roughness: 0.55 });
+    const blue = std({ color: 0xf2f0eb, roughness: 0.5 }); // (white now, like the rest of the kitchen)
     const inside = std({ color: 0xe9e6df, roughness: 0.7 });
     const b = (min, max, m) => box(min, max, m, { story: k, cast: true });
     // the boards fit between each other, so no two faces lie in one plane
@@ -1793,13 +1941,14 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     for (let i = 0; i < 4; i++) {
       const a = i ? Z0 + i * W + 0.008 : Z0 + T;
       const c = i < 3 ? Z0 + (i + 1) * W - 0.008 : Z1 - T;
-      b([X0 + 0.015, SHELF, a], [BACK, SHELF + 0.015, c], inside); // the middle shelf, set back a little
+      for (const y of SHELVES) b([X0 + 0.015, y, a], [BACK, y + 0.015, c], inside); // the shelves, set back a little
     }
     const solid = body([X0 - DOOR_T, Y0, Z0], [X1, Y1, Z1], physMats.hard, { kind: 'furniture' });
 
-    // what's inside, on the bottom (LOW) and on the middle shelf (MID) of each compartment
+    // what's inside, on the bottom (LOW), the middle shelf (MID) and the top shelf (HIGH) of each compartment
     const LOW = Y0 + T;
-    const MID = SHELF + 0.015;
+    const MID = SHELVES[0] + 0.015;
+    const HIGH = SHELVES[1] + 0.015;
     const XM = (X0 + BACK) / 2;
     const secs = [0, 1, 2, 3].map(() => {
       const sec = stocks[k].section({ bounds: ROOMS.kitchen, floorY: 0.012, k, name: 'kitchen', fresh: false });
@@ -1839,16 +1988,37 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     inCupboard(3, 'thee', XM, MID, zOf(3, 0.42), { yaw: -Math.PI / 2 });
     inCupboard(3, 'muisjesRoze', XM, MID, zOf(3, 0.62), { yaw: -Math.PI / 2 });
     inCupboard(3, 'jam', XM, MID, zOf(3, 0.82));
+    // and up top, the things nobody can reach: the good plates and glasses, more bowls, the coffee
+    stack(0, 'plateClean', XM, HIGH, zOf(0, 0.28), 6);
+    for (let j = 0; j < 3; j++) inCupboard(0, 'glassClean', XM, HIGH, zOf(0, 0.58 + j * 0.15));
+    for (let j = 0; j < 4; j++) inCupboard(1, 'glassClean', X0 + 0.07, HIGH, zOf(1, 0.14 + j * 0.24));
+    stack(1, 'bowlClean', BACK - 0.08, HIGH, zOf(1, 0.5), 4);
+    for (let j = 0; j < 4; j++) inCupboard(2, mugs[j], XM, HIGH, zOf(2, 0.14 + j * 0.24));
+    inCupboard(3, 'koffie', XM, HIGH, zOf(3, 0.2), { yaw: -Math.PI / 2 });
+    inCupboard(3, 'koffiepads', XM, HIGH, zOf(3, 0.48), { yaw: -Math.PI / 2 });
+    stack(3, 'bowlClean', XM, HIGH, zOf(3, 0.78), 3);
 
-    // the doors: blue, a little lighter than the carcass, with a steel handle along the bottom
-    const doorMat = std({ color: 0x6b9cc0, roughness: 0.5 });
+    // The doors: a white frame round a pane of glass, so you see the crockery
+    // behind it, and a steel handle along the bottom. The pane sits in the
+    // middle of the frame's thickness and reaches 2 mm into it all round.
+    const doorMat = std({ color: 0xf8f7f3, roughness: 0.45 });
+    const glassMat = std({ color: 0xdff1ff, roughness: 0.05, transparent: true, opacity: 0.22, depthWrite: false });
     const steel = std({ color: 0x9aa3ad, roughness: 0.35, metalness: 0.5 });
     const DOOR_H = Y1 - Y0 - 0.01;
+    const DW = W - 0.008;
+    const [STILE, RAIL, FOOT] = [0.055, 0.06, 0.09]; // the frame's sides, top and bottom
+    const v2 = (pts) => pts.map(([u, v]) => new THREE.Vector2(u, v));
+    const outline = new THREE.Shape(v2([[-DW / 2, -DOOR_H / 2], [DW / 2, -DOOR_H / 2], [DW / 2, DOOR_H / 2], [-DW / 2, DOOR_H / 2]]));
+    outline.holes.push(new THREE.Path(v2([[-DW / 2 + STILE, -DOOR_H / 2 + FOOT], [-DW / 2 + STILE, DOOR_H / 2 - RAIL], [DW / 2 - STILE, DOOR_H / 2 - RAIL], [DW / 2 - STILE, -DOOR_H / 2 + FOOT]])));
+    // extruded along z, then turned so its width runs along z and its thickness along x
+    const frameGeo = new THREE.ExtrudeGeometry(outline, { depth: DOOR_T, bevelEnabled: false }).translate(0, 0, -DOOR_T / 2).rotateY(Math.PI / 2);
+    const paneGeo = new THREE.BoxGeometry(0.004, DOOR_H - FOOT - RAIL + 0.004, DW - 2 * STILE + 0.004).translate(0, (FOOT - RAIL) / 2, 0);
     const doors = [0, 1, 2, 3].map((i) => {
       const zc = Z0 + (i + 0.5) * W;
       const group = new THREE.Group();
       group.rotation.order = 'YXZ'; // when it falls: tipped over (z) first, then turned (y)
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(DOOR_T, DOOR_H, W - 0.008), doorMat);
+      const panel = new THREE.Mesh(frameGeo, doorMat);
+      group.add(new THREE.Mesh(paneGeo, glassMat));
       const handle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.14), steel);
       handle.position.set(-DOOR_T / 2 - 0.01, -DOOR_H / 2 + 0.045, 0);
       for (const m of [panel, handle]) {
@@ -1926,6 +2096,62 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     }
 
     return { update, reset };
+  }
+
+  // The little toy cabinet in the living room, beside the piano with its back
+  // against the kitchen counter: white, open at the front, four cubbies with a
+  // mint back, crammed with toys. Crash into it and the toys near the hit
+  // come tumbling out into the room ("Fix everything" puts them back).
+  function buildToyCabinet() {
+    const k = 0;
+    const { x0: X0, x1: X1, z0: Z0, z1: Z1, top: TOP } = TOY_CABINET;
+    const T = 0.018;
+    const PLINTH = 0.05;
+    const MIDY = 0.33; // the middle shelf's underside
+    const XM = (X0 + X1) / 2;
+    const BACK = Z1 - 0.012; // the back panel's front
+    const white = std({ color: 0xf4f2ee, roughness: 0.5 });
+    const mint = std({ color: 0x8fd3c1, roughness: 0.6 });
+    const b = (min, max, m) => box(min, max, m, { story: k, cast: true });
+    // the boards fit between each other, so no two faces lie in one plane
+    b([X0, 0, Z0], [X1, PLINTH, Z1], white); // plinth and bottom
+    b([X0, TOP - T, Z0], [X1, TOP, Z1], white); // the top
+    b([X0, PLINTH, Z0], [X0 + T, TOP - T, Z1], white); // the sides
+    b([X1 - T, PLINTH, Z0], [X1, TOP - T, Z1], white);
+    b([X0 + T, PLINTH, BACK], [X1 - T, TOP - T, Z1], mint); // the back
+    b([XM - T / 2, PLINTH, Z0 + 0.006], [XM + T / 2, TOP - T, BACK], white); // the divider, set back a little
+    for (const [a, c] of [[X0 + T, XM - T / 2], [XM + T / 2, X1 - T]]) b([a, MIDY, Z0 + 0.003], [c, MIDY + T, BACK], white); // the shelf, either side of it
+    const solid = body([X0, 0, Z0], [X1, TOP, Z1], physMats.hard, { kind: 'furniture' });
+
+    // the toys, in a section of their own that only a crash into the cabinet knocks
+    // (it reaches back to the cabinet's back, past the living room's edge at the counter)
+    const sec = stocks[k].section({ bounds: { ...ROOMS.living, z1: BACK - 0.01 }, floorY: 0.012, k, name: 'toycabinet', fresh: false });
+    sections[k].push(sec);
+    const inside = (id, x, y, z, opts = {}) => stocks[k].place(id, x, y, z, opts.yaw ?? rnd() * TAU, sec, 0, opts);
+    const L = (X0 + T + XM - T / 2) / 2; // the middle of the left cubbies
+    const R = (XM + T / 2 + X1 - T) / 2;
+    const UP = MIDY + T;
+    // bottom left: the teddy, and a car in front of it
+    inside('teddy', L, PLINTH, 1.04, { yaw: Math.PI / 2 + 0.2 });
+    inside('carRed', L + 0.02, PLINTH, 0.88, { yaw: 0.15 });
+    // bottom right: a tower of blocks at the back, a car in front
+    let below = null;
+    ['blockA', 'blockC', 'blockB'].forEach((id, i) => (below = inside(id, R - 0.04, PLINTH + i * 0.07, 1.06, { yaw: 0.25 * i, on: below })));
+    inside('carBlue', R + 0.03, PLINTH, 0.9, { yaw: -0.3 });
+    // top left: the duck and a heap of bricks
+    inside('duck', L - 0.05, UP, 1.03, { yaw: -Math.PI / 2 });
+    below = inside('brickRed', L + 0.06, UP, 0.95, { yaw: 0.4 });
+    inside('brickYellow', L + 0.06, UP + 0.038, 0.95, { yaw: 1.1, on: below });
+    inside('brickBlue', L - 0.03, UP, 0.88, { yaw: 2.0 });
+    // top right: the ball, a block and the crayons
+    inside('ball', R + 0.04, UP, 1.05);
+    inside('blockD', R - 0.06, UP, 0.92, { yaw: 0.5 });
+    for (const [id, dx] of [['crayonRed', -0.02], ['crayonGreen', 0.04]]) inside(id, R + dx, UP, 0.86, { yaw: 0.2 + dx * 8, ...tipped(id) });
+
+    const out = new THREE.Vector3(0, 0, -1);
+    solid.surface.tally = 'toys';
+    solid.surface.mess = TOY_MESS;
+    solid.surface.onHit = (point, strength, push) => stocks[k].knock(sec, point, out, strength, push, { radius: 0.5 + strength * 0.1, chance: 0.9, power: 1.1 });
   }
 
   // The storage cupboard under the stairs (house.js), stuffed with everything
