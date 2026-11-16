@@ -809,6 +809,88 @@ export class Sfx {
     }
   }
 
+  // ------------------------------------------------------------ the cat (cat.js)
+
+  /** A miaow, `volume` 0..1 (quieter further from the camera). */
+  meow(volume = 1) {
+    if (!this.ready) return;
+    const p = rand(0.9, 1.15);
+    this.#catVoice(this.ctx.currentTime, {
+      f: [600 * p, 920 * p, 560 * p], dur: rand(0.45, 0.7), peak: 0.32 * volume * this.#tire('meow', 3),
+      formants: [[420, 950, 480], [2200, 1500, 850]],
+    });
+  }
+
+  /** The cat puffing up and hissing at him. */
+  hiss(volume = 1) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const k = volume * this.#tire('hiss', 2);
+    this.#burst(t, { filter: 'bandpass', f: 600, Q: 1, peak: 0.25 * k, attack: 0.003, release: 0.04 }); // the spit
+    this.#burst(t + 0.02, { filter: 'highpass', f: rand(2600, 3200), to: rand(4200, 5200), glide: 0.5, Q: 0.7, peak: 0.3 * k, attack: 0.05, release: 0.65 });
+  }
+
+  /** A furious "MRRRAOW!" as it pounces. */
+  yowl() {
+    if (!this.ready) return;
+    const p = rand(0.9, 1.1);
+    this.#catVoice(this.ctx.currentTime, {
+      f: [360 * p, 640 * p, 300 * p], dur: rand(0.55, 0.75), peak: 0.38 * this.#tire('yowl', 2), wobble: 17,
+      formants: [[500, 1000, 420], [1400, 1700, 800]],
+    });
+  }
+
+  /** The cat flap swinging shut behind it: a soft plastic clack-clack. */
+  catFlap() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (const [dt, peak] of [[0, 0.12], [0.16, 0.07], [0.27, 0.04]]) {
+      this.#burst(t + dt, { filter: 'bandpass', f: rand(1300, 1700), Q: 4, peak, attack: 0.002, release: 0.035 });
+    }
+  }
+
+  /** A cat's voice: a buzzy tone gliding through f[0], f[1], f[2], through two mouth filters that glide too (m-i-a-ow). */
+  #catVoice(t, { f, dur, peak, wobble = 0, formants }) {
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(f[0], t);
+    osc.frequency.linearRampToValueAtTime(f[1], t + dur * 0.35);
+    osc.frequency.linearRampToValueAtTime(f[2], t + dur);
+    let vib = null;
+    if (wobble) {
+      vib = ctx.createOscillator();
+      const depth = ctx.createGain();
+      vib.frequency.value = wobble;
+      depth.gain.value = f[1] * 0.05;
+      vib.connect(depth).connect(osc.frequency);
+    }
+    const out = ctx.createGain();
+    const top = Math.max(peak, 0.0002);
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(top, t + 0.05);
+    out.gain.setValueAtTime(top, t + dur * 0.6);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    out.connect(this.master);
+    formants.forEach(([a, b, c], i) => {
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.Q.value = i === 0 ? 5 : 8;
+      bp.frequency.setValueAtTime(a, t);
+      bp.frequency.linearRampToValueAtTime(b, t + dur * 0.4);
+      bp.frequency.linearRampToValueAtTime(c, t + dur);
+      const g = ctx.createGain();
+      g.gain.value = i === 0 ? 0.9 : 0.4;
+      osc.connect(bp).connect(g).connect(out);
+    });
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
+    if (vib) {
+      vib.start(t);
+      vib.stop(t + dur + 0.05);
+    }
+  }
+
   // ------------------------------------------------------------ Lennie's voice
 
   /**

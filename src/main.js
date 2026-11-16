@@ -13,6 +13,7 @@ import { Zap } from './zap.js';
 import { Effects } from './effects.js';
 import { createTrolley } from './trolley.js';
 import { createCars } from './cars.js';
+import { createCat } from './cat.js';
 import { Challenges, CHALLENGES, CHALLENGE_BONUS } from './challenges.js';
 import { createSeeThrough } from './seethrough.js';
 import { combineScenery } from './batching.js';
@@ -300,6 +301,35 @@ const effects = new Effects({
     feat: (id) => { if (toss.state === 'flying' || toss.state === 'held') toss.fx.add(id); },
     free: () => !grab && !sling && !replay.playing,
     enabled: () => !replay.playing,
+  },
+});
+// The family's cat (cat.js), wandering about the house and the back garden:
+// toss Lennie near it and it attacks him.
+const catRay = { from: new CANNON.Vec3(), to: new CANNON.Vec3(), hit: new CANNON.RaycastResult() };
+const cat = createCat({
+  scene, house, ragdoll: lennie, effects, sfx,
+  hooks: {
+    pop: (position, text, cls) => popAt(position, text, cls),
+    feat: (id) => { if (toss.state === 'flying' || toss.state === 'held') toss.fx.add(id); },
+    free: () => !grab && !sling && !replay.playing,
+    enabled: () => !replay.playing,
+    flying: () => toss.state === 'flying' && !grab && !sling,
+    inside: (p) => house.isInside(p),
+    cameraDistance: (p) => camera.position.distanceTo(p),
+    /** True when no wall, door or furniture is between a and b. */
+    clear(a, b) {
+      catRay.from.set(a.x, a.y, a.z);
+      catRay.to.set(b.x, b.y, b.z);
+      catRay.hit.reset();
+      return !world.raycastClosest(catRay.from, catRay.to, SCENERY_ONLY, catRay.hit);
+    },
+    /** The height of whatever is under p (the ground if nothing is). */
+    ground(p) {
+      catRay.from.set(p.x, p.y + 0.2, p.z);
+      catRay.to.set(p.x, p.y - 30, p.z);
+      catRay.hit.reset();
+      return world.raycastClosest(catRay.from, catRay.to, SCENERY_ONLY, catRay.hit) ? catRay.hit.hitPointWorld.y : 0;
+    },
   },
 });
 const challenges = new Challenges();
@@ -610,6 +640,7 @@ const FX_BONUSES = [
   ['lamp', 'Bonked a lamp post!', 300],
   ['trolley', 'Trolley ride!', 500],
   ['scratched', 'Scratched by brambles!', 200],
+  ['cat', 'Cat attack!', 350],
 ];
 
 /** The feats of a toss, each with an id that challenges can look for. */
@@ -2120,6 +2151,7 @@ function dropLennie(level) {
   replay.stop(false);
   const p = level === SHOP_DROP ? shop.spawnPoint() : house.spawnPoint(level);
   effects.clear(); // (before he's moved: it lets go of anything holding him, frozen or stuck)
+  cat.release(); // (and the cat lets go of him)
   lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
   zap.clear();
   guard.forget();
@@ -3087,6 +3119,7 @@ function tick(dt, now) {
   updateShards(dt * timeScale);
   zap.update(dt * timeScale, !replay.playing);
   effects.update(dt * timeScale, !replay.playing);
+  cat.update(dt * timeScale);
   if (!replay.playing) {
     shop.update(dt * timeScale);
     house.update(dt * timeScale);
@@ -3101,7 +3134,7 @@ requestAnimationFrame(frame);
 // Handy for debugging from the console. advance() runs the game loop by hand,
 // e.g. when the tab is in the background and requestAnimationFrame is paused.
 window.lennie = {
-  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, effects, trolley, cars, replay,
+  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, effects, trolley, cars, cat, replay,
   advance(seconds) {
     for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60, performance.now());
   },

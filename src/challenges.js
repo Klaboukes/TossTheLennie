@@ -35,6 +35,7 @@ export const CHALLENGES = [
   { id: 'tree', text: 'Get Lennie stuck in a tree', test: (r) => r.ids.has('tree') },
   { id: 'car', text: 'Throw Lennie in front of a car', test: (r) => r.ids.has('car') },
   { id: 'brambles', text: 'Throw Lennie into the brambles', test: (r) => r.ids.has('scratched') || r.ids.has('brambles') },
+  { id: 'cat', text: 'Get Lennie attacked by the cat', test: (r) => r.ids.has('cat') },
   { id: 'hotplate', text: 'Sit Lennie on the hot cooker', test: (r) => r.ids.has('hotplate') },
   { id: 'paint', text: 'Give Lennie a paint job in the garage', test: (r) => r.ids.has('paint') },
   { id: 'hagelslag', text: 'Cover Lennie in hagelslag', test: (r) => r.ids.has('hagelslag') },

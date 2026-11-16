@@ -208,6 +208,7 @@ const NL = {
   'Get Lennie stuck in a tree': 'Laat Lennie vastzitten in een boom',
   'Throw Lennie in front of a car': 'Gooi Lennie voor een auto',
   'Throw Lennie into the brambles': 'Gooi Lennie in de bramen',
+  'Get Lennie attacked by the cat': 'Laat de poes Lennie aanvallen',
   'Sit Lennie on the hot cooker': 'Zet Lennie op het hete fornuis',
   'Give Lennie a paint job in the garage': 'Geef Lennie een verfbeurt in de garage',
   'Cover Lennie in hagelslag': 'Bestrooi Lennie met hagelslag',
@@ -351,6 +352,7 @@ const NL = {
   'Bonked a lamp post!': 'Tegen een lantaarnpaal!',
   'Trolley ride!': 'Winkelwagenritje!',
   'Scratched by brambles!': 'Opengekrast door bramen!',
+  'Cat attack!': 'Poezenaanval!',
   'Napping on the trampoline': 'Dutje op de trampoline',
   // landing spots (house.js, clutter.js, supermarket.js) and what pops up there
   'In the bath!': 'In bad!',
@@ -724,6 +726,16 @@ const NL = {
   'Ow ow ow!': 'Au au au!',
   'Thorny!': 'Doornig!',
   'Into the brambles!': 'De bramen in!',
+  // the cat (cat.js)
+  'Meow!': 'Miauw!',
+  'HISSSS!': 'SSSSSS!',
+  'Angry kitty!': 'Boze poes!',
+  'Claws out!': 'Klauwen uit!',
+  'MRRRAOW!': 'MRRRAUW!',
+  'Get it off!': 'Haal hem eraf!',
+  'Bad kitty!': 'Stoute poes!',
+  'Not the face!': 'Niet mijn gezicht!',
+  'Nice kitty... NOT!': 'Lieve poes... NIET!',
 };
 
 const DUTCH = new Set(Object.values(NL));

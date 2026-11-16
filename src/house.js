@@ -486,7 +486,37 @@ export function buildHouse(scene, world, physMats) {
         pane.userData.line = line; // like the windows' glass
         group.add(pane);
       }
-    } else {
+    }
+    let flap = null;
+    if (o.catFlap && o.glazed) { // (only a glass door has room for one, in its lower pane)
+      // A cat flap in the lower pane, for the cat (cat.js): a grey plastic
+      // frame round a hole, set in the glass, and a smoky flap hanging from the
+      // top of the hole that swings when the cat hops through. The frame is
+      // thicker than the glass and thinner than the glazing beads, and stops
+      // short of the beads below it, so none of its faces lie in one plane with theirs.
+      const [W, w] = [0.16, 0.12]; // half the frame's width, half the hole's
+      const [fy0, fy1] = [o.bottom + 0.215, o.bottom + 0.485]; // the frame's bottom and top
+      const [hy0, hy1] = [o.bottom + 0.24, o.bottom + 0.46]; // the hole's
+      M.flapFrame ??= std({ color: 0xd6d6d0, roughness: 0.5 });
+      M.flap ??= std({ color: 0x6f7880, roughness: 0.25 });
+      part(midA - W, midA + W, fy0, hy0, 0.05, M.flapFrame);
+      part(midA - W, midA + W, hy1, fy1, 0.05, M.flapFrame);
+      part(midA - W, midA - w, hy0, hy1, 0.05, M.flapFrame);
+      part(midA + w, midA + W, hy0, hy1, 0.05, M.flapFrame);
+      const pivot = new THREE.Group();
+      const [hinge] = extents(run, at, midA, midA, hy1, hy1, 0);
+      pivot.position.set(...hinge).sub(center);
+      const [fmin, fmax] = extents(run, at, midA - w + 0.004, midA + w - 0.004, hy0 + 0.004, hy1 - 0.003, 0.008);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(fmax[0] - fmin[0], fmax[1] - fmin[1], fmax[2] - fmin[2]), lineMat(line, M.flap));
+      plate.position.set((fmin[0] + fmax[0]) / 2, (fmin[1] + fmax[1]) / 2, (fmin[2] + fmax[2]) / 2).sub(center).sub(pivot.position);
+      plate.userData.catFlap = true; // it swings, so it isn't glued to the rest of the door (batching.js)
+      pivot.add(plate);
+      group.add(pivot);
+      // swing(d): the flap's bottom pushed out d (−1..1) along the door's normal
+      const sign = run === 'x' ? -1 : 1;
+      flap = { pivot, swing: (d) => (run === 'x' ? (pivot.rotation.x = sign * d * 1.2) : (pivot.rotation.z = sign * d * 1.2)) };
+    }
+    if (!o.glazed) {
       part(o.a + 0.01, o.b - 0.01, o.bottom + 0.01, o.top - 0.01, 0.06, slab);
       // raised panels on both faces
       part(o.a + 0.14, o.b - 0.14, o.bottom + 1.15, o.top - 0.16, 0.08, o.front && !o.leaf ? M.frontDoorGlass : panel);
@@ -509,6 +539,7 @@ export function buildHouse(scene, world, physMats) {
       width: o.b - o.a,
       height: o.top - o.bottom,
       body: null,
+      flap, // its cat flap, if it has one
     };
     door.body = body(pmin, pmax, physMats.hard, { kind: 'door', piece: door });
     doors.push(door);
@@ -587,7 +618,7 @@ export function buildHouse(scene, world, physMats) {
     });
     wall({
       ...common, run: 'x', at: HOUSE.z0, from: OUT.x0, to: OUT.x1, physOffset: -off, outward: -1, line: `north-${k}`,
-      openings: k === 0 ? [...BACK_GROUND.map(win), door(UTILITY_DOOR, false, true)] : BACK.map(win),
+      openings: k === 0 ? [...BACK_GROUND.map(win), { ...door(UTILITY_DOOR, false, true), catFlap: true }] : BACK.map(win),
       mats: { pos: (x) => wallpaper(roomAt(x, IN.z0 + 0.1)), neg: M.brick, ends: M.brick },
     });
     wall({
@@ -820,7 +851,7 @@ export function buildHouse(scene, world, physMats) {
     });
     wall({
       ...ext, run: 'z', at: U.x0, from: zi, to: OUT.z0, physOffset: -off, outward: -1, line: 'utility-w',
-      openings: [{ a: -6.35, b: -5.3, bottom: 0, top: DOOR_TOP, slack: DOOR_SLACK, glazed: true }],
+      openings: [{ a: -6.35, b: -5.3, bottom: 0, top: DOOR_TOP, slack: DOOR_SLACK, glazed: true, catFlap: true }], // the garden door, with a cat flap
       mats: { pos: paper, neg: M.brick, ends: M.brick },
     });
     wall({
@@ -1762,6 +1793,7 @@ export function buildHouse(scene, world, physMats) {
         piece.cracked = false;
         piece.group.position.copy(piece.center);
         piece.group.rotation.set(0, 0, 0);
+        piece.flap?.swing(0);
       }
       if (!piece.broken) continue;
       piece.broken = false;

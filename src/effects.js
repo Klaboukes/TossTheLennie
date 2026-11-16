@@ -12,6 +12,7 @@
 //    cloud and buzzing flies, until he's washed
 //  - the paint tins in the garage: his hoodie gets painted, until R
 //  - the brambles behind the trampoline: scratches, and an ouch
+//  - the cat (cat.js does the attack): scratches where it clings, and its fur flying
 // In the supermarket and the street:
 //  - a smashed freezer (or the open snack freezer): he freezes solid, stiff
 //    as a plank, then thaws, shivering with chattering teeth
@@ -70,6 +71,7 @@ const FROST = [0xffffff, 0xe6f7ff, 0xbfe6ff];
 const FEATHERS = [0xffffff, 0xfbf6ea, 0xf2ece0];
 const PEPERNOTEN = [0xa0632e, 0x8a5226, 0xb87a3d];
 const SCRATCHES = [0xc0392b, 0xa93226, 0xd9534f];
+const CAT_FUR = [0x55555c, 0x606067, 0xf3f1ec, 0xeceae4]; // the cat's (cat.js): grey-black and white
 
 // What pops up (each list says one at random).
 const LINES = {
@@ -802,6 +804,19 @@ export class Effects {
       this.sfx.voice('hit');
     }
     if (v > 2) this.hooks.feat('scratched');
+  }
+
+  /** The cat's claws (cat.js), on body part `part` at `point`: red scratches there, and tufts of its fur floating off. */
+  clawed(part, point) {
+    if (!this.hooks.enabled()) return;
+    this.sfx.scratch();
+    const old = this.bitList.filter((b) => b.kind === 'scratch');
+    if (old.length > MAX_SCRATCHES - 2) this.bitList.splice(this.bitList.indexOf(old[0]), 1);
+    for (let i = 0; i < 2; i++) {
+      part.body.pointToLocalFrame(_cv.set(point.x + rand(-0.06, 0.06), point.y + rand(-0.06, 0.06), point.z + rand(-0.06, 0.06)), _cv);
+      this.#stick({ part, local: new THREE.Vector3(_cv.x, _cv.y, _cv.z), size: new THREE.Vector3(rand(0.06, 0.1), 0.004, 0.008), color: pick(SCRATCHES), kind: 'scratch', flat: true });
+    }
+    this.#burst(3, point, { colors: CAT_FUR, size: [0.02, 0.035], shape: [1, 0.5, 1], speed: [0.3, 1.2], up: [0.4, 1.4], life: [1.5, 2.5], mode: 'float', spread: 0.1 });
   }
 
   #ride() {
