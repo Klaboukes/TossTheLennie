@@ -997,7 +997,8 @@ const splinterMat = (color) => {
 };
 
 function smash(piece) {
-  (piece.owner ?? house).breakPiece(piece);
+  // what was behind it, if it all came pouring out (the storage cupboard)
+  const spilled = (piece.owner ?? house).breakPiece(piece);
   const door = piece.kind === 'door';
   if (door) sfx.splinter();
   else sfx.crash();
@@ -1027,6 +1028,12 @@ function smash(piece) {
   }
   popAt(piece.center.clone().addScaledVector(piece.normal, 0.6 * travel), door ? 'CRASH!' : 'SMASH!', 'big');
   lennie.setExpression('ouch', 1);
+  if (spilled?.n) {
+    if (toss.state === 'flying' || toss.state === 'held') toss.mess += spilled.n;
+    sfx.clatter(Math.min(spilled.n, 6));
+    lastMessAt = performance.now();
+    popAt(piece.center.clone().setY(piece.center.y + 0.7).addScaledVector(piece.normal, 0.6 * travel), pickLine(spilled.mess), 'good');
+  }
 }
 
 function updateShards(dt) {

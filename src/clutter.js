@@ -160,6 +160,7 @@ const ROOM_MESS = {
   living: ['Who left their socks here?', 'Remote? What remote?', 'Movie night is cancelled!', 'Controller down!', 'Living room? Flying room!', 'Crisps for everyone!'],
   hall: ['Shoes everywhere!', 'Welcome home!', 'Wipe your feet!', 'Coming through!'],
   utility: ['Kitty litter!', 'Meow?!', 'The cat did it!', 'Cool down, Lennie!', 'Flying boots!', 'Coats everywhere!'],
+  storage: ['Spring cleaning!', 'Who keeps all this stuff?', 'Never throw anything away!', 'Cupboard avalanche!', 'Everything must go!', 'Found the Christmas stuff!'],
   garage: ['Garage sale!', "Where's my hammer?", 'Camping trip cancelled!', 'DIY disaster!', 'Junk everywhere!', 'Tools down!'],
   kitchen: ['Hagelslag avalanche!', "Who's doing the dishes?", 'Breakfast in the air!', 'Pan-demonium!', "Don't cry over spilt milk!", 'Plate-tectonics!'],
   bedroom: ['Laundry day!', 'Sock it to me!', 'Lost a slipper!', 'Wake-up call!', 'Bedtime? Not yet!', 'Bed head!'],
@@ -1451,6 +1452,8 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   const tvCabinet = buildTVCabinet();
   // ---------------------------------------------------------------- the kitchen's hanging cupboard, full of crockery
   const wallCupboard = buildWallCupboard();
+  // ---------------------------------------------------------------- the storage cupboard under the stairs, stuffed full
+  const storage = buildStorage();
 
   for (const s of stocks) s.build();
 
@@ -1916,6 +1919,140 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     return { update, reset };
   }
 
+  // The storage cupboard under the stairs (house.js), stuffed with everything
+  // the family never throws away: shelves up high along the back and the left
+  // wall, crammed with boxes, paint, cleaning stuff and a secret stash of
+  // sweets, and more junk on the floor under them. When Lennie smashes its
+  // door it all comes pouring out into the living room (house.js calls
+  // spill()). The shelves start at 1.15 m, so the floor stays clear for
+  // Lennie: the junk on it is loose and gets kicked about, and a solid
+  // crate on the floor made the cupboard a trap.
+  function buildStorage() {
+    const k = 0;
+    // its inner wall faces: the stairs' wall, the wall with the door onto the living room, the back, the hallway
+    const [X0, X1, Z0, Z1] = [-2.77, -1.84, -0.61, 1.01];
+    const LEFT = X0 + 0.3; // the front of the shelves along the left wall
+    const BACK = Z0 + 0.25; // the front of the shelves along the back
+    const LEVELS = [1.15, 1.5, 1.85, 2.2]; // the shelves' tops
+    const TOP = 2.6; // the ceiling
+    const BOARD = 0.022;
+    const pine = std({ color: 0xd8c39a, roughness: 0.7 });
+    // The boards reach 1 cm into the walls behind and beside them; along the
+    // back they stop 1 cm short of the door's wall, clear of the doorframe.
+    for (const y of LEVELS) {
+      box([X0 - 0.01, y - BOARD, Z0 - 0.01], [X1 - 0.01, y, BACK], pine, { story: k, cast: true });
+      box([X0 - 0.01, y - BOARD, BACK], [LEFT, y, Z1 + 0.01], pine, { story: k, cast: true });
+    }
+    const back = body([X0, LEVELS[0] - BOARD, Z0], [X1, TOP - 0.15, BACK], physMats.hard, { kind: 'furniture' });
+    const left = body([X0, LEVELS[0] - BOARD, BACK], [LEFT, TOP - 0.15, Z1], physMats.hard, { kind: 'furniture' });
+
+    // Where it all lands: the cupboard and the strip of living room in front
+    // of its door (between the cupboard's back and the hallway's wall, as far
+    // as the middle of the room), so nothing flies through the cupboard's walls.
+    const AREA = { x0: X0, x1: 0.6, z0: Z0, z1: Z1 };
+    const secs = [];
+    const section = (fresh) => {
+      const s = stocks[k].section({ bounds: AREA, floorY: 0.012, k, name: 'storage', fresh });
+      sections[k].push(s);
+      secs.push(s);
+      return s;
+    };
+    const shelfSec = section(false); // only Lennie bumping the shelves, or the door smashing, brings these down
+    const floorSec = section(true); // these get kicked about like any mess on the floor
+
+    // the shelves, filled from one end to the other with whatever fits
+    const shelfStuff = [
+      'doosKerst', 'doosLego', 'doosBoeken', 'doosBaby', 'doos', 'seeds', 'tub', 'toolbox', 'lantern', 'gasCan', 'screwTin', 'screwTin',
+      'paintWhite', 'paintBlue', 'paintGreen', 'waspoeder', 'wcRol', 'wcRol', 'afwas', 'allesreiniger', 'emmer',
+      'sleepingBagRed', 'sleepingBagBlue', 'campChair',
+      'stroopwafels', 'chocolade', 'drop', 'snoepmix', 'cola', 'limo', 'hagelslag', 'pindakaas', 'jam', // the secret stash
+    ];
+    const pick = (list) => list[Math.floor(rnd() * list.length)];
+    function fillShelf(along, a, b, y, mid, maxH, maxD) {
+      let u = a + 0.02 + rnd() * 0.04;
+      for (let tries = 0; tries < 60 && u < b - 0.08; tries++) {
+        const id = pick(shelfStuff);
+        const [hx, hy, hz] = half(id);
+        if (2 * hy > maxH || 2 * hz > maxD || u + 2 * hx > b - 0.01) continue;
+        const c = u + hx;
+        const [x, z] = along === 'x' ? [c, mid + (rnd() - 0.5) * (maxD - 2 * hz) * 0.6] : [mid + (rnd() - 0.5) * (maxD - 2 * hz) * 0.6, c];
+        const yaw = (along === 'x' ? 0 : Math.PI / 2) + (rnd() - 0.5) * 0.12;
+        let under = stocks[k].place(id, x, y, z, yaw, shelfSec);
+        // small things stand two or three high
+        let top = y + 2 * hy;
+        while (2 * hy < 0.14 && top + 2 * hy < y + maxH && rnd() < 0.6) {
+          under = stocks[k].place(id, x + (rnd() - 0.5) * 0.01, top, z + (rnd() - 0.5) * 0.01, yaw + (rnd() - 0.5) * 0.2, shelfSec, 0, { on: under });
+          top += 2 * hy;
+        }
+        u = c + hx + 0.012 + rnd() * 0.03;
+      }
+    }
+    LEVELS.forEach((y, i) => {
+      const room = (LEVELS[i + 1] ?? TOP) - BOARD - y - 0.03;
+      fillShelf('x', X0 + 0.01, X1 - 0.02, y, (Z0 + BACK) / 2, room, BACK - Z0 - 0.02);
+      fillShelf('z', BACK + 0.01, Z1 - 0.01, y, (X0 + LEFT) / 2, room, LEFT - X0 - 0.02);
+    });
+
+    // and the floor, along the left wall under the shelves and in the front corner
+    // (clear of the vacuum cleaner standing at the back, decorate())
+    const FLOOR = 0.012;
+    const floorPut = (id, x, z, opts = {}) => stocks[k].place(id, x, FLOOR, z, opts.yaw ?? rnd() * TAU, floorSec, 0, opts);
+    floorPut('bottleCrate', X0 + 0.16, 0.79, { yaw: Math.PI / 2 }); // the crate of empties, waiting to go back to the shop
+    floorPut('emmer', X0 + 0.15, 0.44);
+    const boxes = floorPut('doosDiversen', X0 + 0.19, 0.08, { yaw: Math.PI / 2 + 0.03 });
+    stocks[k].place('doosBoeken', X0 + 0.18, FLOOR + 2 * half('doosDiversen')[1], 0.09, Math.PI / 2 - 0.06, floorSec, 0, { on: boxes });
+    floorPut('wcRol', X0 + 0.1, -0.26, { yaw: 0.3 });
+    floorPut('wcRol', X0 + 0.22, -0.3, { yaw: 1.1 });
+    floorPut('waspoeder', X0 + 0.14, -0.5, { yaw: 0.1 });
+    floorPut('bootGreen', -2.2, 0.88, { yaw: 0.2 });
+    floorPut('bootGreen', -2.05, 0.82, { yaw: 0.35 });
+    floorPut('paintWhite', -1.97, 0.32);
+    floorPut('ball', -2.0, 0.08);
+
+    // Bumping into the shelves brings down what's near; a smashed door lets it all out.
+    const out = new THREE.Vector3(1, 0, 0);
+    const DOOR = { x: X1, z0: -0.33, z1: 0.43, y: 1.95 }; // the doorway, leaving room for a product's own size
+    /**
+     * Products move in straight lines across the floor plan, so a product
+     * heading for the cupboard's door wall is aimed through the doorway
+     * instead (and low enough to clear its top), in or out.
+     */
+    function steer() {
+      for (const s of secs) {
+        for (const item of s.items) {
+          if (item.state !== 'flying' || item.t > 0) continue;
+          const p = item.pos;
+          const v = item.vel;
+          const side = p.x - DOOR.x;
+          if (side * v.x >= 0) continue; // moving away from the wall, or along it
+          const t = -side / v.x;
+          const z = p.z + v.z * t;
+          const zz = Math.min(DOOR.z1, Math.max(DOOR.z0, z));
+          if (zz !== z) v.z = (zz - p.z) / t;
+          if (p.y + v.y * t - 4.9 * t * t > DOOR.y) v.y = (DOOR.y - p.y + 4.9 * t * t) / t;
+        }
+      }
+    }
+    for (const solid of [back, left]) {
+      solid.surface.tally = 'mess';
+      solid.surface.mess = ROOM_MESS.storage;
+      solid.surface.onHit = (point, strength, push) => {
+        const n = stocks[k].knock(shelfSec, point, out, strength, push, { radius: 0.5 + strength * 0.1, chance: 0.9, power: 1.1 });
+        steer();
+        return n;
+      };
+    }
+    /** The door's smashed: out it all comes. Returns how many things and the shouts for it. */
+    function spill() {
+      const at = new THREE.Vector3((X0 + X1) / 2, 1.2, (Z0 + Z1) / 2);
+      let n = stocks[k].knock(shelfSec, at, out, 10, null, { radius: 3, chance: 1, power: 1.35 });
+      n += stocks[k].knock(floorSec, at.setY(0.2), out, 10, null, { radius: 3, chance: 0.9, power: 1.2 });
+      steer();
+      return { n, mess: ROOM_MESS.storage };
+    }
+    return { spill, steer };
+  }
+
   function decorate() {
     const add = (k, mesh, cast = true) => {
       mesh.castShadow = cast;
@@ -2024,17 +2161,18 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
         mess = ROOM_MESS[sec.name];
       }
     }
+    if (k === 0) storage.steer(); // through the storage cupboard's doorway, not its walls
     return { n, mess };
   }
 
   const spots = [
-    { id: 'closet', label: 'On top of the game closet!', value: 450, say: 'GAME ON!', min: [closet.x0 - 0.1, closet.top, closet.z0 - 0.1], max: [closet.x1 + 0.1, closet.top + 0.8, closet.z1 + 0.25] },
     { id: 'washer', label: 'In the wash!', value: 250, say: 'SPIN!', min: [3.2, 2 * H + 0.8, -0.8], max: [3.9, 2 * H + 1.5, -0.1] },
   ];
 
   return {
     scatter,
     spots,
+    spillStorage: storage.spill, // house.js: when the storage cupboard's door is smashed
     doors: closet.doors, // the board game closet's doors, which house.js smashes and mends like its own
     update: (dt) => {
       for (const s of stocks) s.update(dt);

@@ -759,6 +759,9 @@ export function buildHouse(scene, world, physMats) {
   // the mess: dishes, toys, clothes, household stuff and the board game closet (clutter.js)
   const clutter = buildClutter({ ...kit, H, garage });
   doors.push(...clutter.doors);
+  // smash the storage cupboard's door and everything stuffed in it comes pouring out
+  const storeDoor = doors.find((d) => d.story === 0 && Math.abs(d.center.x - GF.toiletX) < 0.05 && d.center.z > GF.storeZ && d.center.z < GF.hallZ);
+  storeDoor.onBreak = clutter.spillStorage;
 
   // ------------------------------------------------------------ the ground floor's own walls
   // The toilet's two walls, the wall between the hallway and the kitchen, the
@@ -1230,8 +1233,6 @@ export function buildHouse(scene, world, physMats) {
       [[-2.72, 0.85, 2.74], [-2.46, 1.62, 2.92], 0xd95d39, { phys: false }],
       [[-2.44, 0.95, 2.76], [-2.21, 1.62, 2.92], 0x2c3e5a, { phys: false }],
       [[-2.19, 1.15, 2.78], [-1.99, 1.62, 2.92], 0xf2c14e, { phys: false }],
-      // storage cupboard: a crate of empties
-      [[-2.65, 0, 0.45], [-2.2, 0.3, 0.85], 0xf2c14e],
       // utility room: the fridge, and the cat's litter box
       [[3.15, 0, -5.85], [IN.x1, 1.95, -5.125], WHITE],
       [[3.13, 1.1, -5.78], [3.15, 1.7, -5.72], 0x9aa3ad, { phys: false }],
@@ -1474,12 +1475,10 @@ export function buildHouse(scene, world, physMats) {
     S('loo', 'On the loo!', 500, 'OOPS!', [3.05, 2 * H + 0.3, -1.8], [3.9, 2 * H + 1.1, -0.95]),
     S('desk', 'Asleep on the desk', 200, 'ZZZ', [-3.9, 2 * H + 0.7, -1.65], [-3.05, 2 * H + 1.4, 0.25]),
     S('armchair', 'Comfy in the armchair', 150, 'AHH!', [-1.63, 2 * H + 0.3, 2.15], [0.52, 2 * H + 1.2, 3.45]),
-    S('wardrobe', 'On top of the wardrobe!', 500, 'HELP!', [-0.13, H + 1.95, 2.55], [0.56, H + 2.7, 4.45]),
     S('bed', 'Tucked into bed', 250, 'NIGHT!', [-2.74, H + 0.3, 0.55], [-0.54, H + 1.1, 2.45]),
     S('bed', 'Tucked into bed', 250, 'NIGHT!', [1.95, H + 0.25, -2.3], [3.9, H + 1.05, -1.15]),
     S('beanbag', 'Beanbag flop!', 250, 'FLUMP!', [2.0, H + 0.4, 2.4], [3.2, H + 1.2, 3.6]),
     S('toybox', 'On the toy box!', 250, 'TOYS!', [1.15, H + 0.45, 4.15], [2.25, H + 1.2, 4.9]),
-    S('fridge', 'On top of the fridge!', 450, 'CHILLY!', [3.05, 1.9, -5.95], [3.9, 2.6, -5.1]),
     S('table', 'On the dinner table!', 200, 'DINNER!', [1.85, 0.75, -2.25], [3.05, 1.45, -0.25]),
     S('counter', 'On the kitchen counter', 200, 'CHEF!', [-0.35, 0.88, 4.15], [3.9, 1.55, 4.9]),
     S('counter', 'On the kitchen counter', 200, 'CHEF!', [3.15, 0.88, 1.8], [3.9, 1.55, 4.2]),
@@ -1596,13 +1595,16 @@ export function buildHouse(scene, world, physMats) {
     return !!entry && entry.opacity < 0.5;
   }
 
-  /** Smashes a window or a door out of its opening. */
+  /**
+   * Smashes a window or a door out of its opening. Returns what came out
+   * behind it, if anything ({ n, mess }: the storage cupboard's junk).
+   */
   function breakPiece(piece) {
-    if (piece.broken) return;
+    if (piece.broken) return null;
     piece.broken = true;
     piece.group.visible = false;
     world.removeBody(piece.body);
-    piece.onBreak?.();
+    return piece.onBreak?.() ?? null;
   }
 
   /** A door that took a knock sags in its frame, pushed towards `dir` (±1 along its normal). */
