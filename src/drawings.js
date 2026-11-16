@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { t, onLangChange } from './i18n.js';
 
 // The kids' drawings and paintings on the living room's white walls (pictures
 // 0–7), and the framed snapshots of friends in the toilet (8–11: cartoon
@@ -556,16 +555,17 @@ export function hangPainting({ addMesh, std }, { x, y, z, w, h, face, line }) {
 // ---------------------------------------------------------------- the kitchen whiteboard
 // The family's week on the kitchen whiteboard, in marker: a column per day
 // with what's on and what's for dinner, a shopping list and a note for Lennie.
-// Its texts go through t() and it's redrawn when the language switches.
+// It's the family's own board, so it's in Dutch whatever language the game is
+// in (like the supermarket's signs), and its texts don't go through t().
 const DAYS = [
   // [day, its colour, what's on (each with its colour), dinner]
-  ['Mon', '#1f4fbf', [['Swimming', '#1f4fbf'], ['Bins out!', '#1e8a3c']], 'Pasta'],
-  ['Tue', '#d1262b', [['Football', '#d1262b'], ['Library books back', '#1f4fbf']], 'Pancakes'],
-  ['Wed', '#1e8a3c', [['Piano lesson', '#1f4fbf'], ['Afternoon off', '#1e8a3c']], 'Fries!'],
-  ['Thu', '#1f4fbf', [['Dentist 9:30', '#d1262b'], ['Gym kit!', '#1e8a3c']], 'Soup'],
-  ['Fri', '#d1262b', [['Pizza night!', '#d1262b'], ['Movie', '#1f4fbf']], 'Pizza!'],
-  ['Sat', '#1e8a3c', [['Match 10:00', '#1f4fbf'], ["Grandma's birthday!", '#d1262b']], 'BBQ'],
-  ['Sun', '#1f4fbf', [['Lie in!', '#d1262b'], ['Bike ride', '#1e8a3c']], 'Stamppot'],
+  ['ma', '#1f4fbf', [['Zwemles', '#1f4fbf'], ['Kliko buiten!', '#1e8a3c']], 'Pasta'],
+  ['di', '#d1262b', [['Voetbal', '#d1262b'], ['Boeken naar bieb', '#1f4fbf']], 'Pannenkoeken'],
+  ['wo', '#1e8a3c', [['Pianoles', '#1f4fbf'], ['Middag vrij', '#1e8a3c']], 'Patat!'],
+  ['do', '#1f4fbf', [['Tandarts 9:30', '#d1262b'], ['Gymtas mee!', '#1e8a3c']], 'Soep'],
+  ['vr', '#d1262b', [['Pizza-avond!', '#d1262b'], ['Film kijken', '#1f4fbf']], 'Pizza!'],
+  ['za', '#1e8a3c', [['Wedstrijd 10:00', '#1f4fbf'], ['Oma jarig!', '#d1262b']], 'BBQ'],
+  ['zo', '#1f4fbf', [['Uitslapen!', '#d1262b'], ['Fietsen', '#1e8a3c']], 'Stamppot'],
 ];
 const HAND = '"Segoe Print", "Comic Sans MS", "Chalkboard SE", "Marker Felt", "Bradley Hand", cursive';
 
@@ -631,7 +631,7 @@ function drawWhiteboard(c) {
     return lines.length * s * 1.05;
   };
 
-  write(t('This week'), 50, 52, 46, '#1f4fbf', 420, { align: 'left', tilt: 0.02 });
+  write('Deze week', 50, 52, 46, '#1f4fbf', 420, { align: 'left', tilt: 0.02 });
   // the grid: a column per day, the day's name on top and dinner at the bottom
   const [X0, X1] = [40, W - 40];
   const cw = (X1 - X0) / 7;
@@ -640,17 +640,17 @@ function drawWhiteboard(c) {
   for (let i = 0; i <= 7; i++) line(X0 + i * cw, TOP, X0 + i * cw, BOTTOM);
   DAYS.forEach(([day, color, todo, dinner], i) => {
     const cx = X0 + (i + 0.5) * cw;
-    write(t(day), cx, (TOP + HEAD) / 2, 34, color, cw - 16);
+    write(day, cx, (TOP + HEAD) / 2, 34, color, cw - 16);
     let y = HEAD + 26;
-    for (const [what, c] of todo) y += write(t(what), cx, y, 26, c, cw - 14, { fromTop: true }) + 22;
+    for (const [what, c] of todo) y += write(what, cx, y, 26, c, cw - 14, { fromTop: true }) + 22;
     // a little knife and fork above dinner
     line(cx - 6, DINNER + 12, cx - 6, DINNER + 29, '#6b6f78', 2);
     line(cx + 6, DINNER + 12, cx + 6, DINNER + 29, '#6b6f78', 2);
-    write(t(dinner), cx, DINNER + 60, 26, '#2a2d33', cw - 14);
+    write(dinner, cx, DINNER + 60, 26, '#2a2d33', cw - 14);
   });
   // under the grid: the shopping list, and a note for Lennie
-  write(t('Shopping: milk, hagelslag, eggs'), 50, 568, 28, '#1e8a3c', 540, { align: 'left', tilt: 0.01 });
-  write(t('Lennie: tidy up!!'), 640, 572, 36, '#d1262b', 330, { align: 'left', tilt: 0.02 });
+  write('Boodschappen: melk, hagelslag, eieren', 50, 568, 28, '#1e8a3c', 540, { align: 'left', tilt: 0.01 });
+  write('Lennie: opruimen!!', 640, 572, 36, '#d1262b', 330, { align: 'left', tilt: 0.02 });
   line(640, 600, 900, 598, '#d1262b', 3);
   line(644, 610, 880, 609, '#d1262b', 3);
   // a smiley, and three magnets
@@ -707,10 +707,6 @@ export function hangWhiteboard({ addMesh, std }, { x, y, z, w, h, face, line }) 
   map.anisotropy = 4;
   const board = add(new THREE.PlaneGeometry(w - 2 * B + 0.02, h - 2 * B + 0.02).translate(0, 0, D - 0.008), std({ map, roughness: 0.25 }));
   board.receiveShadow = true;
-  onLangChange(() => {
-    drawWhiteboard(c);
-    map.needsUpdate = true;
-  });
   // the tray, 8 mm under the frame: a shelf (sunk into the wall) with a lip along
   // its front, a little shorter and 2 mm back, so their ends and fronts don't lie in one plane
   const ty = -h / 2 - 0.008; // the tray's top
