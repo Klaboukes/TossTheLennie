@@ -1146,17 +1146,26 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     for (let i = 0; i < n; i++) below = put(room, id, x + (rnd() - 0.5) * jitter, y + i * h, z + (rnd() - 0.5) * jitter, { yaw: yaw + (rnd() - 0.5) * 0.3, on: below });
     return below;
   }
-  /** Things strewn over the floor of a room, clear of its furniture. */
+  /**
+   * Things strewn over the floor of a room, clear of its furniture and of
+   * each other: two toys of one height lying into each other share a top
+   * face, which flickers.
+   */
+  const strewn = [];
   function strew(room, ids, n, { area = null, how = null } = {}) {
     const r = area ?? ROOMS[room];
+    const k = ROOMS[room].k;
     const avoid = FURNITURE[room] ?? [];
     for (let i = 0; i < n; i++) {
       const id = ids[Math.floor(rnd() * ids.length)];
-      const reach = Math.max(...half(id)) + 0.05;
+      const size = Math.max(...half(id));
+      const reach = size + 0.05;
       for (let tries = 0; tries < 25; tries++) {
         const x = r.x0 + reach + rnd() * (r.x1 - r.x0 - 2 * reach);
         const z = r.z0 + reach + rnd() * (r.z1 - r.z0 - 2 * reach);
         if (avoid.some(([x0, x1, z0, z1]) => x > x0 - reach && x < x1 + reach && z > z0 - reach && z < z1 + reach)) continue;
+        if (strewn.some((s) => s.k === k && Math.hypot(s.x - x, s.z - z) < s.size + size + 0.01)) continue;
+        strewn.push({ k, x, z, size });
         put(room, id, x, 0, z, how?.(id) ?? {});
         break;
       }
