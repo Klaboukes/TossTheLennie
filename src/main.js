@@ -1119,6 +1119,19 @@ function clampInWorld(v, margin) {
   v.x = clamp(v.x, -h, h);
   v.y = clamp(v.y, margin, 30);
   v.z = clamp(v.z, -h, YARD.front - margin);
+  // Out of the blocked-off ground behind the row (yard.js): onto its nearest
+  // open side. The block behind the garden comes last, so a corner ends up
+  // pushed out of both.
+  for (const r of YARD.out) {
+    if (v.x <= r.x0 - margin || v.x >= r.x1 + margin || v.z <= r.z0 - margin || v.z >= r.z1 + margin) continue;
+    const toLeft = r.x0 > -YARD.half ? v.x - (r.x0 - margin) : Infinity;
+    const toRight = r.x1 < YARD.half ? r.x1 + margin - v.x : Infinity;
+    const toFront = r.z1 + margin - v.z;
+    const least = Math.min(toLeft, toRight, toFront);
+    if (least === toFront) v.z = r.z1 + margin;
+    else if (least === toLeft) v.x = r.x0 - margin;
+    else v.x = r.x1 + margin;
+  }
   return v;
 }
 
@@ -2811,10 +2824,20 @@ function subStep(h) {
   } else if (bodies.some((b) => outsideArea(b.position, 0.3))) putBackNearEdge();
 }
 
-// The play area (yard.js): the invisible walls stand just outside these lines.
+// The play area (yard.js): the invisible walls stand just outside these lines,
+// and fill the blocked-off ground behind the row (YARD.out).
 const AREA = { x0: -YARD.half, x1: YARD.half, z0: -YARD.half, z1: YARD.front };
+/** How far p is from rectangle r (x/z ranges): negative inside it. */
+function rectDistance(p, r) {
+  const dx = Math.max(r.x0 - p.x, p.x - r.x1);
+  const dz = Math.max(r.z0 - p.z, p.z - r.z1);
+  if (dx <= 0 && dz <= 0) return Math.max(dx, dz);
+  return Math.hypot(Math.max(dx, 0), Math.max(dz, 0));
+}
+/** Is p outside the play area by more than slack? (A negative slack: within that of its edge.) */
 function outsideArea(p, slack = 0) {
-  return p.x < AREA.x0 - slack || p.x > AREA.x1 + slack || p.z < AREA.z0 - slack || p.z > AREA.z1 + slack;
+  if (p.x < AREA.x0 - slack || p.x > AREA.x1 + slack || p.z < AREA.z0 - slack || p.z > AREA.z1 + slack) return true;
+  return YARD.out.some((r) => rectDistance(p, r) < -slack);
 }
 
 /**
@@ -2831,7 +2854,8 @@ function putBackNearEdge() {
   const bz = inZ(c.z);
   const tried = new Set();
   // the nearest spot first, then rings around it, keeping only open ground
-  for (let r = 0; r <= 12; r += 1) {
+  // (far enough to get from deep in a neighbour's garden back to Lennie's)
+  for (let r = 0; r <= 20; r += 1) {
     const n = r === 0 ? 1 : 8 + r * 4;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
@@ -2840,6 +2864,7 @@ function putBackNearEdge() {
       const key = `${x.toFixed(1)},${z.toFixed(1)}`;
       if (tried.has(key)) continue;
       tried.add(key);
+      if (outsideArea({ x, z }, -EDGE_INSET)) continue; // behind the row: out of bounds
       _from.set(x, 25, z);
       _to.set(x, -1, z);
       _rayHit.reset();

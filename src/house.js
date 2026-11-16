@@ -158,6 +158,7 @@ const TOILET_OUT = { x0: OUT.x0 + LAYOUT.toilet[0], x1: OUT.x0 + LAYOUT.toilet[1
 export const ROW = { width: OUT.x1 - OUT.x0, left: 1, right: 3 };
 ROW.x0 = OUT.x0 - ROW.left * ROW.width;
 ROW.x1 = OUT.x1 + ROW.right * ROW.width;
+ROW.z0 = OUT.z0; // the row's back walls
 
 /** The convector trench's grille: wooden slats across it, 3 per 10 cm, over the dark trench. */
 function grilleTexture(length) {

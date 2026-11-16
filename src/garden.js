@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { meterBoxUVs } from './textures.js';
 import { canvasTexture } from './supermarket.js';
-import { GARAGE as GARAGE_WALLS } from './house.js';
+import { GARAGE as GARAGE_WALLS, ROW } from './house.js';
 
 // Lennie's back garden, after the owner's sketch (docs/floorplan-floor1.png):
 // bushes all along the left fence, and down the right-hand side, behind the
@@ -10,7 +10,8 @@ import { GARAGE as GARAGE_WALLS } from './house.js';
 // corner lounge set with its little round table under a flat plastic canopy, the
 // round trampoline, and a tree beside the three wheelie bins, with a stretch
 // of lawn behind them to the gate in the back fence, where old plywood boards,
-// bin bags, boxes and tyres lie about. A wooden fence runs round it, with the alley behind.
+// bin bags, boxes and tyres lie about. A wooden fence runs round it, with the
+// alley behind; it's the end of the map at the back (yard.js).
 // The bikes and the moped parked along the left-hand bushes are loose (bikes.js, built with house.js's loose furniture).
 // Lennie bounces off all of it; the bushes, the lounge set, the canopy and the
 // trampoline are bouncy.
@@ -19,7 +20,7 @@ import { GARAGE as GARAGE_WALLS } from './house.js';
 export const GARDEN = { x0: -4, x1: 4, back: -19.5 };
 const GARAGE = { x0: GARAGE_WALLS.x0 - 0.125, z0: GARAGE_WALLS.z0 - 0.125, top: GARAGE_WALLS.top }; // its outer faces
 
-export function buildGarden(scene, world, physMats, { std, tex }) {
+export function buildGarden(scene, world, physMats, { std, tex, edge }) {
   const add = (mesh, cast = true) => {
     mesh.castShadow = cast;
     mesh.receiveShadow = true;
@@ -77,6 +78,11 @@ export function buildGarden(scene, world, physMats, { std, tex }) {
   // the gate: a lighter door in the back fence, with a latch
   both([gate[0], 0.05, back - 0.04], [gate[1], FH - 0.05, back + 0.04], gateMat, 'fence');
   boxMesh([gate[1] - 0.25, 1.0, back + 0.04], [gate[1] - 0.1, 1.05, back + 0.08], std({ color: 0x222222, roughness: 0.4, metalness: 0.6 }));
+  // The same fence closes off the backs at the far left of the row, from the
+  // end house's back corner to the edge of the play area (edge: its x), so the
+  // neighbours' gardens are out of bounds there too (yard.js). Its plank ends
+  // 1 cm inside the end house's gable.
+  fence(edge - 0.05, ROW.z0, ROW.x0 + 0.01, ROW.z0);
 
   // ------------------------------------------------------------ the lounge set in the corner behind the garage
   // A corner sofa (grey rattan, cream cushions): its long side against the

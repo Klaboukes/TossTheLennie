@@ -3,13 +3,26 @@ import * as CANNON from 'cannon-es';
 import { textures, floorGeometry } from './textures.js';
 import { buildStreet, STREET } from './streetscape.js';
 import { SHOP } from './supermarket.js';
-import { buildGarden } from './garden.js';
+import { buildGarden, GARDEN } from './garden.js';
 import { ROW } from './house.js';
 
-// The play area: x and the back garden reach ±half; at the front it runs
-// across the street and through the supermarket to its back wall (see
-// streetscape.js and supermarket.js).
+// The play area: x reaches ±half; at the front it runs across the street and
+// through the supermarket to its back wall (see streetscape.js and
+// supermarket.js). At the back it stops at the row's back walls, except for
+// Lennie's own garden, up to its fences (garden.js). out: the blocked-off
+// ground behind the row (x/z ranges of the invisible blocks built below),
+// starting just behind the fences' own solid parts (0.15 either side of them).
 export const YARD = { half: 22, front: SHOP.z1 - SHOP.t };
+{
+  const far = YARD.half + 4; // the blocks reach well past the sides and back
+  const side = 0.15;
+  YARD.out = [
+    { x0: -far, x1: GARDEN.x0 - side, z0: -far, z1: ROW.z0 }, // behind the row, left of Lennie's garden
+    { x0: GARDEN.x1 + side, x1: far, z0: -far, z1: ROW.z0 }, // and right of it
+    { x0: GARDEN.x0 - side, x1: GARDEN.x1 + side, z0: -far, z1: GARDEN.back - side }, // behind its back fence
+  ];
+}
+const OUT_TOP = 80; // the blocks' height: higher than Lennie ever flies
 
 // Deterministic pseudo-random, so the hedge looks the same every load.
 function rng(seed) {
@@ -65,38 +78,22 @@ export function buildYard(scene, world, physMats) {
   path.receiveShadow = true;
   scene.add(path);
 
-  // ------------------------------------------------------------ back-garden fence (visual) + invisible boundary planes
-  // Like the real street, the front gardens are open to the street; only the
-  // back gardens are fenced. The invisible sides run all the way to the front.
+  // ------------------------------------------------------------ the edges of the play area: invisible walls
+  // Like the real street, the front gardens are open to the street. At the
+  // back, Lennie's own garden fence is the end of the map (garden.js), with the
+  // same fence closing off the far left of the row: the neighbours' back
+  // gardens are out of bounds. Tall invisible blocks (YARD.out) stand just
+  // behind those fences and fill everything behind the row, so a high toss
+  // over a fence or off the back of a roof bounces back. They're thick, so a
+  // fast limb can't slip through. The invisible sides run all the way to the front.
   const h = YARD.half;
-  const spacing = 0.28;
-  const perSide = Math.floor((2 * h) / spacing);
-  const rowGap = 5.3; // the side fences stop short of the row's back walls (z −5.125), where the row reaches them
-  const pickets = new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 1.0, 0.04), std({ color: 0xffffff, roughness: 0.7 }), perSide * 3);
-  const m = new THREE.Matrix4();
-  let n = 0;
-  for (let i = 0; i < perSide; i++) {
-    const a = -h + (i + 0.5) * spacing;
-    m.makeTranslation(a, 0.5, -h); pickets.setMatrixAt(n++, m);
-    if (a > -rowGap) continue;
-    m.makeRotationY(Math.PI / 2).setPosition(h, 0.5, a); pickets.setMatrixAt(n++, m);
-    m.makeRotationY(Math.PI / 2).setPosition(-h, 0.5, a); pickets.setMatrixAt(n++, m);
+  for (const r of YARD.out) {
+    const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3((r.x1 - r.x0) / 2, OUT_TOP / 2, (r.z1 - r.z0) / 2)) });
+    b.position.set((r.x0 + r.x1) / 2, OUT_TOP / 2, (r.z0 + r.z1) / 2);
+    b.surface = { kind: 'fence' };
+    world.addBody(b);
   }
-  pickets.count = n;
-  pickets.castShadow = true;
-  scene.add(pickets);
-  const railMat = std({ color: 0xf2f0ea });
-  for (const y of [0.3, 0.75]) {
-    const rx = new THREE.Mesh(new THREE.BoxGeometry(2 * h, 0.08, 0.05), railMat);
-    rx.position.set(0, y, -(h - 0.05));
-    scene.add(rx);
-    for (const s of [1, -1]) {
-      const rz = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, h - rowGap), railMat);
-      rz.position.set(s * (h - 0.05), y, -(h + rowGap) / 2);
-      scene.add(rz);
-    }
-  }
-  for (const [axis, sign, at] of [['x', 1, h], ['x', -1, h], ['z', 1, YARD.front], ['z', -1, h]]) {
+  for (const [axis, sign, at] of [['x', 1, h], ['x', -1, h], ['z', 1, YARD.front]]) {
     const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Plane() });
     // Plane normal is local +z; point it back into the yard.
     if (axis === 'x') b.quaternion.setFromEuler(0, sign > 0 ? -Math.PI / 2 : Math.PI / 2, 0);
@@ -204,6 +201,6 @@ export function buildYard(scene, world, physMats) {
   }
 
   // ------------------------------------------------------------ Lennie's own back garden (garden.js)
-  buildGarden(scene, world, physMats, { std, tex });
+  buildGarden(scene, world, physMats, { std, tex, edge: -h });
   return { shop };
 }

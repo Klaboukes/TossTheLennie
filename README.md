@@ -67,7 +67,7 @@ The rest of the neighbourhood is scenery, modelled on the real street so it's re
 - **The street:** a red cycle path, a grass verge with tall trees and street lamps, and a two-lane road with room to play.
 - **Cars:** now and then a car drives by (a hatchback, an estate or a van, in a random colour), keeping to the right. Throw Lennie in front of a moving one and it sends him flying up and along the road. While he lies in a lane (or is being picked up there), the cars stop short of him and honk until he's out of the way, and the ones behind queue up.
 
-The play area runs from the back garden, across the street, to the supermarket's back wall. If Lennie ever gets out of it, he's stood back on open ground just inside the edge, near where he left.
+The play area runs from the back garden, across the street, to the supermarket's back wall. At the back, Lennie's own garden fence is the end of the map: the neighbours' back gardens are out of bounds, and the same dark wooden fence closes them off at the far left end of the row. If Lennie ever gets out of it, he's stood back on open ground just inside the edge, near where he left.
 
 Couches, beds, the beanbag, bushes, the hedge, the shrubs, tree tops and the trampoline are bouncy.
 
@@ -193,8 +193,8 @@ Each frame, `main.js` moves the camera first, then lets the house and the shop d
 - `src/loose.js`: furniture Lennie can knock over (the dining chairs, the piano stool, the small round tables, the bikes and the moped), which rests ("sleeps") when it stands still so it costs nothing
 - `src/clutter.js`: the mess in the house (dishes, toys, clothes, household stuff), the board game closet, the TV cabinet with its breakable doors and toys, the toy cabinet beside the piano, the kitchen's hanging cupboard with its breakable glass doors and crockery, the plants and the coffee machine on the counters, the storage cupboard stuffed with junk that pours out when its door is smashed, the stuff in the garage, and sending it flying when Lennie lands in it
 - `src/street.js`: the neighbour houses, and the details every house in the row shares (porch, chimney, dormer, skylight, vents, downpipe)
-- `src/yard.js`: sky, lighting, lawn, the play area's edges and fence, the neighbours' garden trees, the front gardens' path, bushes and hedge
-- `src/garden.js`: Lennie's back garden: fences and gate, lounge set and its canopy, trampoline, the brambles behind it, tree, wheelie bins, the junk by the back fence and bushes (the garage is a room of the house, in `house.js`)
+- `src/yard.js`: sky, lighting, lawn, the play area's (invisible) edges, the neighbours' garden trees, the front gardens' path, bushes and hedge
+- `src/garden.js`: Lennie's back garden: fences and gate (the end of the map at the back, with the fence closing off the row's far left end), lounge set and its canopy, trampoline, the brambles behind it, tree, wheelie bins, the junk by the back fence and bushes (the garage is a room of the house, in `house.js`)
 - `src/bikes.js`: the bikes and the moped parked along the back garden's bushes, which Lennie knocks over (as loose pieces, `loose.js`)
 - `src/streetscape.js`: the street in front: cycle path, verge trees and lamps, and the road
 - `src/cars.js`: the cars driving by: a few low-poly cars built once and reused, on physics bodies that only ever touch Lennie, braking and honking for him when he's in the road
