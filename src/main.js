@@ -341,14 +341,39 @@ function toast(message, ms = 2200) {
   toastTimer = setTimeout(() => ui.toast.classList.remove('show'), ms);
 }
 
-function popAt(position, text, cls = '') {
+// At most this many popup lines on screen at once: more piled up on top of each
+// other and none of them could be read.
+const MAX_POPS = 2;
+// The score, the landing line, big crashes and price tags matter more than the chatter of a bump.
+const popRank = (cls) => (cls === 'big' || cls === 'price' ? 2 : 1);
+const shownPops = [];
+
+function dropPop(pop, fade) {
+  const i = shownPops.indexOf(pop);
+  if (i < 0) return;
+  shownPops.splice(i, 1);
+  clearTimeout(pop.timer);
+  if (!fade) return pop.el.remove();
+  // A quick fade on top of the rising animation, so it doesn't just blink away.
+  pop.el.animate({ opacity: [getComputedStyle(pop.el).opacity, 0] }, { duration: 180, fill: 'forwards' });
+  setTimeout(() => pop.el.remove(), 200);
+}
+
+/** `rank` overrides how important the line is (see popRank). */
+function popAt(position, text, cls = '', rank = popRank(cls)) {
   const v = new THREE.Vector3().copy(position).project(camera);
   if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) return;
+  // Screen full: a line that's no more important than the ones up there is skipped,
+  // a more important one makes room by fading out the oldest less important line.
+  if (shownPops.length >= MAX_POPS) {
+    const weaker = shownPops.find((p) => p.rank < rank);
+    if (!weaker) return;
+    dropPop(weaker, true);
+  }
   text = t(text);
   const el = document.createElement('div');
   el.className = `pop ${cls}`;
   el.textContent = text;
-  el.style.top = `${(-v.y * 0.5 + 0.5) * innerHeight}px`;
   el.style.setProperty('--rot', `${(Math.random() * 16 - 8).toFixed(1)}deg`);
   // Short shouts ("BOING!") flash by; longer lines ("Crunchy or smooth?") stay up long enough to read.
   const ms = Math.min(4000, 1400 + 120 * Math.max(0, text.length - 6));
@@ -362,8 +387,19 @@ function popAt(position, text, cls = '') {
     el.style.fontSize = `${(parseFloat(getComputedStyle(el).fontSize) * room) / w}px`;
     w = room;
   }
-  el.style.left = `${clamp((v.x * 0.5 + 0.5) * innerWidth, 12 + w * 0.6, innerWidth - 12 - w * 0.6)}px`;
-  setTimeout(() => el.remove(), ms + 100);
+  const h = el.offsetHeight;
+  const x = clamp((v.x * 0.5 + 0.5) * innerWidth, 12 + w * 0.6, innerWidth - 12 - w * 0.6);
+  let y = (-v.y * 0.5 + 0.5) * innerHeight;
+  // Landing on top of a line that's still up: go just below it (that one floats up and away).
+  for (const p of shownPops) {
+    if (Math.abs(p.x - x) < (p.w + w) * 0.55 && Math.abs(p.y - y) < (p.h + h) * 0.7) y = p.y + (p.h + h) * 0.7;
+  }
+  y = Math.min(y, innerHeight - h);
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
+  const pop = { el, rank, x, y, w, h };
+  pop.timer = setTimeout(() => dropPop(pop, false), ms + 100);
+  shownPops.push(pop);
 }
 
 const CONFETTI = ['#ff6b4a', '#3f5fd6', '#22a06b', '#ffd166', '#d63384', '#4cc9f0'];
@@ -675,7 +711,7 @@ function finishToss() {
     if (cheer === 'best') setTimeout(() => sfx.chime(), 550);
   }
   const said = result.tricks.find((t) => t.say);
-  if (said) setTimeout(() => popAt(new THREE.Vector3(head.x, head.y + 0.9, head.z), said.say, 'good'), 450);
+  if (said) setTimeout(() => popAt(new THREE.Vector3(head.x, head.y + 0.9, head.z), said.say, 'good', 2), 450);
   focusLennie(1.0);
   toss.state = 'scored';
   resetChain();
@@ -710,6 +746,7 @@ const BUMP = {
   wall: ['Hello, wall!', 'Wall wins!', 'Splat!', 'Pancake!', 'Who put that wall there?'],
   floor: ['Floor kiss!', 'Belly flop!', 'Faceplant!', 'Flat as a pannenkoek!'],
   ground: ['Grass stains!', 'Faceplant!', 'Lawn dart!', 'Mud pie!'],
+  street: ['Road rash!', 'Hello, pavement!', 'Mind the traffic!', 'Faceplant!'],
   stair: ['Mind the step!', 'Step by step!', 'Ba-dum-tss!', 'Stair-ific!'],
   furniture: ['Not the furniture!', 'Stubbed toe!', 'Sit down, Lennie!', 'Table manners!'],
   roof: ['Up on the roof!', 'Hello, pigeons!', 'Tile trouble!'],
@@ -729,6 +766,16 @@ const BUMP = {
   trash: ['Bin bag!', 'Pee-yew!', 'Smells like Lennie!'],
   bramble: ['Thorny!', 'Prickly!', 'Into the brambles!'],
 };
+// The lawn (yard.js) runs on under the supermarket's and the house's floors and the street, so a
+// hit on it sounds and says what's really there instead of grass.
+function groundKind(point) {
+  const where = locate(point);
+  if (where === 'in the supermarket' || where.endsWith(')')) return 'floor'; // "in the kitchen (floor 1)"
+  // the cycle path and the road (the verges along them are grass)
+  const on = ([z0, z1]) => point.z >= z0 && point.z <= z1;
+  if (on(STREET.cycle) || on(STREET.road)) return 'street';
+  return 'ground';
+}
 function bumpLine(partName, kind, soft) {
   if (soft && BUMP[kind]) return pickLine(BUMP[kind]);
   return pickLine([...EXCLAIM, ...(partName === 'head' && !soft ? HEAD_BUMP : []), ...(BUMP[kind] ?? [])]);
@@ -793,9 +840,10 @@ lennie.onCollide = (partName, e) => {
 
   const strength = Math.min(1, v / 14);
   const soft = SOFT.has(surf.kind);
+  const kind = surf.kind === 'ground' ? groundKind(contactPoint(e)) : surf.kind;
   if (now - lastSoundAt > 45) {
     lastSoundAt = now;
-    sfx.impact(surf.sound ?? surf.kind, strength);
+    sfx.impact(surf.sound ?? kind, strength);
   }
 
   const flying = toss.state === 'flying';
@@ -810,7 +858,7 @@ lennie.onCollide = (partName, e) => {
       toss.trampoline += 1;
       popAt(point, 'BOING!', 'good');
     } else if (v > 7) {
-      popAt(point, bumpLine(partName, surf.kind, SOFT.has(surf.kind)));
+      popAt(point, bumpLine(partName, kind, soft));
     }
   }
   if (v > 7 && !soft) {
