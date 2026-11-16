@@ -4,7 +4,7 @@ import { textures, meterBoxUVs, floorGeometry } from './textures.js';
 import { makeDetails, buildNeighbours, LAYOUT, PORCH_Y, HOUSE_NUMBERS } from './street.js';
 import { buildClutter } from './clutter.js';
 import { buildTV } from './tv.js';
-import { hangDrawings, hangPainting } from './drawings.js';
+import { hangDrawings, hangPainting, hangWhiteboard } from './drawings.js';
 import { createLoose } from './loose.js';
 import { parkBikes } from './bikes.js';
 
@@ -754,6 +754,8 @@ export function buildHouse(scene, world, physMats) {
   ]);
   // the big black-and-white painting of a medieval town on the wall behind the dining table (drawings.js)
   hangPainting(kit, { face: '-x', x: IN.x1, y: 1.62, z: -1.25, w: 1.5, h: 0.98, line: 'east-0' });
+  // the family's week schedule on a whiteboard, on the kitchen side of the wall to the hallway, between the counters (drawings.js)
+  hangWhiteboard(kit, { face: '+x', x: GF.hallX + INT / 2, y: 1.5, z: 2.75, w: 1.2, h: 0.78, line: 'kitchenside-0' });
   // the TV on its cabinet, which cracks and sparks when Lennie hits it (tv.js)
   const tv = buildTV(kit);
   // the mess: dishes, toys, clothes, household stuff and the board game closet (clutter.js)

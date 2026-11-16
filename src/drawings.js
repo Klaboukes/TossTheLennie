@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { t, onLangChange } from './i18n.js';
 
 // The kids' drawings and paintings on the living room's white walls (pictures
 // 0–7), and the framed snapshots of friends in the toilet (8–11: cartoon
@@ -550,4 +551,178 @@ export function hangPainting({ addMesh, std }, { x, y, z, w, h, face, line }) {
   const mesh = new THREE.Mesh(place(pic), std({ map: townPicture(), roughness: 0.8 }));
   mesh.receiveShadow = true;
   addMesh(mesh, 0, line);
+}
+
+// ---------------------------------------------------------------- the kitchen whiteboard
+// The family's week on the kitchen whiteboard, in marker: a column per day
+// with what's on and what's for dinner, a shopping list and a note for Lennie.
+// Its texts go through t() and it's redrawn when the language switches.
+const DAYS = [
+  // [day, its colour, what's on (each with its colour), dinner]
+  ['Mon', '#1f4fbf', [['Swimming', '#1f4fbf'], ['Bins out!', '#1e8a3c']], 'Pasta'],
+  ['Tue', '#d1262b', [['Football', '#d1262b'], ['Library books back', '#1f4fbf']], 'Pancakes'],
+  ['Wed', '#1e8a3c', [['Piano lesson', '#1f4fbf'], ['Afternoon off', '#1e8a3c']], 'Fries!'],
+  ['Thu', '#1f4fbf', [['Dentist 9:30', '#d1262b'], ['Gym kit!', '#1e8a3c']], 'Soup'],
+  ['Fri', '#d1262b', [['Pizza night!', '#d1262b'], ['Movie', '#1f4fbf']], 'Pizza!'],
+  ['Sat', '#1e8a3c', [['Match 10:00', '#1f4fbf'], ["Grandma's birthday!", '#d1262b']], 'BBQ'],
+  ['Sun', '#1f4fbf', [['Lie in!', '#d1262b'], ['Bike ride', '#1e8a3c']], 'Stamppot'],
+];
+const HAND = '"Segoe Print", "Comic Sans MS", "Chalkboard SE", "Marker Felt", "Bradley Hand", cursive';
+
+function drawWhiteboard(c) {
+  const [W, Hc] = [c.width, c.height];
+  const g = c.getContext('2d');
+  const r = rng(23);
+  const j = (n) => (r() - 0.5) * n; // a marker's wobble
+  g.fillStyle = '#fbfbf8';
+  g.fillRect(0, 0, W, Hc);
+  // ghosts of last week, never quite wiped off
+  g.lineCap = 'round';
+  for (let i = 0; i < 14; i++) {
+    g.strokeStyle = `rgba(120, 130, 150, ${0.04 + r() * 0.05})`;
+    g.lineWidth = 8 + r() * 30;
+    g.beginPath();
+    const [x, y] = [r() * W, r() * Hc];
+    g.moveTo(x, y);
+    g.quadraticCurveTo(x + j(160), y + j(60), x + j(320), y + j(50));
+    g.stroke();
+  }
+  const line = (x0, y0, x1, y1, color = '#2a2d33', w = 3) => {
+    g.strokeStyle = color;
+    g.lineWidth = w;
+    g.beginPath();
+    g.moveTo(x0 + j(3), y0 + j(3));
+    g.quadraticCurveTo((x0 + x1) / 2 + j(5), (y0 + y1) / 2 + j(5), x1 + j(3), y1 + j(3));
+    g.stroke();
+  };
+  // handwriting, `size` px tall, wrapped onto more lines (and shrunk if need be) to fit `maxW`, centred
+  // on `y` (or starting at it, with `fromTop`); returns its height
+  const write = (text, x, y, size, color, maxW, { align = 'center', tilt = 0.03, fromTop = false } = {}) => {
+    const font = (s) => `bold ${s}px ${HAND}`;
+    g.font = font(size);
+    // a word that would have to shrink a lot to fit breaks in two, after its hyphen if it has one
+    const words = text.split(' ').flatMap((word) => {
+      if (g.measureText(word).width <= maxW / 0.72 || word.length < 8) return [word];
+      const at = word.includes('-') ? word.indexOf('-') + 1 : Math.ceil(word.length / 2);
+      return [word.includes('-') ? word.slice(0, at) : `${word.slice(0, at)}-`, word.slice(at)];
+    });
+    let lines = [text];
+    if (g.measureText(text).width > maxW && words.length > 1) {
+      lines = [];
+      for (const word of words) {
+        const last = lines[lines.length - 1];
+        if (last && g.measureText(`${last} ${word}`).width <= maxW) lines[lines.length - 1] = `${last} ${word}`;
+        else lines.push(word);
+      }
+    }
+    const widest = Math.max(...lines.map((l) => g.measureText(l).width));
+    const s = widest > maxW ? Math.floor((size * maxW) / widest) : size;
+    g.font = font(s);
+    g.fillStyle = color;
+    g.textAlign = align;
+    g.textBaseline = 'middle';
+    lines.forEach((l, i) => {
+      g.save();
+      g.translate(x + j(4), y + (fromTop ? i + 0.5 : i - (lines.length - 1) / 2) * s * 1.05);
+      g.rotate(j(tilt * 2));
+      g.fillText(l, 0, 0);
+      g.restore();
+    });
+    return lines.length * s * 1.05;
+  };
+
+  write(t('This week'), 50, 52, 46, '#1f4fbf', 420, { align: 'left', tilt: 0.02 });
+  // the grid: a column per day, the day's name on top and dinner at the bottom
+  const [X0, X1] = [40, W - 40];
+  const cw = (X1 - X0) / 7;
+  const [TOP, HEAD, DINNER, BOTTOM] = [92, 140, 430, 520];
+  for (const y of [TOP, HEAD, DINNER, BOTTOM]) line(X0, y, X1, y);
+  for (let i = 0; i <= 7; i++) line(X0 + i * cw, TOP, X0 + i * cw, BOTTOM);
+  DAYS.forEach(([day, color, todo, dinner], i) => {
+    const cx = X0 + (i + 0.5) * cw;
+    write(t(day), cx, (TOP + HEAD) / 2, 34, color, cw - 16);
+    let y = HEAD + 26;
+    for (const [what, c] of todo) y += write(t(what), cx, y, 26, c, cw - 14, { fromTop: true }) + 22;
+    // a little knife and fork above dinner
+    line(cx - 6, DINNER + 12, cx - 6, DINNER + 29, '#6b6f78', 2);
+    line(cx + 6, DINNER + 12, cx + 6, DINNER + 29, '#6b6f78', 2);
+    write(t(dinner), cx, DINNER + 60, 26, '#2a2d33', cw - 14);
+  });
+  // under the grid: the shopping list, and a note for Lennie
+  write(t('Shopping: milk, hagelslag, eggs'), 50, 568, 28, '#1e8a3c', 540, { align: 'left', tilt: 0.01 });
+  write(t('Lennie: tidy up!!'), 640, 572, 36, '#d1262b', 330, { align: 'left', tilt: 0.02 });
+  line(640, 600, 900, 598, '#d1262b', 3);
+  line(644, 610, 880, 609, '#d1262b', 3);
+  // a smiley, and three magnets
+  g.strokeStyle = '#1f4fbf';
+  g.lineWidth = 3;
+  g.beginPath();
+  g.arc(W - 90, 50, 24, 0, Math.PI * 2);
+  g.stroke();
+  g.beginPath();
+  g.arc(W - 90, 52, 14, 0.2, Math.PI - 0.2);
+  g.stroke();
+  g.fillStyle = '#1f4fbf';
+  for (const dx of [-8, 8]) g.fillRect(W - 90 + dx - 2, 40, 4, 6);
+  for (const [mx, my, mc] of [[520, 48, '#f2c14e'], [W - 30, Hc - 70, '#d1262b'], [30, 615, '#3fa35a']]) {
+    g.fillStyle = 'rgba(0, 0, 0, 0.18)';
+    g.beginPath();
+    g.arc(mx + 3, my + 4, 15, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = mc;
+    g.beginPath();
+    g.arc(mx, my, 15, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    g.beginPath();
+    g.arc(mx - 5, my - 5, 5, 0, Math.PI * 2);
+    g.fill();
+  }
+}
+
+/**
+ * Hangs the whiteboard on a wall: an aluminium frame round the white board,
+ * with a tray of markers and a wiper under it. (x, y, z) is the middle of its
+ * back, on the wall's face; `w` and `h` the frame's outer size; `face` the way it looks.
+ */
+export function hangWhiteboard({ addMesh, std }, { x, y, z, w, h, face, line }) {
+  const yaw = { '+x': Math.PI / 2, '-x': -Math.PI / 2, '-z': Math.PI, '+z': 0 }[face];
+  const place = (geo) => geo.rotateY(yaw).translate(x, y, z);
+  const add = (geo, mat) => addMesh(new THREE.Mesh(place(geo), mat), 0, line);
+  const B = 0.025; // the frame's width
+  const D = 0.022; // how far it stands off the wall (sunk 5 mm into it, so no face lies on the wall's)
+  const alu = std({ color: 0xc4c8cc, roughness: 0.35, metalness: 0.5 });
+  for (const [x0, y0, x1, y1] of [
+    [-w / 2, h / 2 - B, w / 2, h / 2], // top
+    [-w / 2, -h / 2, w / 2, -h / 2 + B], // bottom
+    [-w / 2, -h / 2 + B, -w / 2 + B, h / 2 - B], // the sides, between them
+    [w / 2 - B, -h / 2 + B, w / 2, h / 2 - B],
+  ]) add(new THREE.BoxGeometry(x1 - x0, y1 - y0, D + 0.005).translate((x0 + x1) / 2, (y0 + y1) / 2, D / 2 - 0.0025), alu);
+  // the board, set back in the frame and reaching in under its edges
+  const c = document.createElement('canvas');
+  [c.width, c.height] = [1024, 656];
+  drawWhiteboard(c);
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  const board = add(new THREE.PlaneGeometry(w - 2 * B + 0.02, h - 2 * B + 0.02).translate(0, 0, D - 0.008), std({ map, roughness: 0.25 }));
+  board.receiveShadow = true;
+  onLangChange(() => {
+    drawWhiteboard(c);
+    map.needsUpdate = true;
+  });
+  // the tray, 8 mm under the frame: a shelf (sunk into the wall) with a lip along
+  // its front, a little shorter and 2 mm back, so their ends and fronts don't lie in one plane
+  const ty = -h / 2 - 0.008; // the tray's top
+  add(new THREE.BoxGeometry(0.56, 0.012, 0.075).translate(0, ty - 0.006, 0.0325), alu);
+  add(new THREE.BoxGeometry(0.55, 0.016, 0.008).translate(0, ty + 0.006, 0.064), alu);
+  // two markers (white, with a blue and a red cap) and the wiper lying in it, sunk 1 mm
+  const marker = std({ color: 0xf0f0ee, roughness: 0.5 });
+  for (const [mx, mz, cap] of [[0.06, 0.022, 0x1f4fbf], [0.12, 0.045, 0xd1262b]]) {
+    add(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 10).rotateZ(Math.PI / 2).translate(mx, ty + 0.007, mz), marker);
+    add(new THREE.CylinderGeometry(0.0088, 0.0088, 0.035, 10).rotateZ(Math.PI / 2).translate(mx + 0.05, ty + 0.007, mz), std({ color: cap, roughness: 0.4 }));
+  }
+  add(new THREE.BoxGeometry(0.12, 0.028, 0.045).translate(-0.14, ty + 0.013, 0.032), std({ color: 0x2b2d31, roughness: 0.8 }));
+  // (its blue grip tucked 1 mm into its top)
+  add(new THREE.BoxGeometry(0.114, 0.006, 0.039).translate(-0.14, ty + 0.029, 0.032), std({ color: 0x3a5a8c, roughness: 0.6 }));
 }
