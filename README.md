@@ -63,7 +63,7 @@ Across the road, after the real one: an orange building under a zigzag of grey g
 
 The rest of the neighbourhood is scenery, modelled on the real street so it's recognizable. You can't go inside any of it, but Lennie bounces off it and can land on it.
 
-- **The row:** a block of five houses under one long roof, like the real one ([docs/house-design.md](docs/house-design.md)), with Lennie's house second from the left. The neighbours are mirrored in pairs, each with its own colour of panels. Lennie can land on their roofs and canopies. Because they share its side walls, Lennie's house has windows only at the front and back.
+- **The row:** a block of five houses under one long roof, like the real one ([docs/house-design.md](docs/house-design.md)), with Lennie's house second from the left. The neighbours are mirrored in pairs, each with its own colour of panels, and their windows are boarded up with plywood to show you can't go in. Lennie can land on their roofs and canopies. Because they share its side walls, Lennie's house has windows only at the front and back.
 - **The street:** a red cycle path, a grass verge with tall trees and street lamps, and a two-lane road with room to play.
 - **Cars:** now and then a car drives by (a hatchback, an estate or a van, in a random colour), keeping to the right. Throw Lennie in front of a moving one and it sends him flying up and along the road. While he lies in a lane (or is being picked up there), the cars stop short of him and honk until he's out of the way, and the ones behind queue up.
 

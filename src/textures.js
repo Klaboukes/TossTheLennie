@@ -316,22 +316,54 @@ function grooves() {
   });
 }
 
-/** Cartoon window glass for the neighbours: a flat colour with diagonal glints. */
-function fakeGlass(color, glint) {
-  return canvasTexture(256, 2, (g, s) => {
-    g.fillStyle = color;
+/**
+ * Plywood boards over the neighbours' windows, so it's plain you can't go in
+ * there: pale wood with long wavy grain and a few knots, the seam between two
+ * sheets at the tile edge (a sheet is 1.22 m wide).
+ */
+function plywood() {
+  const r = rng(31);
+  return canvasTexture(256, 1.22, (g, s) => {
+    g.fillStyle = '#c9a46a';
     g.fillRect(0, 0, s, s);
-    g.strokeStyle = glint;
-    g.lineCap = 'butt';
-    // stripes drawn three times (shifted by the tile size) so they wrap seamlessly
-    for (const off of [-s, 0, s]) {
-      for (const [x, w] of [[0.2, 26], [0.36, 9]]) {
-        g.lineWidth = w;
+    // grain: long thin streaks running across the sheet, drawn wrapping so tiles join
+    for (let i = 0; i < 46; i++) {
+      const y = r() * s;
+      const amp = 2 + r() * 5;
+      const phase = r() * Math.PI * 2;
+      g.strokeStyle = r() < 0.5 ? `rgba(120,80,35,${0.12 + r() * 0.18})` : `rgba(255,236,190,${0.1 + r() * 0.15})`;
+      g.lineWidth = 1 + r() * 2.5;
+      for (const off of [-s, 0, s]) {
         g.beginPath();
-        g.moveTo(x * s + off - s / 2, s);
-        g.lineTo(x * s + off + s / 2, 0);
+        for (let x = 0; x <= s; x += 8) {
+          const yy = y + off + Math.sin((x / s) * Math.PI * 2 + phase) * amp;
+          if (x === 0) g.moveTo(x, yy);
+          else g.lineTo(x, yy);
+        }
         g.stroke();
       }
+    }
+    // a few knots and darker patches
+    for (let i = 0; i < 4; i++) {
+      const x = 20 + r() * (s - 40);
+      const y = 20 + r() * (s - 40);
+      g.fillStyle = 'rgba(110,70,30,0.35)';
+      g.beginPath();
+      g.ellipse(x, y, 10 + r() * 8, 4 + r() * 3, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = 'rgba(80,50,20,0.5)';
+      g.beginPath();
+      g.ellipse(x, y, 4, 2, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+    // the seam where two sheets meet, with a row of screw heads beside it
+    g.fillStyle = 'rgba(70,45,20,0.6)';
+    g.fillRect(0, 0, 3, s);
+    g.fillStyle = '#6d6a64';
+    for (let y = 16; y < s; y += 42) {
+      g.beginPath();
+      g.arc(12, y, 3, 0, Math.PI * 2);
+      g.fill();
     }
   });
 }
@@ -366,8 +398,7 @@ export function textures() {
       grass: grass(),
       pantiles: pantiles(),
       grooves: grooves(),
-      glassSky: fakeGlass('#8cc4e8', 'rgba(255,255,255,0.55)'),
-      glassWarm: fakeGlass('#f0a75e', 'rgba(255,236,190,0.45)'),
+      plywood: plywood(),
       stone: stone(),
     };
   }

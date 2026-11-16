@@ -3,8 +3,8 @@ import * as THREE from 'three';
 // The rest of the terrace: a block of five houses, built like the photo it's
 // based on (a 1970s Dutch row), with Lennie's house second from the left. The
 // four neighbours have the same front layout, mirrored in pairs, and their own
-// colour of panels. They're solid
-// blocks: Lennie bounces off them and can land on their roofs, porches and
+// colour of panels. Their windows are boarded up with plywood, to show they
+// aren't places to go. They're solid blocks: Lennie bounces off them and can land on their roofs, porches and
 // dormers, but can't go inside. Also the shared details (porch, chimney,
 // dormer, skylight, vents, downpipe) that Lennie's own house uses too.
 //
@@ -53,8 +53,8 @@ export function makeDetails(kit) {
   }
 
   /**
-   * A neighbour's dormer: a solid white flat-roofed block with a two-pane
-   * window, the same shape as the real one on Lennie's house (house.js).
+   * A neighbour's dormer: a solid white flat-roofed block with a window
+   * boarded up with plywood, the same shape as the real one on Lennie's house (house.js).
    */
   function dormer(x0, x1, story, frame = M.trim) {
     const zf = DORMER.front + DORMER.wallT / 2;
@@ -64,16 +64,15 @@ export function makeDetails(kit) {
     const wy0 = underside(zf) + 0.45 - 0.07;
     const wy1 = D.y1 - 0.18;
     box([x0 + 0.25, wy0, D.z1], [x1 - 0.25, wy1, D.z1 + 0.03], frame, { story });
-    box([x0 + 0.33, wy0 + 0.08, D.z1 + 0.03], [x1 - 0.33, wy1 - 0.08, D.z1 + 0.04], M.glassSky, { story });
-    const mx = (x0 + x1) / 2;
-    box([mx - 0.04, wy0, D.z1 + 0.035], [mx + 0.04, wy1, D.z1 + 0.06], frame, { story }); // (its back not in one plane with the glass's)
+    // the board just clear of the frame's face, a strip of frame showing round it
+    box([x0 + 0.3, wy0 + 0.05, D.z1 + 0.035], [x1 - 0.3, wy1 - 0.05, D.z1 + 0.055], M.plywood, { story });
     body([x0 - 0.15, D.y0, D.z0 - 0.15], [x1 + 0.15, D.y1 + 0.16, D.z1 + 0.15], physMats.hard, { kind: 'roof' });
   }
 
-  /** A roof window lying in the front slope. */
+  /** A roof window lying in the front slope, boarded up with plywood like the neighbours' other windows. */
   function skylight(x0, x1, zc, story) {
     const depth = 1.0;
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.08, depth), [frameGrey, frameGrey, M.glassSky, frameGrey, frameGrey, frameGrey]);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.08, depth), [frameGrey, frameGrey, M.plywood, frameGrey, frameGrey, frameGrey]);
     mesh.position.set((x0 + x1) / 2, roofTop(zc) + 0.02, zc);
     mesh.rotation.x = angle;
     groups[story].add(mesh);
@@ -268,18 +267,16 @@ export function buildNeighbours(kit, details) {
     body([x0, 0, OUT.z0], [x1, HOUSE.eaveY, OUT.z1], physMats.hard, { kind: 'block' });
 
     // ---- windows, door and panels (decoration on the facades)
-    const window_ = ({ x: [a, b], y: [ya, yb], side = 1, glass = M.glassSky, bars = { v: [0.5], h: [0.5] }, line }) => {
+    // Every window is boarded up with plywood, so it's plain you can't go in:
+    // the board covers the glass and sits on the frame, a strip of frame showing round it.
+    const window_ = ({ x: [a, b], y: [ya, yb], side = 1, line }) => {
       const zf = side > 0 ? OUT.z1 : OUT.z0;
       const Z = (d0, d1) => (side > 0 ? [zf + d0, zf + d1] : [zf - d1, zf - d0]);
       const opts = { story: 0, line };
       let z = Z(-0.01, 0.04);
       box([a - 0.07, ya - 0.05, z[0]], [b + 0.07, yb + 0.07, z[1]], frameMat, opts);
-      z = Z(0.04, 0.05);
-      box([a, ya, z[0]], [b, yb, z[1]], glass, opts);
-      // the bars sit on the glass, not beside it: level with it, their ends flickered against its edges
-      z = Z(0.05, 0.08);
-      for (const f of bars.v) box([a + (b - a) * f - 0.03, ya, z[0]], [a + (b - a) * f + 0.03, yb, z[1]], frameMat, opts);
-      for (const f of bars.h) box([a, ya + (yb - ya) * f - 0.03, z[0]], [b, ya + (yb - ya) * f + 0.03, z[1]], frameMat, opts);
+      z = Z(0.045, 0.065); // just clear of the frame's face, not in one plane with it
+      box([a - 0.03, ya - 0.02, z[0]], [b + 0.03, yb + 0.03, z[1]], M.plywood, opts);
       z = Z(-0.01, 0.13);
       box([a - 0.1, ya - 0.1, z[0]], [b + 0.1, ya - 0.05, z[1]], M.trim, opts);
     };
@@ -287,11 +284,7 @@ export function buildNeighbours(kit, details) {
     const col = span(LAYOUT.column);
     for (let k = 0; k < HOUSE.brickStories; k++) {
       const y0 = k * H;
-      window_({
-        x: col, y: k === 0 ? [y0 + 0.9, y0 + 2.2] : [y0 + 0.6, y0 + 2.5], line: front,
-        glass: k === 0 ? M.glassWarm : M.glassSky,
-        bars: k === 0 ? { v: [1 / 3, 2 / 3], h: [0.7] } : { v: [style.mirror ? 0.68 : 0.32], h: [] },
-      });
+      window_({ x: col, y: k === 0 ? [y0 + 0.9, y0 + 2.2] : [y0 + 0.6, y0 + 2.5], line: front });
       if (k < HOUSE.brickStories - 1) {
         const yb = y0 + 2.27;
         const yt = y0 + H + 0.5; // up to the sill above, not into it (their tops flickered)
@@ -299,14 +292,14 @@ export function buildNeighbours(kit, details) {
         box([col[0] - 0.07, yb, OUT.z1 - 0.01], [col[0], yt, OUT.z1 + 0.05], frameMat, { story: 0, line: front });
         box([col[1], yb, OUT.z1 - 0.01], [col[1] + 0.07, yt, OUT.z1 + 0.05], frameMat, { story: 0, line: front });
       }
-      if (k > 0) for (const s of LAYOUT.small) window_({ x: span(s), y: [y0 + 1.45, y0 + 2.25], line: front, bars: { v: [], h: [] } });
+      if (k > 0) for (const s of LAYOUT.small) window_({ x: span(s), y: [y0 + 1.45, y0 + 2.25], line: front });
       for (const s of LAYOUT.back) window_({ x: span(s), y: [y0 + 0.9, y0 + 2.2], side: -1, line: back });
     }
-    // front door: dark, with a tall glass panel and a white frame
+    // front door: dark, with a white frame, its tall glass panel boarded up too
     const [d0, d1] = span(LAYOUT.door);
     box([d0 - 0.07, 0, OUT.z1 - 0.01], [d1 + 0.07, 2.22, OUT.z1 + 0.05], M.trim, { story: 0, line: front });
     box([d0, 0, OUT.z1 + 0.05], [d1, 2.15, OUT.z1 + 0.07], doorMat, { story: 0, line: front });
-    box([d0 + 0.14, 0.95, OUT.z1 + 0.07], [d1 - 0.14, 1.99, OUT.z1 + 0.08], M.glassSky, { story: 0, line: front });
+    box([d0 + 0.12, 0.93, OUT.z1 + 0.075], [d1 - 0.12, 2.01, OUT.z1 + 0.095], M.plywood, { story: 0, line: front });
 
     details.downpipe(X(LAYOUT.pipe), 2.55, () => ({ story: 0, line: front }));
     // the house on Lennie's right has no toilet sticking out in the photo

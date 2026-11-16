@@ -204,8 +204,7 @@ export function buildHouse(scene, world, physMats) {
     canopy: std({ color: 0x2c2522, roughness: 0.7 }),
     pipe: std({ color: 0x4a4644, roughness: 0.5 }),
     spandrel: std({ map: tex.grooves, color: 0x3a4566, roughness: 0.6 }),
-    glassSky: std({ map: tex.glassSky, roughness: 0.15 }),
-    glassWarm: std({ map: tex.glassWarm, roughness: 0.3 }),
+    plywood: std({ map: tex.plywood, roughness: 0.9 }), // boarding up the neighbours' windows
     cladding: std({ color: 0xf1eee6, roughness: 0.7 }),
     darkRoof: std({ color: 0x35302e, roughness: 0.8 }),
     trim: std({ color: 0xfbfaf6, roughness: 0.6 }),
