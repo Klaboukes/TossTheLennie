@@ -58,10 +58,12 @@ const NL = {
   // ------------------------------------------------ meter, score card, bubbles
   'Contortion': 'Kronkel',
   'Contortion {n}%': 'Kronkel {n}%',
+  'Gentle toss': 'Slap worpje',
   'Grab Lennie, pull back and let go!': 'Pak Lennie, trek naar achteren en laat los!',
   'Toss #{n}': 'Worp #{n}',
   '▶ Watch the replay': '▶ Bekijk de herhaling',
   'Grab me!': 'Pak me!',
+  'Pull me back, then let go!': 'Trek me terug en laat los!',
   '{name}, grab me!': '{name}, pak me!',
   'Arc': 'Boog',
   'Higher arc': 'Hogere boog',
@@ -175,6 +177,8 @@ const NL = {
   'the supermarket floor': 'de vloer van de supermarkt',
   // ------------------------------------------------ challenges
   'Challenge done: {text}! +{n}': 'Uitdaging gehaald: {text}! +{n}',
+  'Also done: {text}': 'Ook gehaald: {text}',
+  'Also done: {text} (and {n} more)': 'Ook gehaald: {text} (en nog {n})',
   'All challenges done. Lennie legend!': 'Alle uitdagingen gehaald. Lennie-legende!',
   'Again': 'Opnieuw',
   'Start the challenges over': 'Begin opnieuw met de uitdagingen',
@@ -218,7 +222,7 @@ const NL = {
   'Take Lennie for a trolley ride': 'Geef Lennie een ritje in een winkelwagen',
   'Stick Lennie to a wall with pindakaas': 'Plak Lennie met pindakaas aan een muur',
   'Tie Lennie in a human knot': 'Leg Lennie in een mensenknoop',
-  'Score 2,500 points in one toss': 'Scoor 2.500 punten in één worp',
+  'Score 4,000 points in one toss': 'Scoor 4.000 punten in één worp',
   // ------------------------------------------------ the status line under the meter
   '▲ ▼ arc': '▲ ▼ boog',
   'scroll: arc': 'scroll: boog',

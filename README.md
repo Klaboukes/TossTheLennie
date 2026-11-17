@@ -124,7 +124,9 @@ Besides the TV's electric shock, these things happen to Lennie. Each earns a bon
 
 **Nederlands / English:** every text in the game (buttons, help, score card, challenges, the shouts that pop up) comes in Dutch and English. It starts in Dutch when the browser has Dutch among its languages, otherwise in English; the NL/EN button switches, and the choice is remembered in the browser. The shop signs and product labels in the supermarket are Dutch in both.
 
-**On a tablet or phone:** pull Lennie back and let go to fling him (▲ ▼ for a higher or lower arc), drag empty space to turn the camera, and pinch or slide two fingers to zoom and move. In aim mode, tap a spot to see the flight path and tap it again to throw. The help screen shows the touch controls on a touch screen and the mouse and keyboard ones on a computer.
+**First visit:** a hand over Lennie shows the pull (press on him, pull back, let go) over and over until the first toss. The full help is under the ? button (or H).
+
+**On a tablet or phone:** pull Lennie back and let go to fling him (▲ ▼ for a higher or lower arc), drag empty space to turn the camera, and pinch or slide two fingers to zoom and move. In aim mode, tap a spot to see the flight path and tap it again to throw. The help screen shows the touch controls on a touch screen and the mouse and keyboard ones on a computer. On a phone held upright the score card comes in under the score, and the picture slides down so Lennie lies in view below it (it slides back when the card goes); on a phone on its side the card goes down the right-hand side, and the meter and the arc buttons move to the bottom edge, so the middle of the screen stays free.
 
 The slingshot works like this: grab Lennie anywhere while he's lying down and pull back, away from where he should go. While you pull, a dotted arc shows exactly where he'll fly and a power bar fills: the further you pull, the further he goes. Pulling down (towards you) throws him into the picture, pulling left throws him right. The scroll wheel or the ▲ ▼ buttons make the arc higher or flatter without changing how far he lands, and the setting is kept for the next throw. A very flat or very steep arc can't reach as far; the power bar turns dark red when pulling further won't take him any further. A pull that's too short throws nothing. Grabbed in mid-air, Lennie isn't in the slingshot: he swings from your hand and a flick throws him again, for juggles.
 
@@ -144,13 +146,14 @@ The game opens close up on Lennie with a "Grab me!" bubble over him, which stays
 - **Special effects** (once a toss each): Frozen solid! (400), Splash! (150), Spin cycle! (350), Hot seat! (300), Piano crash! (200), Pillow burst! (250), Stinky Lennie! (200), Paint job! (300), Scratched by brambles! (200), Hagelslag shower! (300), Sticky Lennie! (250), Stuck to the wall! (300), Sinterklaas hat! (300), Bonked a lamp post! (300), Trolley ride! (500), Cat attack! (350).
 - **Landing spots**: where he comes to rest can earn a bonus, with Lennie saying something about it: in the bath, on either loo, on the desk, in the armchair, in the wash (on the washing machine), in either bed, on the beanbag or the toy box, on the dinner table, the kitchen counter or the piano, on the couch, in the cat litter, on the garage's junk pile or up on its camping shelf; in the supermarket in a freezer or a drinks fridge (through a smashed door, half in counts), on top of the freezers, the drinks fridges, the shelves, the bread rack or the cheese cooler, in the trolleys, in the fruit and veg, in the bread baskets, in the smashed pastry case or meat counter, behind the butcher counter, in the pindakaas, in the snack freezer, in the tulips, or scanned at a checkout; outside stuck in a tree, in the bushes, in the brambles, chilling on the lounge set, or napping on the trampoline.
 - **Multiplier**: +0.1 per hard bounce, +0.25 per mid-air juggle (re-grabbing him while he's airborne), +0.3 per smashed window (the shop window and the freezer and fridge doors count too), +0.4 per smashed door, up to ×4.
-- A toss that's too gentle doesn't score.
+- **Gentle toss**: a toss has to be a proper fling to score in full. When Lennie never got up to speed (letting him flop over after the tiniest pull), the score card says *Gentle toss* and only part of the score counts, down to a quarter. A pull of about a quarter of full power, or a good fall, is enough for all of it.
+- A toss that's too gentle to count at all doesn't score.
 - **Spots found**: the first time Lennie comes to rest in a landing spot, the score card says *New spot found!* with how many of them have been found so far, and the challenge list shows the count at the bottom. Remembered in the browser.
 - The best score is remembered in the browser, so it survives a reload on the same computer.
 
 ## Challenges
 
-Under the score there's always one challenge to go for, from easy ("Smash a window") to hard ("Put Lennie in the freezer", "Score 2,500 points in one toss"): 39 in all, including getting him attacked by the cat, sending him behind the butcher counter, getting him kicked out of the supermarket, throwing him in front of a car, knocking the board games out of the closet, smashing the TV cabinet's doors, freezing him solid, a trolley ride and sticking him to a wall with pindakaas. Doing one adds 300 points to that toss and brings up the next. *Skip* moves on and comes back to it later. Tap the challenge to see the whole list, with the ones already done ticked off, and pick any of them to go for next, done ones too. Progress is remembered in the browser. Challenges pause during a game of turns.
+Under the score there's always one challenge to go for, from easy ("Smash a window") to hard ("Put Lennie in the freezer", "Score 4,000 points in one toss"): 39 in all, including getting him attacked by the cat, sending him behind the butcher counter, getting him kicked out of the supermarket, throwing him in front of a car, knocking the board games out of the closet, smashing the TV cabinet's doors, freezing him solid, a trolley ride and sticking him to a wall with pindakaas. Doing one adds 300 points to that toss and brings up the next. A toss that happens to do other challenges that aren't up yet ticks those off too (without the bonus). *Skip* moves on and comes back to it later. Tap the challenge to see the whole list, with the ones already done ticked off, and pick any of them to go for next, done ones too. Progress is remembered in the browser. Challenges pause during a game of turns.
 
 ## Taking turns
 
@@ -160,13 +163,15 @@ The people button starts a game for 2–4 players, with their names (remembered 
 
 Every toss is recorded. *Watch the replay* on the score card (or P) plays it back in slow motion with the camera following Lennie, from just before he's let go to where he lands, however long he was held first. A tap or a key stops it. A replay only plays when someone asks for it.
 
-A big toss (1,500 or more) gets a burst of confetti where Lennie lands and a blue *Big toss!* sticker on the score card. A new best gets more confetti with gold in it, a gold *New best!* sticker and a little chime. Both make *Watch the replay* glow a few times.
+A big toss (2,000 or more, about one toss in six) gets a burst of confetti where Lennie lands and a blue *Big toss!* sticker on the score card. A new best gets more confetti with gold in it, a gold *New best!* sticker and a little chime. Both make *Watch the replay* glow a few times.
 
 Lennie reacts: a grin and a "wheee!" or "wa-hoo!" when he's flung, "ow!", "oof", "eek!" or "ouch" when he hits something hard, a groan when he lands, and after a good toss he lies there with crossed-out eyes, his tongue out and stars circling his head until he's picked up again. The stars come in a few styles (the classic yellow ring, a bobbing rainbow, two crossing rings like an atom, and a pink-and-gold ring that breathes in and out), and a good toss never shows the same one twice in a row. All sounds are synthesized; there are no audio files. To keep them from getting old, each surface sounds like what it's made of (wooden furniture knocks, the shop's shelves clang, hedges rustle, cushions puff), every sound has a few variations that never come twice in a row, and a sound that keeps repeating gets quieter.
 
 ## Low-end devices
 
-The game is made to run smoothly on cheap tablets and older phones too. That's why there are no real shadows (Lennie has a soft spot under him instead, which grows and fades as he flies higher), why the shelves hold one row of products, and why the picture is drawn a little less sharp than a phone's screen could show. If a device still can't keep up, the game makes the picture a bit less sharp by itself, a step at a time.
+The game is made to run smoothly on cheap tablets and older phones too. That's why there are no real shadows (Lennie has a soft spot under him instead, which grows and fades as he flies higher), why the shelves hold one row of products, and why the picture is drawn a little less sharp than a phone's screen could show. If a device still can't keep up, the game makes the picture a bit less sharp by itself, a step at a time. The panels are frosted glass only where there's a mouse (a computer): on a tablet or phone they're plain, because blurring what's behind them has to be redone every frame. And the physics only looks at the scenery near Lennie (`broadphase.js`), which more than halves its work.
+
+While the game loads, a *Lennie is on his way…* bubble shows, so a slow tablet doesn't sit there with an empty screen; if the game can't start (no internet for three.js, or no WebGL) it says so.
 
 ## How it fits together
 
@@ -184,7 +189,7 @@ Each frame, `main.js` moves the camera first, then lets the house and the shop d
 
 ## Files
 
-- `index.html`, `style.css`: the page, toolbar, score panel, challenge, players board, turn card and help; the import map that loads three.js and cannon-es
+- `index.html`, `style.css`: the page, toolbar, score panel, challenge, players board, turn card and help, with the layouts for a computer, an upright phone and a phone on its side; the loading message; the import map that loads three.js and cannon-es
 - `src/main.js`: scene, input (mouse and touch), camera, toss state machine, breaking glass and doors, landing spots, putting Lennie back when he leaves the play area, HUD, challenges, taking turns and the replay controls
 - `src/house.js`: the house (walls with windows and breakable doors, floors, stairs, the row's roof, furniture), plus cutaway and wall fading
 - `src/drawings.js`: the kids' drawings and paintings on the living room walls and the framed photos of friends in the toilet, all drawn on one canvas, the medieval town painting behind the dining table, and the kitchen whiteboard's week schedule (always in Dutch, like the supermarket's signs)
@@ -204,12 +209,13 @@ Each frame, `main.js` moves the camera first, then lets the house and the shop d
 - `src/supermarket.js`: the supermarket across the road, inside and out (the breakable shop window, aisles, freezers and fridges, the bakery, the sloping veg stand, the cheese cooler, the pindakaas pyramid, the butcher's counter and the other displays), with its own fading walls and roof
 - `src/seethrough.js`: the see-through circle that keeps Lennie in view through whatever is between him and the camera
 - `src/batching.js`: once everything is built, glues the scenery that never moves into a few big meshes, so there's far less to draw
+- `src/broadphase.js`: the physics' bookkeeping done the cheap way: only the scenery near Lennie is tested for bumps, and only the pairs that touch are remembered, which changes nothing in the game and more than halves what a physics step costs
 - `src/blobshadow.js`: the soft dark spot under Lennie (the game has no real shadows, so it stays smooth on low-end tablets)
 - `src/flickercheck.js`: when the game runs on your own computer (localhost), lists any spots where two surfaces lie in the same place and would flicker, in the browser console
 - `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking (the house's mess uses the same tumbling, and its plates, mugs and glasses smash into shards there)
 - `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, wallpaper, grubby white paint with the kids' handprints and crayon, wood, floor tiles, grass)
 - `src/ragdoll.js`: Lennie's bodies, joints and look (1.90 m and 100 kg, with a bit of a belly, in a worn hoodie and joggers; his face after the photo in docs: thinning dark hair receding at the temples, rectangular glasses and a short salt-and-pepper beard)
-- `src/scoring.js`: contortion measurement, trick detection and the multiplier
+- `src/scoring.js`: contortion measurement, trick detection and the multiplier, and how much of the score a gentle toss keeps
 - `src/challenges.js`: the list of challenges and the progress kept in the browser
 - `src/i18n.js`: Dutch and English: the Dutch version of every text (the game's code is written in English; a new text needs its Dutch version added here), switching between them, and putting `index.html`'s own texts in the chosen language
 - `src/replay.js`: records each toss (and the chairs he knocks over) and plays it back in slow motion

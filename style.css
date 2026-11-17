@@ -3,7 +3,8 @@
   --ink: #2b2433;                            /* dark outline for the pop-up words */
   --text: #fff6ec;
   --text-soft: rgba(255, 240, 228, 0.62);
-  --panel: linear-gradient(180deg, rgba(54, 42, 78, 0.82), rgba(28, 21, 42, 0.82));
+  /* (a bit more solid than on a computer, where the panels are frosted glass: see .glass) */
+  --panel: linear-gradient(180deg, rgba(54, 42, 78, 0.92), rgba(28, 21, 42, 0.92));
   --panel-solid: linear-gradient(180deg, #34284a, #1f182e);
   --edge: rgba(255, 255, 255, 0.13);
   --hover: rgba(255, 255, 255, 0.09);
@@ -46,10 +47,18 @@ html, body {
 .glass {
   color: var(--text);
   background: var(--panel);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
   border: 1px solid var(--edge);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+/* Frosted glass, on a computer only. The panels lie over the game, which is drawn
+   again every frame, so the blur behind each of them has to be redone every frame
+   too: too much for a low-end tablet or phone, which gets plain panels instead. */
+@media (hover: hover) and (pointer: fine) {
+  :root { --panel: linear-gradient(180deg, rgba(54, 42, 78, 0.82), rgba(28, 21, 42, 0.82)); }
+  .glass {
+    backdrop-filter: blur(14px) saturate(1.4);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  }
 }
 #toolbar, #meter, #result, #aim-pad, #replay-badge, #turn-card, #match-setup, #help { position: fixed; }
 
@@ -70,6 +79,28 @@ kbd {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 5px;
 }
+
+/* ---------- "Lennie is on his way…", until the game's first picture ---------- */
+#loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+#loading span {
+  max-width: calc(100vw - 32px);
+  padding: 9px 18px;
+  font: 600 15px 'Fredoka', system-ui, sans-serif;
+  text-align: center;
+  color: var(--text);
+  background: var(--panel-solid);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  animation: hint-bob 1s ease-in-out infinite;
+}
+#loading.failed span { border-radius: 16px; animation: none; }
 
 /* ---------- Top left: score, challenge, players' board ---------- */
 #hud-left {
@@ -506,6 +537,11 @@ kbd {
   width: 250px;
   padding: 12px 15px;
   border-radius: 18px;
+  /* a toss with a long list of feats on a low window: the card scrolls rather than running off the screen */
+  max-height: calc(100% - 2 * var(--gap));
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
   transform: translate(calc(100% + 32px), -50%);
   visibility: hidden;
   transition: transform 0.45s cubic-bezier(0.2, 1.4, 0.4, 1), visibility 0s linear 0.45s;
@@ -570,6 +606,8 @@ kbd {
 .r-lines li span:last-child { font-weight: 700; font-variant-numeric: tabular-nums; }
 .r-lines li.trick span:first-child { color: var(--good); font-weight: 600; }
 .r-lines li.mult span:last-child { color: var(--blue); }
+.r-lines li.gentle span { color: var(--accent-soft); }
+.r-lines li.gentle span:last-child { color: var(--accent); }
 @keyframes line-in { to { opacity: 1; transform: none; } }
 .r-foot { margin-top: 6px; font-size: 11px; color: var(--text-soft); }
 
@@ -792,6 +830,67 @@ body:not(.touch) .touch-only { display: none !important; }
   50% { transform: translateY(-6px); }
 }
 
+/* First visit: a hand shows the pull, over and over, until the first toss. It
+   presses on Lennie, pulls back with a dotted band behind it and lets go, and
+   an arrow shoots off the other way. main.js keeps the box on Lennie's chest. */
+.pull-hint {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.pull-hint[hidden] { display: none; }
+.pull-hand {
+  position: absolute;
+  left: -21px;
+  top: -4px;
+  width: 42px;
+  font-size: 36px;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 2px 5px rgba(18, 10, 28, 0.55);
+  transform-origin: 50% 0;
+  animation: pull-hand 2.6s ease-in-out infinite;
+}
+.pull-band {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  width: 8px;
+  height: 92px;
+  background: radial-gradient(circle, #fff 2.2px, rgba(43, 36, 51, 0.6) 2.6px, transparent 3.6px) 0 0 / 8px 11.5px repeat-y;
+  animation: pull-band 2.6s ease-in-out infinite;
+}
+.pull-go {
+  position: absolute;
+  left: -11px;
+  top: -34px;
+  border: 11px solid transparent;
+  border-top: 0;
+  border-bottom: 16px solid #fff;
+  filter: drop-shadow(0 0 2px rgba(43, 36, 51, 0.8));
+  animation: pull-go 2.6s ease-out infinite;
+}
+@keyframes pull-hand {
+  0% { opacity: 0; transform: translateY(-12px) scale(1.15); }
+  10% { opacity: 1; transform: translateY(0) scale(1); }
+  18% { opacity: 1; transform: translateY(0) scale(0.88); }
+  60%, 74% { opacity: 1; transform: translateY(92px) scale(0.88); }
+  82%, 100% { opacity: 0; transform: translateY(92px) scale(1.15); }
+}
+@keyframes pull-band {
+  0%, 18% { opacity: 1; clip-path: inset(0 0 100% 0); }
+  60%, 74% { opacity: 1; clip-path: inset(0 0 0 0); }
+  80%, 100% { opacity: 0; clip-path: inset(0 0 0 0); }
+}
+@keyframes pull-go {
+  0%, 74% { opacity: 0; transform: translateY(0); }
+  78% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-80px); }
+}
+
 /* ---------- Aim arc buttons ---------- */
 #aim-pad {
   left: 50%;
@@ -896,7 +995,10 @@ body:not(.touch) .touch-only { display: none !important; }
 }
 
 /* ---------- Small screens: score on top, toolbar at the bottom ---------- */
-@media (max-width: 760px) {
+/* A phone held upright (or a very narrow window). A phone on its side is wider
+   than it's high and keeps the computer's layout, see below. main.js looks at
+   where the score card ended up, not at these numbers. */
+@media (max-width: 760px) and (orientation: portrait), (max-width: 560px) {
   :root { --gap: 10px; }
   #hud-left { right: var(--gap); max-width: none; align-items: stretch; }
   #scorebox { justify-content: space-between; padding: 5px 14px; }
@@ -907,12 +1009,59 @@ body:not(.touch) .touch-only { display: none !important; }
   .menu { top: auto; bottom: calc(100% + 8px); }
   .ch-menu { width: auto; right: 0; }
   #meter { bottom: calc(var(--gap) + 54px); }
-  #result { top: 104px; left: var(--gap); right: var(--gap); width: auto; transform: translateY(calc(-100% - 140px)); }
+  /* The score card goes right under the score and the challenge (or the players'
+     board, which is taller: main.js sets --result-top), and is kept low, because
+     Lennie has to fit on the screen below it. */
+  #result {
+    top: var(--result-top, 104px);
+    left: var(--gap);
+    right: var(--gap);
+    width: auto;
+    max-height: calc(100% - var(--result-top, 104px) - 150px);
+    padding: 8px 13px 9px;
+    transform: translateY(calc(-100% - var(--result-top, 104px) - 40px));
+  }
   #result.show { transform: none; }
-  .r-total { font-size: 30px; }
+  .r-total { font-size: 28px; margin: 0 0 2px; }
+  .r-lines { font-size: 12px; }
+  .r-lines li { padding: 2px 0; }
+  .r-foot { margin-top: 4px; }
+  .replay-btn { margin-top: 7px; padding: 6px 10px; }
   #toast { top: 66px; white-space: normal; text-align: center; max-width: calc(100vw - 32px); }
   #aim-pad { bottom: calc(var(--gap) + 118px); }
   #replay-badge { top: auto; bottom: calc(var(--gap) + 118px); }
+}
+/* ---------- A phone on its side: low and wide ---------- */
+/* The computer's layout, squeezed: no title, the meter in the bottom left corner
+   and the arc buttons at the very bottom, so the middle (Lennie) stays free, and
+   a smaller score card down the right-hand side under the toolbar. */
+@media (max-height: 500px) and (orientation: landscape) and (min-width: 561px) {
+  :root { --gap: 8px; }
+  .brand { display: none; }
+  #hud-left { max-width: min(300px, 44vw); gap: 4px; }
+  #meter { left: var(--gap); transform: none; width: min(250px, 38vw); padding: 5px 11px 4px; }
+  #aim-pad { bottom: var(--gap); }
+  #replay-badge { top: 52px; }
+  #toast { top: 52px; }
+  #result {
+    top: 52px;
+    width: 232px;
+    max-height: calc(100% - 52px - var(--gap));
+    padding: 8px 12px 9px;
+    transform: translateX(calc(100% + 32px));
+  }
+  #result.show { transform: none; }
+  .r-total { font-size: 26px; margin: 0 0 2px; }
+  .r-lines { font-size: 11.5px; }
+  .r-lines li { padding: 2px 0; }
+  .r-foot { display: none; }
+  .replay-btn { margin-top: 6px; padding: 5px 10px; }
+}
+@media (max-height: 500px) and (orientation: landscape) and (min-width: 561px) and (max-width: 700px) {
+  #toolbar { gap: 0; padding: 3px; }
+  .tb-group { gap: 0; }
+  .tb-sep { margin: 0 2px; }
+  .icon-btn { width: 30px; height: 30px; }
 }
 @media (max-width: 440px) {
   #toolbar { gap: 0; padding: 3px; }
@@ -937,4 +1086,8 @@ body:not(.touch) .touch-only { display: none !important; }
   .confetti { display: none; }
   .replay-btn.invite { animation: none; }
   #result { transition: none; }
+  /* the hand stands still, pulled back */
+  .pull-hand { animation: none; transform: translateY(60px); }
+  .pull-band { animation: none; height: 60px; }
+  .pull-go { display: none; }
 }

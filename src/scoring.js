@@ -74,12 +74,15 @@ export function detectTricks(ragdoll) {
   return tricks;
 }
 
+// What a toss is called, by its score. An ordinary toss scores about 1,000 and
+// the best one in ten about 2,500 (60 test tosses from all over the map), so
+// the top names stay rare: with the old, lower steps every fifth toss was a legend.
 const RATINGS = [
-  [150, 'Barely bent'],
-  [400, 'Mildly crumpled'],
-  [800, 'Properly pretzeled'],
-  [1400, 'Gloriously gnarled'],
-  [2200, 'Spaghetti supreme'],
+  [300, 'Barely bent'],
+  [700, 'Mildly crumpled'],
+  [1200, 'Properly pretzeled'],
+  [1800, 'Gloriously gnarled'],
+  [2800, 'Spaghetti supreme'],
   [Infinity, 'Lennie legend'],
 ];
 
@@ -88,10 +91,28 @@ export function chainMultiplier(chain) {
   return Math.min(4, 1 + 0.1 * chain.bounces + 0.25 * chain.juggles + 0.3 * chain.smashed + 0.4 * chain.doors);
 }
 
+// A toss has to be a proper fling to score in full. Lying in a heap already
+// counts as some 45% contorted, and often as a trick or two, so letting Lennie
+// flop over after the tiniest pull scored like any other toss: 500 to 1,000,
+// now and then 1,600. `chain.fling` says how hard he was thrown, as a speed:
+// the speed he was let go at, or most of the top speed he reached later (a
+// long fall, a car). From `full` m/s on nothing changes; below it the score
+// shrinks, down to `least` of it at the gentlest throw the slingshot gives.
+// (The shortest pull there is throws him at 4.7 m/s, a pull of a quarter of
+// full power at 6, and aim mode never throws slower than that.)
+const GENTLE = { slow: 4.5, full: 6, least: 0.25 };
+
+/** What's left of the score of a toss thrown at `speed` m/s: 1 for a proper fling, less for a gentle one. */
+export function gentleFactor(speed) {
+  const effort = Math.min(1, Math.max(0, (speed - GENTLE.slow) / (GENTLE.full - GENTLE.slow)));
+  // (in steps of 0.05, so the score card's sum is the one shown)
+  return Math.round((GENTLE.least + (1 - GENTLE.least) * effort) * 20) / 20;
+}
+
 /**
  * Scores a finished toss. `chain` holds what happened during the flight:
- * { bounces, juggles, smashed, doors, bonuses: [{ label, value }] }, where bonuses
- * are the house-specific feats (falling floors, stairs, defenestration...).
+ * { bounces, juggles, smashed, doors, fling, bonuses: [{ label, value }] }, where
+ * bonuses are the house-specific feats (falling floors, stairs, defenestration...).
  */
 export function evaluateToss(ragdoll, chain) {
   const c = measureContortion(ragdoll);
@@ -109,9 +130,11 @@ export function evaluateToss(ragdoll, chain) {
   if (chain.smashed) multParts.push(plural(chain.smashed, 'window'));
   if (chain.doors) multParts.push(plural(chain.doors, 'door'));
   if (mult > 1) lines.push({ label: multParts.join(' · '), value: `×${fixed(mult, 2)}`, mult: true });
+  const gentle = gentleFactor(chain.fling ?? Infinity);
+  if (gentle < 1) lines.push({ label: t('Gentle toss'), value: `×${fixed(gentle, 2)}`, mult: true, gentle: true });
 
-  const total = Math.round(base * mult);
+  const total = Math.round(base * mult * gentle);
   const worst = c.joints.reduce((a, b) => (b.norm > a.norm ? b : a));
   const rating = t(RATINGS.find(([max]) => total < max)[1]);
-  return { total, base, mult, percent: c.percent, lines, tricks, worst, rating };
+  return { total, base, mult, gentle, percent: c.percent, lines, tricks, worst, rating };
 }

@@ -23,6 +23,31 @@
 <body>
   <canvas id="scene"></canvas>
 
+  <!-- Shown until the game draws its first picture (main.js takes it away). On a slow tablet or a slow
+       connection that takes a while, and without this the screen just stayed empty. If the game can't
+       start at all (no internet for three.js, no WebGL), it says so instead of waiting for ever.
+       The game's own texts (i18n.js) haven't arrived yet at this point, so both languages are right here. -->
+  <div id="loading" translate="no"><span>Lennie is on his way…</span></div>
+  <script>
+    (function () {
+      var nl = false;
+      try {
+        var saved = localStorage.getItem('toss-the-lennie:lang');
+        nl = saved ? saved === 'nl' : (navigator.languages || [navigator.language]).some(function (l) { return /^nl\b/i.test(l || ''); });
+      } catch (e) { /* storage unavailable */ }
+      var box = document.getElementById('loading');
+      if (nl) box.firstElementChild.textContent = 'Lennie komt eraan…';
+      window.lennieFailed = function () {
+        if (!box.isConnected) return; // the game is running: whatever went wrong later, it isn't this
+        box.classList.add('failed');
+        box.firstElementChild.textContent = nl
+          ? 'Het spel kon niet starten. Controleer de internetverbinding en laad de pagina opnieuw.'
+          : "The game couldn't start. Check the internet connection and load the page again.";
+      };
+      window.addEventListener('error', window.lennieFailed);
+    })();
+  </script>
+
   <!-- Top left: the score, and under it the current challenge (free play) or the players' scores (taking turns) -->
   <div id="hud-left">
     <div id="scorebox" class="glass">
@@ -143,6 +168,8 @@
   </aside>
 
   <div id="grab-hint" class="grab-hint" aria-hidden="true" hidden><span id="grab-hint-text">Grab me!</span></div>
+  <!-- First visit: a hand that shows the pull (press on Lennie, pull back, let go), until the first toss -->
+  <div id="pull-hint" class="pull-hint" aria-hidden="true" translate="no" hidden><i class="pull-band"></i><i class="pull-go"></i><span class="pull-hand">👆</span></div>
 
   <div id="sling-power" aria-hidden="true" hidden><i id="sling-fill"></i></div>
 
@@ -222,6 +249,6 @@
   <div id="pops"></div>
 
   <noscript>Toss the Lennie needs JavaScript and WebGL.</noscript>
-  <script type="module" src="src/main.js"></script>
+  <script type="module" src="src/main.js" onerror="lennieFailed()"></script>
 </body>
 </html>

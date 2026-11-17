@@ -1,5 +1,7 @@
 // Challenges: one goal at a time, roughly from easy to hard. Progress is kept
 // in the browser, so it carries over to the next visit on the same device.
+// A toss that happens to do a challenge that isn't up yet ticks that one off
+// as well (without the bonus, which is for doing the one that was asked).
 //
 // Each test gets what happened in a scored toss:
 //   { total, ids: Set of trick, feat and landing-spot ids, chain: { bounces, juggles, smashed, doors, trampoline } }
@@ -45,7 +47,8 @@ export const CHALLENGES = [
   { id: 'trolley', text: 'Take Lennie for a trolley ride', test: (r) => r.ids.has('trolley') },
   { id: 'stuck', text: 'Stick Lennie to a wall with pindakaas', test: (r) => r.ids.has('stuck') },
   { id: 'knot', text: 'Tie Lennie in a human knot', test: (r) => r.ids.has('knot') },
-  { id: 'score2500', text: 'Score 2,500 points in one toss', test: (r) => r.total >= 2500 },
+  // The last and hardest. (It was 2,500, which one toss in ten scores by accident.)
+  { id: 'score4000', text: 'Score 4,000 points in one toss', test: (r) => r.total >= 4000 },
 ];
 
 export const CHALLENGE_BONUS = 300;
@@ -57,7 +60,8 @@ export class Challenges {
     this.chosen = null; // a challenge picked from the list, which goes before the usual order
     try {
       const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
-      for (const id of saved.done ?? []) this.done.add(id);
+      // (only challenges that still exist: one that was dropped or replaced mustn't count as done)
+      for (const id of saved.done ?? []) if (CHALLENGES.some((c) => c.id === id)) this.done.add(id);
       this.skipped = (saved.skipped ?? []).filter((id) => !this.done.has(id));
       if (CHALLENGES.some((c) => c.id === saved.chosen)) this.chosen = saved.chosen;
     } catch { /* storage unavailable */ }
@@ -108,15 +112,26 @@ export class Challenges {
     this.#save();
   }
 
-  /** Checks a scored toss against the current challenge; returns it if it was just completed. */
+  /**
+   * Checks a scored toss. Returns { done, also }: the current challenge if this
+   * toss did it (that's the one that earns the bonus), and the others not done
+   * yet that it did along the way. Those are ticked off too: smashing a window
+   * on the first toss and then being asked to smash a window felt like it
+   * hadn't counted.
+   */
   check(result) {
     const c = this.current;
-    if (!c || !c.test(result)) return null;
-    this.done.add(c.id);
-    this.skipped = this.skipped.filter((id) => id !== c.id);
-    this.chosen = null;
+    const done = c?.test(result) ? c : null;
+    const also = CHALLENGES.filter((o) => o !== c && !this.done.has(o.id) && o.test(result));
+    if (!done && !also.length) return { done, also };
+    if (done) {
+      this.done.add(done.id);
+      this.chosen = null;
+    }
+    for (const o of also) this.done.add(o.id);
+    this.skipped = this.skipped.filter((id) => !this.done.has(id));
     this.#save();
-    return c;
+    return { done, also };
   }
 
   skip() {

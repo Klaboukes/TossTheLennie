@@ -19,6 +19,7 @@ import { createSeeThrough } from './seethrough.js';
 import { combineScenery } from './batching.js';
 import { sceneryParts, reportFlicker } from './flickercheck.js';
 import { createBlobShadow } from './blobshadow.js';
+import { tunePhysics } from './broadphase.js';
 import { t, fmt, fixed, lang, setLang, onLangChange } from './i18n.js';
 
 const FIXED_DT = 1 / 120;
@@ -40,6 +41,7 @@ const SETTLE_LIMB_SPEED = 0.6;
 const SETTLE_TIME = 0.5;
 const MAX_TOSS_TIME = 14;
 const MIN_TOSS_SPEED = 3.5;
+const FLING_SHARE = 0.85; // how much of the top speed he reaches in flight counts as "thrown this hard"
 const BOUNCE_IMPACT = 4;
 const GLASS_BREAK_SPEED = 4.5;
 // Doors are a bit tougher: a hard hit breaks one at once, a window-breaking
@@ -93,7 +95,9 @@ const SLING = {
   arcTime: 4, // s of flight shown in the preview
 };
 const SLING_ANGLE = { start: 35, min: 5, max: 80, step: 5 }; // launch angle above level, degrees
-const BIG_TOSS = 1500; // from this score a toss gets confetti and a "Big toss!" sticker
+// From this score a toss gets confetti and a "Big toss!" sticker. About one toss in six gets there
+// (in 60 test tosses from all over the map); at 1,500 it was nearly one in three, and no longer special.
+const BIG_TOSS = 2000;
 const TOSS_CHOICES = [5, 10, 15, 20]; // tosses each in a game of turns
 const PLAYER_COLORS = ['#ff6b4a', '#3f5fd6', '#22a06b', '#b04ad6'];
 
@@ -156,21 +160,9 @@ camera.position.copy(HOME_CAM);
 // ---------------------------------------------------------------- physics
 const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -GRAVITY, 0) });
 world.solver.iterations = 20;
-// The house is ~230 static boxes and only Lennie moves, so only test pairs
-// that involve a moving body. (SAP sorting breaks on the infinite planes.)
-class MovingBodiesBroadphase extends CANNON.NaiveBroadphase {
-  collisionPairs(w, pairs1, pairs2) {
-    const all = w.bodies;
-    for (const bi of all) {
-      if (bi.type === CANNON.Body.STATIC) continue;
-      for (const bj of all) {
-        if (bj === bi || (bj.type !== CANNON.Body.STATIC && bj.id < bi.id)) continue;
-        if (this.needBroadphaseCollision(bi, bj)) this.intersectionTest(bi, bj, pairs1, pairs2);
-      }
-    }
-  }
-}
-world.broadphase = new MovingBodiesBroadphase();
+// The world is some 500 boxes that never move and only Lennie (and what he
+// knocks over) does, so the physics only looks at the scenery near him (broadphase.js).
+tunePhysics(world);
 
 const lennieMat = new CANNON.Material('lennie');
 const physMats = {
@@ -254,6 +246,7 @@ const ui = {
   slingFill: $('sling-fill'),
   hint: $('grab-hint'),
   hintText: $('grab-hint-text'),
+  pull: $('pull-hint'),
   challenge: $('challenge'),
   chNum: $('ch-num'),
   chCount: $('ch-count'),
@@ -334,6 +327,27 @@ const cat = createCat({
 });
 const challenges = new Challenges();
 const hint = { on: true }; // the "Grab me!" bubble over Lennie, until he's first grabbed (and at each turn)
+// On the first visit a hand over Lennie shows the pull (press, pull back, let
+// go), over and over until his first toss. It's there in place of the help,
+// which used to open at once: a page of text a child doesn't read. The help is
+// still under the ? button.
+const HELP_SEEN_KEY = 'toss-the-lennie:help-seen'; // (named for the help, which is what it used to remember)
+const coach = { on: true };
+try { coach.on = localStorage.getItem(HELP_SEEN_KEY) !== '1'; } catch { /* storage unavailable */ }
+
+/** The words in the bubble over Lennie. */
+function hintLabel() {
+  const p = match && !matchOver() ? match.players[match.turn] : null;
+  if (p) return t('{name}, grab me!', { name: p.name });
+  return coach.on ? t('Pull me back, then let go!') : t('Grab me!');
+}
+
+/** The first toss is on its way: no more showing how. */
+function endCoach() {
+  coach.on = false;
+  try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch { /* ignore */ }
+  ui.hintText.textContent = hintLabel();
+}
 
 const BEST_KEY = 'toss-the-lennie:house-best';
 const OLD_BEST_KEY = 'bounce-the-lennie:house-best'; // from before the rename
@@ -424,6 +438,8 @@ function popAt(position, text, cls = '', rank = popRank(cls)) {
   for (const p of shownPops) {
     if (Math.abs(p.x - x) < (p.w + w) * 0.55 && Math.abs(p.y - y) < (p.h + h) * 0.7) y = p.y + (p.h + h) * 0.7;
   }
+  // Not on top of the score card, where it lies across the screen (a phone held upright): just below it.
+  if (ui.result.classList.contains('show') && resultOverMiddle()) y = Math.max(y, ui.result.offsetTop + ui.result.offsetHeight + h * 0.7);
   y = Math.min(y, innerHeight - h);
   el.style.left = `${x}px`;
   el.style.top = `${y}px`;
@@ -484,7 +500,7 @@ function showResult(result, where, cheer = null) {
   result.lines.forEach((line, i) => {
     const li = document.createElement('li');
     if (line.trick) li.className = 'trick';
-    if (line.mult) li.className = 'mult';
+    if (line.mult) li.className = line.gentle ? 'mult gentle' : 'mult';
     li.style.animationDelay = `${0.15 + i * 0.12}s`;
     const a = document.createElement('span');
     a.textContent = line.label;
@@ -499,12 +515,55 @@ function showResult(result, where, cheer = null) {
   countUp = { t: 0, dur: 0.9, to: result.total };
   ui.rTotal.textContent = '0';
   ui.result.classList.add('show');
+  placeResult();
   clearTimeout(resultTimer);
   resultTimer = setTimeout(hideResult, 9000);
 }
 
 function hideResult() {
   ui.result.classList.remove('show');
+  view.to = 0;
+}
+
+// On a phone held upright the score card lies right across the screen, over the
+// middle, which is where Lennie is: the card hid the pose it was scoring. So the
+// card goes straight under the score and the challenge (or the players' board,
+// which is taller), and the whole picture slides down until Lennie lies in the
+// middle of the free space below the card (updateViewShift). When the card
+// goes, the picture slides back.
+// Where the card is comes from the page itself, not from the screen's size:
+// style.css decides which layout a screen gets.
+const view = { shift: 0, to: 0, set: 0 }; // px the picture is moved down: now, where it's heading, and as last given to the camera
+const hudLeft = $('hud-left');
+const meterBox = $('meter');
+
+/** Is the score card lying over the middle of the screen (not beside it, as on a computer)? */
+function resultOverMiddle() {
+  const mid = innerWidth / 2;
+  return ui.result.offsetLeft < mid && ui.result.offsetLeft + ui.result.offsetWidth > mid;
+}
+
+function placeResult() {
+  view.to = 0;
+  if (!ui.result.classList.contains('show')) return;
+  ui.result.style.setProperty('--result-top', `${hudLeft.offsetTop + hudLeft.offsetHeight + 6}px`);
+  if (!resultOverMiddle()) return;
+  const top = ui.result.offsetTop + ui.result.offsetHeight;
+  const bottom = Math.min(ui.aimPad.offsetTop, meterBox.offsetTop);
+  view.to = clamp((top + bottom) / 2 - innerHeight / 2, 0, innerHeight * 0.3);
+}
+
+function updateViewShift(dt) {
+  // (not while Lennie is held: the picture mustn't slide away under the finger that's pulling him)
+  if (view.shift !== view.to && !grab && !sling) {
+    view.shift += (view.to - view.shift) * (1 - Math.exp(-dt * 7));
+    if (Math.abs(view.to - view.shift) < 0.5) view.shift = view.to;
+  }
+  const px = Math.round(view.shift);
+  if (px === view.set) return;
+  view.set = px;
+  if (px) camera.setViewOffset(innerWidth, innerHeight, 0, -px, innerWidth, innerHeight);
+  else camera.clearViewOffset();
 }
 
 // ---------------------------------------------------------------- toss state
@@ -517,6 +576,7 @@ const toss = {
   maxSpeed: 0,
   lastBounceAt: 0,
   // the combo chain, kept across juggles
+  fling: 0, // how hard he was thrown, as a speed (m/s): a toss that never got going scores less (scoring.js)
   bounces: 0,
   juggles: 0,
   smashed: 0,
@@ -537,6 +597,7 @@ const toss = {
 };
 
 function resetChain() {
+  toss.fling = 0;
   toss.bounces = 0;
   toss.juggles = 0;
   toss.smashed = 0;
@@ -703,13 +764,14 @@ function finishToss() {
   }
   replay.stop(true);
   const center = lennie.center(_center);
-  const chain = { bounces: toss.bounces, juggles: toss.juggles, smashed: toss.smashed, doors: toss.doors, trampoline: toss.trampoline };
+  const chain = { bounces: toss.bounces, juggles: toss.juggles, smashed: toss.smashed, doors: toss.doors, trampoline: toss.trampoline, fling: toss.fling };
   const result = evaluateToss(lennie, { ...chain, bonuses: houseBonuses(center) });
   const found = newSpotLine(result.tricks);
   if (found) result.lines.push(found);
 
-  // The challenge (free play only): a bonus on top when it's done.
-  const done = match ? null : challenges.check({ total: result.total, ids: new Set(result.tricks.map((t) => t.id)), chain });
+  // The challenge (free play only): a bonus on top when it's done. Other
+  // challenges this toss happened to do are ticked off as well.
+  const { done, also } = match ? { done: null, also: [] } : challenges.check({ total: result.total, ids: new Set(result.tricks.map((t) => t.id)), chain });
   if (done) {
     result.lines.push({ label: t('Challenge done!'), value: CHALLENGE_BONUS, trick: true });
     result.total += CHALLENGE_BONUS;
@@ -730,7 +792,7 @@ function finishToss() {
   if (beatBest) bump(ui.best);
   const cheer = beatBest ? 'best' : result.total >= BIG_TOSS ? 'big' : null;
   showResult(result, sayWhere(center), cheer);
-  sfx.score(result.total > 1600 ? 3 : result.total > 900 ? 2 : result.total > 400 ? 1 : 0);
+  sfx.score(result.total >= BIG_TOSS ? 3 : result.total > 1000 ? 2 : result.total > 500 ? 1 : 0);
   sfx.voice(result.total >= 900 ? 'land' : 'grunt');
   // A good toss leaves him seeing stars until he's picked up again.
   if (result.total >= 400 || toss.bounces >= 5) lennie.setExpression('dizzy');
@@ -747,7 +809,7 @@ function finishToss() {
   toss.state = 'scored';
   resetChain();
 
-  if (done) challengeDone(done);
+  if (done || also.length) challengeDone(done, also);
   if (match) {
     recordTurn(result.total);
     turnPending = true;
@@ -762,6 +824,9 @@ function updateToss(simDt) {
   if (toss.state !== 'flying') return;
   toss.time += simDt;
   toss.maxSpeed = Math.max(toss.maxSpeed, lennie.coreSpeed());
+  // (a long fall, a car or a flick in mid-air count as a fling too; the bit of
+  // speed he picks up toppling over after the gentlest throw doesn't)
+  toss.fling = Math.max(toss.fling, FLING_SHARE * toss.maxSpeed);
   if (lennie.coreSpeed() < SETTLE_CORE_SPEED && lennie.maxSpeed() < SETTLE_LIMB_SPEED) toss.settle += simDt;
   else toss.settle = 0;
   if ((toss.time > 0.6 && toss.settle > SETTLE_TIME) || toss.time > MAX_TOSS_TIME) finishToss();
@@ -1516,6 +1581,7 @@ function beginFlight() {
   toss.time = 0;
   toss.settle = 0;
   toss.maxSpeed = 0;
+  if (coach.on) endCoach();
 }
 
 function idleCursor() {
@@ -1933,6 +1999,7 @@ function launch(v, through = null) {
   spin.y = (Math.random() - 0.5) * 2;
   aim.guide = { v: v.clone(), t0: world.time, spin };
   const speed = v.length();
+  toss.fling = speed;
   sfx.whoosh(Math.min(1, speed / 20));
   if (speed > 7) {
     sfx.voice('fly');
@@ -2277,8 +2344,7 @@ onLangChange(() => {
   renderBoard();
   if (!ui.setup.hidden) renderSetup();
   if (!ui.turnCard.hidden && match && !matchOver()) showTurnCard();
-  const p = match && !matchOver() ? match.players[match.turn] : null;
-  ui.hintText.textContent = p ? t('{name}, grab me!', { name: p.name }) : t('Grab me!');
+  ui.hintText.textContent = hintLabel();
 });
 // Drop menu
 function setDropMenu(open) {
@@ -2301,23 +2367,14 @@ document.addEventListener('pointerdown', (e) => {
   if (!ui.dropMenu.hidden && !ui.dropMenu.contains(e.target) && !btn.drop.contains(e.target)) setDropMenu(false);
 });
 
-// Help: shown on the first visit, then on demand.
-const HELP_SEEN_KEY = 'toss-the-lennie:help-seen';
+// Help: under the ? button. (A first visit gets the hand over Lennie instead, see `coach`.)
 function setHelp(open) {
   ui.help.hidden = !open;
   btn.help.setAttribute('aria-expanded', String(open));
   if (open) ui.helpClose.focus({ preventScroll: true });
-  else {
-    try { localStorage.setItem(HELP_SEEN_KEY, '1'); } catch { /* ignore */ }
-  }
 }
 btn.help.addEventListener('click', () => setHelp(ui.help.hidden));
 ui.helpClose.addEventListener('click', () => setHelp(false));
-{
-  let seen = false;
-  try { seen = localStorage.getItem(HELP_SEEN_KEY) === '1'; } catch { /* ignore */ }
-  if (!seen) setHelp(true);
-}
 
 // Toolbar buttons shouldn't keep keyboard focus after a click, so Space/keys
 // keep driving the game rather than re-pressing the button.
@@ -2380,6 +2437,9 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  // the score card may lie somewhere else now (a phone turned on its side)
+  placeResult();
+  view.set = -1;
 });
 
 // ---------------------------------------------------------------- instant replay
@@ -2406,6 +2466,7 @@ function endReplay() {
     showTurnCard();
   } else if (toss.state === 'scored') {
     ui.result.classList.add('show');
+    placeResult();
     clearTimeout(resultTimer);
     resultTimer = setTimeout(hideResult, 6000);
   }
@@ -2419,20 +2480,27 @@ ui.replayBtn.addEventListener('click', () => {
 
 // ---------------------------------------------------------------- "Grab me!" hint
 const _hintPos = new THREE.Vector3();
-function updateHint() {
-  const show = hint.on && toss.state === 'idle' && !grab && !sling && !replay.playing
-    && ui.help.hidden && ui.turnCard.hidden && ui.setup.hidden && ui.chMenu.hidden;
+/** Shows `el` at a point `lift` m above a part of Lennie, or hides it when `show` is false or that's off screen. */
+function pinToLennie(el, show, part, lift) {
   if (show) {
-    const head = lennie.parts.head.body.position;
-    const v = _hintPos.set(head.x, head.y + 0.35, head.z).project(camera);
+    const p = lennie.parts[part].body.position;
+    const v = _hintPos.set(p.x, p.y + lift, p.z).project(camera);
     if (v.z < 1 && Math.abs(v.x) < 1 && Math.abs(v.y) < 1) {
-      ui.hint.style.left = `${(v.x * 0.5 + 0.5) * innerWidth}px`;
-      ui.hint.style.top = `${(-v.y * 0.5 + 0.5) * innerHeight}px`;
-      if (ui.hint.hidden) ui.hint.hidden = false;
+      el.style.left = `${(v.x * 0.5 + 0.5) * innerWidth}px`;
+      el.style.top = `${(-v.y * 0.5 + 0.5) * innerHeight}px`;
+      if (el.hidden) el.hidden = false;
       return;
     }
   }
-  if (!ui.hint.hidden) ui.hint.hidden = true;
+  if (!el.hidden) el.hidden = true;
+}
+
+function updateHint() {
+  const waiting = toss.state === 'idle' && !grab && !sling && !replay.playing
+    && ui.help.hidden && ui.turnCard.hidden && ui.setup.hidden && ui.chMenu.hidden;
+  pinToLennie(ui.hint, waiting && hint.on, 'head', 0.35);
+  // The hand that shows the pull stays until the first toss, also after a grab that threw nothing.
+  pinToLennie(ui.pull, waiting && coach.on, 'chest', 0);
 }
 
 // ---------------------------------------------------------------- challenges
@@ -2531,13 +2599,28 @@ document.addEventListener('pointerdown', (e) => {
   if (!ui.chMenu.hidden && !ui.chMenu.contains(e.target) && !ui.chOpen.contains(e.target)) setChallengeMenu(false);
 });
 
-function challengeDone(c) {
+/** Celebrates the challenge a toss did (`c`, if any), and says which others it ticked off along the way. */
+let alsoTimer = 0;
+function challengeDone(c, also = []) {
   sfx.chime();
+  clearTimeout(alsoTimer);
+  const sayAlso = () => {
+    const text = t(also[0].text);
+    toast(also.length > 1 ? t('Also done: {text} (and {n} more)', { text, n: also.length - 1 }) : t('Also done: {text}', { text }), 2600);
+  };
+  if (!c) {
+    sayAlso();
+    flash(ui.challenge, 'picked');
+    renderChallenge();
+    return;
+  }
   sfx.voice('cheer');
   toast(t('Challenge done: {text}! +{n}', { text: t(c.text), n: CHALLENGE_BONUS }), 2600);
   ui.chText.textContent = `✔ ${t(c.text)}`;
   flash(ui.challenge, 'done');
   setTimeout(renderChallenge, 1600);
+  // (one message at a time: the others wait for the first to go)
+  if (also.length) alsoTimer = setTimeout(sayAlso, 2800);
 }
 
 ui.chSkip.addEventListener('click', () => {
@@ -2640,7 +2723,7 @@ function newMatch(names, tosses) {
 function endMatch() {
   match = null;
   turnPending = false;
-  ui.hintText.textContent = t('Grab me!');
+  ui.hintText.textContent = hintLabel();
   clearTimeout(turnTimer);
   ui.board.hidden = true;
   ui.turnCard.hidden = true;
@@ -2682,7 +2765,7 @@ function renderBoard() {
 function showTurnCard() {
   if (!match || replay.playing) return; // after a replay, endReplay shows it
   // On a phone the score card sits right where the turn card goes; it had its 2.4 s.
-  if (matchMedia('(max-width: 760px)').matches) hideResult();
+  if (resultOverMiddle()) hideResult();
   ui.turnRanking.hidden = true;
   ui.turnAlt.hidden = true;
   if (matchOver()) {
@@ -2756,7 +2839,7 @@ function beginTurn() {
   resetAll(false);
   hint.on = true;
   const p = match.players[match.turn];
-  ui.hintText.textContent = t('{name}, grab me!', { name: p.name });
+  ui.hintText.textContent = hintLabel();
   toast(t("{name}'s turn!", { name: p.name }), 1400);
 }
 
@@ -2795,6 +2878,7 @@ function changeArc(steps) {
 ui.aimPad.querySelector('#aim-higher').addEventListener('click', () => changeArc(1));
 ui.aimPad.querySelector('#aim-lower').addEventListener('click', () => changeArc(-1));
 renderChallenge();
+ui.hintText.textContent = hintLabel();
 
 // ---------------------------------------------------------------- HUD per frame
 let meter = 0;
@@ -3082,7 +3166,13 @@ function frame(now) {
   last = now;
   watchSpeed(seconds);
   tick(dt, now);
+  // The first picture is on screen: "Lennie is on his way…" (index.html) can go.
+  if (loading) {
+    loading.remove();
+    loading = null;
+  }
 }
+let loading = $('loading');
 
 function tick(dt, now) {
   if (replay.playing) {
@@ -3108,6 +3198,7 @@ function tick(dt, now) {
   lennie.update(dt);
   updateGrabVisual();
   updateSettleFocus(dt);
+  updateViewShift(dt);
   updateCamera(dt);
   updateAim();
   updateHint();
