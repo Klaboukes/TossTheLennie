@@ -17,10 +17,23 @@ import { parkBikes } from './bikes.js';
 // below): a wall from the back to the front, the loft with the washing
 // machine on the left, the attic bedroom on the right. It's the second house in a block of
 // five; the neighbours (solid, no rooms; see street.js) share one long roof.
-export const HOUSE = { x0: -4, x1: 4, z0: -5, z1: 5, H: 3, T: 0.4, stories: 3, brickStories: 2, eaveY: 6, ridgeY: 11 };
-// The roof's underside runs from the wall tops (eaveY at z = ±5) up to the ridge.
+export const HOUSE = { x0: -4, x1: 4, z0: -5, z1: 5, H: 3, T: 0.4, stories: 3, brickStories: 2, eaveY: 6, ridgeY: 11, backEaveY: 3.5, kneeY: 3.55 };
+// The roof's underside runs from the front wall's top (eaveY at z = 5) up to
+// the ridge, and from there, steeper, all the way down the back to just above
+// floor 2's floor (backEaveY at z = -5), as on the real house: the back rooms
+// of floor 2 are under the roof, with a wide dormer for their windows.
 const PITCH = (HOUSE.ridgeY - HOUSE.eaveY) / HOUSE.z1;
-const underside = (z) => HOUSE.ridgeY - PITCH * Math.abs(z);
+const BACK_PITCH = (HOUSE.ridgeY - HOUSE.backEaveY) / HOUSE.z1;
+const pitchAt = (z) => (z < 0 ? BACK_PITCH : PITCH);
+const underside = (z) => HOUSE.ridgeY - pitchAt(z) * Math.abs(z);
+// Where the back slope's underside comes down to the attic floor: the attic stops there.
+const ATTIC_BACK = -(HOUSE.ridgeY - 2 * HOUSE.H) / BACK_PITCH;
+// The attic floor's slab reaches a little further back, its end tucked into the
+// roof (its top inside the tiles, its underside showing below them on floor 2).
+const ATTIC_SLAB_Z0 = ATTIC_BACK - 0.09;
+const ATTIC_FLOOR_Z0 = ATTIC_SLAB_Z0 + 0.02; // its floorboards, 2 cm short of the slab's end
+// The back wall of floor 2 is only a low knee wall under the roof (brick outside).
+const KNEE_TOP = HOUSE.kneeY;
 
 const { H, T } = HOUSE;
 const EXT = 0.25; // exterior wall thickness (visual)
@@ -34,6 +47,18 @@ const WIN = { sill: 0.9, top: 2.2 };
 // attic (the bedroom), with a window Lennie can be thrown out of. `back` is
 // where its flat roof meets the roof's underside, `front` the middle of its front wall.
 export const DORMER = { x0: 0.6, x1: 3.2, back: HOUSE.ridgeY - 8.4, front: 4.0, top: 8.4, wallT: 0.2 };
+// The dormer on the back slope, after the photo of the back: wide, over both
+// back rooms of floor 2, its front wall standing on the back wall, a window
+// for each room (the middle wall meets it between them), its flat roof just
+// under floor 2's ceiling with a dark edge. x0 / x1 are its sides' centre
+// lines, `front` its front wall's, `back` where its roof meets the roof's
+// underside (a negative z, like the whole back slope).
+export const BACK_DORMER = {
+  x0: -3.65, x1: 2.25, front: -4.775, top: 5.55, wallT: 0.2,
+  windows: [{ a: -3.4, b: -0.4, bars: { v: [0.35], h: [] } }, { a: 0.1, b: 2.0, bars: { v: [0.5], h: [] } }],
+  sill: 4.15, head: 5.3,
+};
+BACK_DORMER.back = -(HOUSE.ridgeY - BACK_DORMER.top) / BACK_PITCH;
 const DOOR_TOP = 2.15;
 const DOOR_COLORS = { inside: 0xf4f2ee, front: 0x3b3735 }; // the inside doors are white
 // A wall faded out of the camera's way keeps this faint ghost of itself, but
@@ -182,7 +207,6 @@ const FRONT = [
   // the two small ones light the bathroom, the big one the front kids room
   [{ a: -3.75, b: -3.05, ...SMALL }, { a: -2.45, b: -1.25, ...SMALL }, { a: COLUMN[0], b: COLUMN[1], sill: 0.6, top: 2.5, bars: { v: [0.32], h: [] } }],
 ];
-const BACK = [{ a: -3.5, b: -2.4 }, { a: 2.3, b: 3.4 }];
 // The living room's back wall: one big window frame onto the garden, a wide
 // pane with a side window on its left (seen from inside, by the TV), and the door to the utility room.
 // The convector heating trench runs in the floor under it.
@@ -399,6 +423,30 @@ export function buildHouse(scene, world, physMats) {
     const faces = [[...Array(m).keys()], [...Array(m).keys()].map((i) => m + i)];
     for (let i = 0; i < m; i++) faces.push([i, (i + 1) % m, m + ((i + 1) % m), m + i]);
     convexBody(points, faces, { kind: 'wall' });
+  }
+
+  /**
+   * A wall across x on floor 2 (a party wall), from the knee wall to `to`,
+   * under the back slope: up to the ceiling, and behind that cut to the roof's
+   * underside. Two convex pieces: the big one, and the little triangle where
+   * the roof's underside is above the ceiling until the attic floor's slab
+   * ends in it (without it you'd see a chink of the neighbour's there).
+   */
+  function underRoofWall({ at, to, ...rest }) {
+    const ceil = 2 * H - T;
+    const zc = -(HOUSE.ridgeY - ceil) / BACK_PITCH; // where the roof's underside comes down to the ceiling
+    prismWall({ run: 'z', at, poly: [[IN.z0, H], [to, H], [to, ceil], [zc, ceil], [IN.z0, underside(IN.z0)]], story: 1, ...rest });
+    prismWall({ run: 'z', at, poly: [[zc, ceil], [ATTIC_SLAB_Z0, ceil], [ATTIC_SLAB_Z0, underside(ATTIC_SLAB_Z0)]], story: 1, ...rest });
+  }
+
+  /** Static physics box with half-sizes `half`, tilted by `rotX` about x (lying on a roof slope). */
+  function tiltedBody(center, half, rotX, surface) {
+    const b = new CANNON.Body({ mass: 0, material: physMats.roof ?? physMats.hard, shape: new CANNON.Box(new CANNON.Vec3(...half)) });
+    b.position.set(...center);
+    b.quaternion.setFromEuler(rotX, 0, 0);
+    b.surface = surface;
+    world.addBody(b);
+    return b;
   }
 
   function body(min, max, material, surface) {
@@ -667,22 +715,30 @@ export function buildHouse(scene, world, physMats) {
       splits: k === 0 ? [GF.toiletX, GF.hallX] : [F2.midX],
       mats: { pos: M.brick, neg: (x) => wallpaper(roomAt(x, IN.z1 - 0.1)), ends: M.brick },
     });
+    // On floor 2 the back wall is only a knee wall: the roof comes down over it
+    // (its top tucked into the roof outside, a little under the roof's underside inside).
     wall({
       ...common, run: 'x', at: HOUSE.z0, from: OUT.x0, to: OUT.x1, physOffset: -off, outward: -1, line: `north-${k}`,
-      openings: k === 0 ? [...BACK_GROUND.map(win), { ...door(UTILITY_DOOR, false, true), catFlap: true }] : BACK.map(win),
-      splits: k === 0 ? [] : [F2.midX],
+      ...(k === 0 ? { openings: [...BACK_GROUND.map(win), { ...door(UTILITY_DOOR, false, true), catFlap: true }] } : { y1: KNEE_TOP, splits: [F2.midX] }),
       mats: { pos: (x) => wallpaper(roomAt(x, IN.z0 + 0.1)), neg: M.brick, ends: M.brick },
     });
+    // The party walls. On floor 2 their back rooms' part is cut to the roof's
+    // underside, from the knee wall up to the ceiling (see underRoofWall).
+    const [wz, ez] = k === 0 ? [IN.z0, IN.z0] : [F2.backZ, F2.rightZ];
     wall({
-      ...common, run: 'z', at: HOUSE.x0, from: IN.z0, to: IN.z1, physOffset: -off, outward: -1, line: `west-${k}`,
-      splits: k === 0 ? [GF.storeZ, GF.toiletZ] : [F2.backZ, F2.frontZ],
+      ...common, run: 'z', at: HOUSE.x0, from: wz, to: IN.z1, physOffset: -off, outward: -1, line: `west-${k}`,
+      splits: k === 0 ? [GF.storeZ, GF.toiletZ] : [F2.frontZ],
       mats: { pos: (z) => wallpaper(roomAt(IN.x0 + 0.1, z)), neg: M.brick },
     });
     wall({
-      ...common, run: 'z', at: HOUSE.x1, from: IN.z0, to: IN.z1, physOffset: off, outward: 1, line: `east-${k}`,
-      splits: k === 0 ? [GF.hallZ] : [F2.rightZ],
+      ...common, run: 'z', at: HOUSE.x1, from: ez, to: IN.z1, physOffset: off, outward: 1, line: `east-${k}`,
+      splits: k === 0 ? [GF.hallZ] : [],
       mats: { pos: M.brick, neg: (z) => wallpaper(roomAt(IN.x1 - 0.1, z)) },
     });
+    if (k === 1) {
+      underRoofWall({ at: HOUSE.x0, to: wz, thick: EXT, physThick: EXT_PHYS, physOffset: -off, mats: { pos: wallpaper(R.kidsBack), neg: M.brick }, line: `west-${k}` });
+      underRoofWall({ at: HOUSE.x1, to: ez, thick: EXT, physThick: EXT_PHYS, physOffset: off, mats: { pos: M.brick, neg: wallpaper(R.bedroom) }, line: `east-${k}` });
+    }
     }
 
     // Interior walls
@@ -730,8 +786,8 @@ export function buildHouse(scene, world, physMats) {
       [{ x0: F2.midX, x1: IN.x1, z0: IN.z0, z1: F2.rightZ }, R.bedroom],
       [{ x0: F2.midX, x1: IN.x1, z0: F2.rightZ, z1: IN.z1 }, R.kids],
     ] : [
-      [{ x0: IN.x0, x1: ATTIC.midX, z0: IN.z0, z1: IN.z1 }, R.left],
-      [{ x0: ATTIC.midX, x1: IN.x1, z0: IN.z0, z1: IN.z1 }, R.right],
+      [{ x0: IN.x0, x1: ATTIC.midX, z0: ATTIC_FLOOR_Z0, z1: IN.z1 }, R.left],
+      [{ x0: ATTIC.midX, x1: IN.x1, z0: ATTIC_FLOOR_Z0, z1: IN.z1 }, R.right],
     ];
     for (const [rect, room] of floors) for (const r of rectMinus(rect, HOLES[k])) addFloor(r, room);
   }
@@ -757,7 +813,8 @@ export function buildHouse(scene, world, physMats) {
     // Slab edges on the outside carry on the brick of the storey below; the
     // attic floor's edge stays white, like the band under the eaves.
     const edge = k < HOUSE.brickStories ? M.brick : M.trim;
-    for (const r of rectMinus({ x0: OUT.x0, x1: OUT.x1, z0: OUT.z0, z1: OUT.z1 }, HOLES[k])) {
+    // (the attic floor stops where the back slope comes down to it, its end tucked into the roof)
+    for (const r of rectMinus({ x0: OUT.x0, x1: OUT.x1, z0: k === 2 ? ATTIC_SLAB_Z0 : OUT.z0, z1: OUT.z1 }, HOLES[k])) {
       const side = (outside) => (outside ? edge : M.trim);
       const mats = [side(r.x1 === OUT.x1), side(r.x0 === OUT.x0), M.ceiling, M.ceiling, side(r.z1 === OUT.z1), side(r.z0 === OUT.z0)];
       box([r.x0, top - T, r.z0], [r.x1, top, r.z1], mats, { story: k, line });
@@ -770,7 +827,7 @@ export function buildHouse(scene, world, physMats) {
   buildStairs();
 
   // Shared details (street.js); x = OUT.x0 + u for Lennie's house.
-  const kit = { box, body, addMesh, groups, M, std, tex, physMats, world, HOUSE, OUT, EXT, ROW, DORMER };
+  const kit = { box, body, convexBody, tiltedBody, addMesh, groups, M, std, tex, physMats, world, HOUSE, OUT, EXT, ROW, DORMER, BACK_DORMER };
   const details = makeDetails(kit);
   const ux = ([u0, u1]) => [OUT.x0 + u0, OUT.x0 + u1];
   buildRoof();
@@ -953,8 +1010,9 @@ export function buildHouse(scene, world, physMats) {
       ...inner, run: 'x', at: frontZ, from: IN.x0, to: midX - INT / 2, line: 'bathback-1',
       openings: [door([-1.75, -0.85])], mats: { pos: paper('bath'), neg: paper('hall') },
     });
+    // (from the back dormer's front wall, its end tucked 2.5 cm into it)
     wall({
-      ...inner, run: 'z', at: midX, from: IN.z0, to: IN.z1, line: 'mid-1',
+      ...inner, run: 'z', at: midX, from: BACK_DORMER.front + BACK_DORMER.wallT / 2 - 0.025, to: IN.z1, line: 'mid-1',
       openings: [door([-0.62, 0.27]), door([0.63, 1.52])],
       splits: [backZ, rightZ, frontZ],
       mats: {
@@ -965,6 +1023,29 @@ export function buildHouse(scene, world, physMats) {
     wall({
       ...inner, run: 'x', at: rightZ, from: midX + INT / 2, to: IN.x1, line: 'kidsfront-1',
       mats: { pos: paper('kids'), neg: paper('bedroom') },
+    });
+    buildBackDormer(paper);
+  }
+
+  // ------------------------------------------------------------ the back dormer
+  // Over both back rooms of floor 2 (BACK_DORMER). Its sides are only there
+  // above the roof's underside: below it the rooms carry on under the slope
+  // beside the dormer. Its front wall stands on the knee wall, with a
+  // breakable window for each room; its flat roof is with the roof (buildRoof).
+  function buildBackDormer(paper) {
+    const B = BACK_DORMER;
+    const bf = B.front - B.wallT / 2; // the outside face of its front wall
+    // (their bottom edge 2 cm above the roof's underside, which runs on 8 cm into them: level with it, it flickered)
+    const cheek = [[bf, underside(bf) + 0.02], [bf, B.top], [B.back - 0.02 / BACK_PITCH, B.top]];
+    prismWall({ run: 'z', at: B.x0, poly: cheek, thick: B.wallT, physThick: 0.3, mats: { pos: paper('kidsBack'), neg: M.cladding }, story: 1, line: 'bcheekl-1' });
+    prismWall({ run: 'z', at: B.x1, poly: cheek, thick: B.wallT, physThick: 0.3, mats: { pos: M.cladding, neg: paper('bedroom') }, story: 1, line: 'bcheek-1' });
+    // the front wall fits between the sides; its ends show inside, below the roof's underside, so they're painted like the rooms
+    wall({
+      run: 'x', at: B.front, from: B.x0 + B.wallT / 2, to: B.x1 - B.wallT / 2, y0: H, y1: B.top,
+      thick: B.wallT, physThick: 0.5, physOffset: -0.15, outward: -1, story: 1, line: 'bdormer-1',
+      openings: B.windows.map((o) => ({ ...o, bottom: B.sill, top: B.head, glass: true, slack: SLACK })),
+      splits: [F2.midX],
+      mats: { pos: (x) => paper(x < F2.midX ? 'kidsBack' : 'bedroom'), neg: M.cladding, ends: paper('bedroom') },
     });
   }
 
@@ -1113,7 +1194,8 @@ export function buildHouse(scene, world, physMats) {
 
   // ------------------------------------------------------------ attic
   // The top floor is the attic, after the owner's floor plan (ATTIC): no front
-  // or back wall (the roof slopes down to the floor), gable walls shared with
+  // or back wall (the roof slopes down to the floor; at the back, steeper, it
+  // reaches the floor at ATTIC_BACK), gable walls shared with
   // the neighbours, a middle wall from the back to the front cut to the roof
   // line, and the dormer on the front of the bedroom, with a window to throw
   // Lennie out of.
@@ -1121,8 +1203,8 @@ export function buildHouse(scene, world, physMats) {
     const y0 = k * H;
     const left = wallpaper(R.left);
     const bedroom = wallpaper(R.right);
-    // the gable (party) walls, one room each, cut to the roof line
-    const gable = [[IN.z0, y0], [IN.z1, y0], [IN.z1, underside(IN.z1)], [0, HOUSE.ridgeY], [IN.z0, underside(IN.z0)]];
+    // the gable (party) walls, one room each, cut to the roof line (at the back it comes down to the floor)
+    const gable = [[ATTIC_BACK, y0], [IN.z1, y0], [IN.z1, underside(IN.z1)], [0, HOUSE.ridgeY]];
     prismWall({ run: 'z', at: HOUSE.x0, poly: gable, thick: EXT, physThick: EXT_PHYS, physOffset: -off, mats: { pos: left, neg: M.brick }, story: k, line: `west-${k}` });
     prismWall({ run: 'z', at: HOUSE.x1, poly: gable, thick: EXT, physThick: EXT_PHYS, physOffset: off, mats: { pos: M.brick, neg: bedroom }, story: k, line: `east-${k}` });
 
@@ -1133,7 +1215,8 @@ export function buildHouse(scene, world, physMats) {
     const dTop = y0 + DOOR_TOP;
     const [p0, p1, pTop] = [d0 - DOOR_SLACK.side, d1 + DOOR_SLACK.side, dTop + DOOR_SLACK.above];
     const mid = (poly, physPoly) => prismWall({ run: 'z', at: ATTIC.midX, poly, physPoly, thick: INT, physThick: INT_PHYS, mats: { pos: bedroom, neg: left }, story: k, line });
-    mid([[IN.z0, y0], [d0, y0], [d0, underside(d0)], [IN.z0, underside(IN.z0)]], [[IN.z0, y0], [p0, y0], [p0, underside(p0)], [IN.z0, underside(IN.z0)]]);
+    // (at the back the roof comes down to the floor at ATTIC_BACK)
+    mid([[ATTIC_BACK, y0], [d0, y0], [d0, underside(d0)]], [[ATTIC_BACK, y0], [p0, y0], [p0, underside(p0)]]);
     mid([[d0, dTop], [d1, dTop], [d1, underside(d1)], [d0, underside(d0)]], [[p0, pTop], [p1, pTop], [p1, underside(p1)], [p0, underside(p0)]]);
     const right = [[IN.z1, y0], [IN.z1, underside(IN.z1)], [0, HOUSE.ridgeY]];
     mid([[d1, y0], ...right, [d1, underside(d1)]], [[p1, y0], ...right, [p1, underside(p1)]]);
@@ -1165,31 +1248,44 @@ export function buildHouse(scene, world, physMats) {
   }
 
   // ------------------------------------------------------------ roof
-  // One long roof over the whole row. Lennie's part is in the top group (the
-  // cutaway hides it), fades out of the way like a wall, has a hole for the
-  // dormer and is only a shell, since the attic under it is a room. The
+  // One long roof over the whole row. Lennie's part fades out of the way like
+  // a wall, has holes for the dormers and is only a shell, since there are
+  // rooms under it. Its front slope and the top of its back slope are in the
+  // top group (the cutaway hides them); the back slope's lower part, over
+  // floor 2's back rooms, goes with the attic (group 2): looking into floor 2
+  // the cutaway lifts it off too, looking into the attic it stays. The
   // neighbours' parts always stay, over solid attics.
   function buildRoof() {
-    const rise = HOUSE.ridgeY - HOUSE.eaveY;
-    const angle = Math.atan(PITCH);
-    const hyp = Math.hypot(1, PITCH);
-    const runOut = HOUSE.z1 + 0.5; // plan distance from the ridge to the eave edge
     const thick = 0.18;
-    const inward = 0.3; // Lennie's roof is thicker on the inside in physics, so fast throws don't tunnel out
+    // plan distance from the ridge to the eave edge; the back's overhang is
+    // shorter, so its fascia stays clear of the utility room's flat roof
+    const RUN_OUT = { 1: HOUSE.z1 + 0.5, [-1]: HOUSE.z1 + 0.3 };
+    const pitchOf = (side) => (side > 0 ? PITCH : BACK_PITCH);
+    const angleOf = (side) => Math.atan(pitchOf(side));
+    const hypOf = (side) => Math.hypot(1, pitchOf(side));
+    // Lennie's roof is thicker on the inside in physics, so fast throws don't
+    // tunnel out; less at the back, where floor 2's rooms come right up under it
+    const INWARD = { 1: 0.3, [-1]: 0.2 };
     const ends = [ROW.x0 - 0.3, ROW.x1 + 0.3];
-    const sections = [[ends[0], OUT.x0, 0], [OUT.x0, OUT.x1, 3], [OUT.x1, ends[1], 0]];
     const ridgeMat = std({ color: 0x2b2523 });
     const LINES = { 1: 'roof-front', [-1]: 'roof-back' };
-    for (const side of [1, -1]) {
-      registerLine(LINES[side], 3, { p: new THREE.Vector3(0, HOUSE.ridgeY, 0), n: new THREE.Vector3(0, Math.cos(angle), side * Math.sin(angle)) });
-    }
+    const LOW = 'roof-back-low';
+    const planeOf = (side) => ({ p: new THREE.Vector3(0, HOUSE.ridgeY, 0), n: new THREE.Vector3(0, Math.cos(angleOf(side)), side * Math.sin(angleOf(side))) });
+    registerLine(LINES[1], 3, planeOf(1));
+    registerLine(LINES[-1], 3, planeOf(-1));
+    registerLine(LOW, 2, planeOf(-1));
+    // the row in three: the neighbours on either side, and Lennie's part (its group and line)
+    const sectionsOf = (side) => [[ends[0], OUT.x0, 0, null], [OUT.x0, OUT.x1, side > 0 ? 3 : 2, side > 0 ? LINES[1] : LOW], [OUT.x1, ends[1], 0, null]];
 
     // A strip of one slope, from plan distance zA to zB from the ridge, x0 to x1.
     function slope(side, x0, x1, zA, zB, { story, line = null, inner = 0 }) {
+      const P = pitchOf(side);
+      const angle = angleOf(side);
+      const hyp = hypOf(side);
       const L = (zB - zA) * hyp;
       const zm = (zA + zB) / 2;
       const normal = new THREE.Vector3(0, Math.cos(angle), side * Math.sin(angle));
-      const mid = new THREE.Vector3((x0 + x1) / 2, HOUSE.ridgeY - PITCH * zm, side * zm);
+      const mid = new THREE.Vector3((x0 + x1) / 2, HOUSE.ridgeY - P * zm, side * zm);
       const geo = new THREE.BoxGeometry(x1 - x0, thick, L);
       meterBoxUVs(geo, [x0, -thick / 2, zA * hyp], [x1, thick / 2, zB * hyp]);
       const mats = [M.soffit, M.soffit, M.roofTiles, M.ceiling, M.soffit, M.soffit];
@@ -1201,7 +1297,7 @@ export function buildHouse(scene, world, physMats) {
       groups[story].add(mesh);
       if (line) {
         const zs = [side * zA, side * zB].sort((p, q) => p - q);
-        addToLine(mesh, line, [x0, underside(zB), zs[0]], [x1, underside(zA) + thick * hyp, zs[1]]);
+        addToLine(mesh, line, [x0, underside(side * zB), zs[0]], [x1, underside(side * zA) + thick * hyp, zs[1]]);
       }
       const b = new CANNON.Body({ mass: 0, material: physMats.roof ?? physMats.hard, shape: new CANNON.Box(new CANNON.Vec3((x1 - x0) / 2, (thick + inner) / 2, L / 2)) });
       const c = mid.clone().addScaledVector(normal, (thick - inner) / 2);
@@ -1211,76 +1307,103 @@ export function buildHouse(scene, world, physMats) {
       world.addBody(b);
     }
 
-    const fy = HOUSE.ridgeY - PITCH * runOut; // underside at the eave edge
     // At the two ends of the row, the fascia boards and the ridge stick out 2 cm
     // past the roof, so their ends don't flicker against the roof's ends.
     const past = (x) => (x === ends[0] ? x - 0.02 : x === ends[1] ? x + 0.02 : x);
     // Lennie's part of the roof stops 1 cm short of the party walls, where the
-    // neighbours' parts take over, and 2 cm inside the dormer's sides. So its
+    // neighbours' parts take over, and 2 cm inside the dormers' sides. So its
     // ends never lie in one plane with the ends of the walls, the attic floor,
     // the fascia boards or the ridge (they'd flicker; see flickercheck.js).
     const [L0, L1] = [OUT.x0 + 0.01, OUT.x1 - 0.01];
+    const B = BACK_DORMER;
+    const bf = -(B.front - B.wallT / 2); // plan distance of the back dormer's front face
+    const bb = -B.back; // ... and of where its roof meets the roof's underside
+    const split = 3.3; // where the back slope's lower part starts: just under the attic floor's level
     for (const side of [1, -1]) {
-      const line = LINES[side];
+      const runOut = RUN_OUT[side];
+      const hyp = hypOf(side);
       for (const [x0, x1] of [[ends[0], L0], [L1, ends[1]]]) slope(side, x0, x1, 0, runOut, { story: 0 });
-      const own = { story: 3, line, inner: inward };
+      const own = { story: 3, line: LINES[side], inner: INWARD[side] };
       if (side > 0) {
         slope(side, L0, DORMER.x0 - 0.02, 0, runOut, own);
         slope(side, DORMER.x1 + 0.02, L1, 0, runOut, own);
         slope(side, DORMER.x0, DORMER.x1, 0, DORMER.back, own);
         slope(side, DORMER.x0, DORMER.x1, DORMER.front + DORMER.wallT / 2, runOut, own);
-      } else slope(side, L0, L1, 0, runOut, own);
+      } else {
+        // the top, over the attic, then the lower part round the back dormer:
+        // a strip across above it, the two sides beside it (their ends inside
+        // its sides) and the bit below it, from its front wall to the eave
+        const low = { story: 2, line: LOW, inner: INWARD[side] };
+        slope(side, L0, L1, 0, split, own);
+        slope(side, L0, L1, split, bb, low);
+        slope(side, L0, B.x0 - 0.02, bb, runOut, low);
+        slope(side, B.x1 + 0.02, L1, bb, runOut, low);
+        slope(side, B.x0 - 0.02, B.x1 + 0.02, bf, runOut, low);
+      }
+      const fy = HOUSE.ridgeY - pitchOf(side) * runOut; // underside at the eave edge
       // white fascia boards along the eave
       const z = side * (runOut + 0.05);
-      for (const [x0, x1, story] of sections) box([past(x0), fy - 0.15, z - 0.07], [past(x1), fy + 0.3, z + 0.07], M.trim, { story, cast: true, line: story === 3 ? line : null });
+      for (const [x0, x1, story, line] of sectionsOf(side)) box([past(x0), fy - 0.15, z - 0.07], [past(x1), fy + 0.3, z + 0.07], M.trim, { story, cast: true, line });
       // The gutter along the eave, in front of the fascia. Its rim sticks up
       // past the tiles, so a Lennie sliding down the roof gets caught in it
       // (stranded on the roof) rather than always sliding off the edge.
       const g0 = runOut + 0.13; // plan distance of its back, just clear of the fascia
       const gz = [side * g0, side * (g0 + 0.22)].sort((p, q) => p - q);
       const gTop = fy + thick * hyp + 0.25;
-      for (const [x0, x1, story] of sections) {
+      for (const [x0, x1, story, line] of sectionsOf(side)) {
         const [a, b] = [x0 === ends[0] ? x0 - 0.04 : x0, x1 === ends[1] ? x1 + 0.04 : x1];
-        box([a, fy + 0.05, gz[0]], [b, gTop, gz[1]], M.pipe, { story, cast: true, line: story === 3 ? line : null });
+        box([a, fy + 0.05, gz[0]], [b, gTop, gz[1]], M.pipe, { story, cast: true, line });
       }
       const lip = [side * (runOut - 0.02), side * (g0 + 0.22)].sort((p, q) => p - q);
       const gb = body([ends[0], fy + thick * hyp - 0.1, lip[0]], [ends[1], gTop, lip[1]], physMats.roof ?? physMats.hard, { kind: 'roof' });
       gb.surface.sound = 'metal';
     }
-    const ry = HOUSE.ridgeY + thick * hyp;
-    for (const [x0, x1, story] of sections) box([past(x0), ry - 0.15, -0.2], [past(x1), ry + 0.1, 0.2], ridgeMat, { story, cast: true, line: story === 3 ? LINES[1] : null });
+    const ry = HOUSE.ridgeY + thick * hypOf(1);
+    for (const [x0, x1, story, line] of sectionsOf(1)) box([past(x0), ry - 0.15, -0.2], [past(x1), ry + 0.1, 0.2], ridgeMat, { story, cast: true, line });
 
-    // The dormer's flat roof (its sides and front are attic walls, see buildAttic).
+    // The front dormer's flat roof (its sides and front are attic walls, see buildAttic).
     const dMin = [DORMER.x0 - 0.15, DORMER.top, DORMER.back - 0.15];
     const dMax = [DORMER.x1 + 0.15, DORMER.top + 0.16, DORMER.front + DORMER.wallT / 2 + 0.15];
     box(dMin, dMax, [M.trim, M.trim, M.darkRoof, M.ceiling, M.trim, M.trim], { story: 3, cast: true, line: LINES[1] });
     body(dMin, dMax, physMats.hard, { kind: 'roof' });
+    // The back dormer's, with the dark edge of the photo (its sides and front
+    // are floor 2's walls, see buildBackDormer). Its underside is the dormer's
+    // ceiling, 5 cm under the room's; at the back it runs on under the roof to
+    // the attic floor's slab, so it closes the ceiling up to there (a header).
+    M.dormerEdge ??= std({ color: 0x3b3d40, roughness: 0.6 });
+    const eMin = [B.x0 - 0.15, B.top, -bf - 0.15];
+    const eMax = [B.x1 + 0.15, B.top + 0.16, ATTIC_SLAB_Z0 + 0.02];
+    box(eMin, eMax, [M.dormerEdge, M.dormerEdge, M.darkRoof, M.ceiling, M.ceiling, M.dormerEdge], { story: 2, cast: true, line: LOW });
+    body(eMin, eMax, physMats.hard, { kind: 'roof' });
 
-    // Gables at the two ends of the row (visual) and the neighbours' solid attics (physics).
-    const shape = new THREE.Shape();
-    shape.moveTo(HOUSE.z0, 0);
-    shape.lineTo(HOUSE.z1, 0);
-    shape.lineTo(0, rise);
-    shape.closePath();
+    // The end walls of the row, up to the roof (visual; the neighbours are solid blocks, street.js).
+    // In the shape, x is -z (it's turned a quarter to stand across the row) and y is y.
+    const zi = [OUT.z0 + EXT, OUT.z1 - EXT]; // the end walls fit between the fronts and the backs
+    const outline = [[zi[0], 0], [zi[1], 0], [zi[1], HOUSE.eaveY], [HOUSE.z1, HOUSE.eaveY], [0, HOUSE.ridgeY], [zi[0], underside(zi[0])]];
+    const shape = new THREE.Shape(outline.map(([z, y]) => new THREE.Vector2(-z, y)));
     for (const x of [ROW.x0, ROW.x1 - EXT]) {
       const gable = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: EXT, bevelEnabled: false }), M.brick);
       gable.rotation.y = Math.PI / 2;
-      gable.position.set(x, HOUSE.eaveY, 0);
+      gable.position.set(x, 0, 0);
       gable.receiveShadow = true;
       groups[0].add(gable);
     }
+    // the neighbours' solid attics (physics), over their solid blocks
     const ey = HOUSE.eaveY;
     for (const [a0, a1] of [[ROW.x0, OUT.x0], [OUT.x1, ROW.x1]]) {
       convexBody(
-        [[a0, ey, HOUSE.z0], [a1, ey, HOUSE.z0], [a1, ey, HOUSE.z1], [a0, ey, HOUSE.z1], [a0, HOUSE.ridgeY, 0], [a1, HOUSE.ridgeY, 0]],
+        [[a0, ey, ATTIC_BACK], [a1, ey, ATTIC_BACK], [a1, ey, HOUSE.z1], [a0, ey, HOUSE.z1], [a0, HOUSE.ridgeY, 0], [a1, HOUSE.ridgeY, 0]],
         [[0, 1, 2, 3], [0, 4, 5, 1], [3, 2, 5, 4], [0, 3, 4], [1, 5, 2]],
         { kind: 'roof' },
       );
     }
 
-    // Lennie's own roof: chimney and a few vents, as in the photo.
+    // Lennie's own roof: chimney and a few vents, as in the photo; on the back
+    // the solar panels and a roof window over the attic, as in the photo of the back.
     details.chimney(...ux(LAYOUT.chimney), 3, LINES[1]);
-    for (const [x, z] of [[-0.8, 2.6], [0.0, 1.2], [-1.35, -2.8]]) details.vent(x, z, 3, LINES[z > 0 ? 1 : -1]);
+    for (const [x, z] of [[-0.8, 2.6], [0.0, 1.2], [3.62, -2.2]]) details.vent(x, z, 3, LINES[z > 0 ? 1 : -1]);
+    details.solarPanels(LAYOUT.panels.map(({ d, u }) => ({ d, x: u.map((v) => OUT.x0 + v) })), 3, LINES[-1]);
+    details.roofWindow(...ux(LAYOUT.roofWindow), LAYOUT.roofWindowD, 3, LINES[-1]);
   }
 
   // ------------------------------------------------------------ furniture
@@ -1786,24 +1909,25 @@ export function buildHouse(scene, world, physMats) {
       return parts;
     };
     const { midX, backZ, rightZ } = F2;
+    const DORMER_IN = BACK_DORMER.front + BACK_DORMER.wallT / 2; // the back dormer's front wall's inside face: the back rooms' furniture stands in front of it
     const [L1, R1] = [midX - INT / 2, midX + INT / 2]; // the middle wall's faces
     piece(1, [
       // the back kids room: a low cabinet under the window, the bed against
       // the middle wall, a high clothes cabinet by the door, and the toy box
-      [[IN.x0, 0, IN.z0], [-3.3, 0.8, -3.3], 0xd9c3a0],
-      [[-3.3, 0.06, -4.8], [-3.296, 0.74, -4.07], 0xc2a77f, NO], // its two doors' faces, apart
-      [[-3.3, 0.06, -4.03], [-3.296, 0.74, -3.36], 0xc2a77f, NO],
-      ...bed(-1.2, L1 - 0.01, IN.z0, -2.85, 0x7d9cc0, 0x3fa7d6),
+      [[IN.x0, 0, DORMER_IN + 0.01], [-3.3, 0.8, -3.3], 0xd9c3a0],
+      [[-3.3, 0.06, -4.6], [-3.296, 0.74, -3.99], 0xc2a77f, NO], // its two doors' faces, apart
+      [[-3.3, 0.06, -3.95], [-3.296, 0.74, -3.36], 0xc2a77f, NO],
+      ...bed(-1.2, L1 - 0.01, DORMER_IN + 0.01, -2.85, 0x7d9cc0, 0x3fa7d6),
       ...cabinet(IN.x0, -2.55, -1.5, backZ - INT / 2 - 0.005, 2.0, 0xe9e4da, -1, 2),
-      [[-2.25, 0, IN.z0], [-1.3, 0.5, -4.25], 0xe24a4a],
+      [[-2.25, 0, DORMER_IN + 0.01], [-1.3, 0.5, -4.065], 0xe24a4a],
       // the bedroom: the bureau against the back wall, the big bed with its
       // head against the right-hand wall, a nightstand, and a high clothes
       // cabinet against the front kids room's wall
-      ...table(R1 + 0.06, IN.z0, 1.9, -4.3, 0.76, WOOD),
-      [[0.7, 0.86, -4.8], [1.3, 1.22, -4.77], 0x111114], // the monitor, on its stand
-      [[0.97, 0.76, -4.82], [1.03, 0.86, -4.7], 0x2a2a2e, NO],
-      [[0.9, 0.765, -4.86], [1.1, 0.775, -4.66], 0x2a2a2e, NO],
-      [[0.73, 0.765, -4.58], [1.27, 0.785, -4.42], 0x2f3035, NO], // the keyboard
+      ...table(R1 + 0.06, DORMER_IN + 0.01, 1.9, -4.1, 0.76, WOOD),
+      [[0.7, 0.86, -4.6], [1.3, 1.22, -4.57], 0x111114], // the monitor, on its stand
+      [[0.97, 0.76, -4.62], [1.03, 0.86, -4.5], 0x2a2a2e, NO],
+      [[0.9, 0.765, -4.645], [1.1, 0.775, -4.46], 0x2a2a2e, NO],
+      [[0.73, 0.765, -4.38], [1.27, 0.785, -4.22], 0x2f3035, NO], // the keyboard
       ...bedX(IN.x1, 1.7, -3.55, -1.65, WOOD, 0x7c6bc4),
       [[3.425, 0, -1.6], [IN.x1, 0.5, -1.15], WOOD],
       ...cabinet(1.2, IN.x1, -0.25, rightZ - INT / 2 - 0.005, 2.1, 0xb48a5c, -1, 4),
@@ -1886,11 +2010,16 @@ export function buildHouse(scene, world, physMats) {
   // ------------------------------------------------------------ queries
   const inFootprint = (p) => p.x > HOUSE.x0 && p.x < HOUSE.x1 && p.z > HOUSE.z0 && p.z < HOUSE.z1;
   const inDormer = (p) => p.x > DORMER.x0 && p.x < DORMER.x1 && p.z > DORMER.back - 0.2 && p.z < DORMER.front && p.y > HOUSE.eaveY && p.y < DORMER.top;
+  const inBackDormer = (p) => p.x > BACK_DORMER.x0 && p.x < BACK_DORMER.x1 && p.z > BACK_DORMER.front && p.z < BACK_DORMER.back + 0.2 && p.y > H && p.y < BACK_DORMER.top;
   const inUtility = (p) => p.x > UTILITY.x0 && p.x < UTILITY.x1 && p.z > UTILITY.z0 && p.z < UTILITY.z1 && p.y < UTILITY.top;
   const inGarage = (p) => p.x > GARAGE.x0 && p.x < GARAGE.x1 && p.z > GARAGE.z0 && p.z < GARAGE.z1 && p.y < GARAGE.top;
   const inToiletOut = (p) => p.x > TOILET_OUT.x0 && p.x < TOILET_OUT.x1 && p.z > OUT.z1 - 0.3 && p.z < TOILET_OUT.z1 - EXT && p.y < TOILET_OUT.top;
-  const isInside = (p) => p.y > -1 && ((inFootprint(p) && p.y < underside(p.z) - 0.05) || inDormer(p) || inUtility(p) || inGarage(p) || inToiletOut(p));
-  const isOnRoof = (p) => !isInside(p) && p.x > ROW.x0 - 0.6 && p.x < ROW.x1 + 0.6 && Math.abs(p.z) < OUT.z1 + 0.6 && p.y > HOUSE.eaveY - 0.4;
+  const isInside = (p) => p.y > -1 && ((inFootprint(p) && p.y < underside(p.z) - 0.05) || inDormer(p) || inBackDormer(p) || inUtility(p) || inGarage(p) || inToiletOut(p));
+  // Up on the roof: above the eaves at the front; at the back, where the roof comes down low, just above
+  // the tiles or in the gutter (but not on the utility room's flat roof under the eave).
+  const BACK_EAVE_EDGE = HOUSE.ridgeY - BACK_PITCH * (HOUSE.z1 + 0.3);
+  const roofLow = (z) => (z >= 0 ? HOUSE.eaveY - 0.4 : Math.max(underside(Math.max(z, OUT.z0)) - 0.4, BACK_EAVE_EDGE));
+  const isOnRoof = (p) => !isInside(p) && p.x > ROW.x0 - 0.6 && p.x < ROW.x1 + 0.6 && Math.abs(p.z) < OUT.z1 + 0.6 && p.y > roofLow(p.z);
   const nearHouse = (p) => Math.abs(p.x) < OUT.x1 + 1.2 && Math.abs(p.z) < OUT.z1 + 1.2;
   const storyAt = (y) => THREE.MathUtils.clamp(Math.floor((y + 0.3) / H), 0, HOUSE.stories - 1);
   const levelOf = (p) => (isOnRoof(p) ? 3 : storyAt(p.y));
@@ -1911,10 +2040,10 @@ export function buildHouse(scene, world, physMats) {
     S('loo', 'On the loo!', 500, 'OOPS!', [-2.3, H + 0.3, 4.2], [-1.62, H + 1.1, 4.9]),
     S('bed', 'Tucked into bed', 250, 'NIGHT!', [BED3.x0 - 0.05, 2 * H + 0.3, BED3.z0 + 0.05], [BED3.x1 + 0.03, 2 * H + 1.1, BED3.z1 + 0.05]),
     S('bed', 'Tucked into bed', 250, 'NIGHT!', [1.65, H + 0.3, -3.6], [3.9, H + 1.1, -1.6]),
-    S('bed', 'Tucked into bed', 250, 'NIGHT!', [-1.25, H + 0.3, -4.85], [-0.2, H + 1.1, -2.8]),
+    S('bed', 'Tucked into bed', 250, 'NIGHT!', [-1.25, H + 0.3, -4.65], [-0.2, H + 1.1, -2.8]),
     S('bed', 'Tucked into bed', 250, 'NIGHT!', [2.85, H + 0.3, 2.7], [3.9, H + 1.1, 4.9]),
     S('beanbag', 'Beanbag flop!', 250, 'FLUMP!', [BEANBAG.x - 0.6, H + 0.4, BEANBAG.z - 0.6], [BEANBAG.x + 0.6, H + 1.2, BEANBAG.z + 0.6]),
-    S('toybox', 'On the toy box!', 250, 'TOYS!', [-2.3, H + 0.45, -4.9], [-1.25, H + 1.2, -4.2]),
+    S('toybox', 'On the toy box!', 250, 'TOYS!', [-2.3, H + 0.45, -4.7], [-1.25, H + 1.2, -4.0]),
     S('table', 'On the dinner table!', 200, 'DINNER!', [1.85, 0.75, -2.25], [3.05, 1.45, -0.25]),
     S('counter', 'On the kitchen counter', 200, 'CHEF!', [-0.35, 0.88, 4.15], [3.9, 1.55, 4.9]),
     S('counter', 'On the kitchen counter', 200, 'CHEF!', [3.15, 0.88, 2.0], [3.9, 1.55, 4.2]),
