@@ -548,7 +548,6 @@ const NL = {
   'The cat did it!': 'De kat heeft het gedaan!',
   'Cool down, Lennie!': 'Rustig aan, Lennie!',
   'Flying boots!': 'Vliegende laarzen!',
-  'Coats everywhere!': 'Overal jassen!',
   // the Kallax full of shoes and the fridge in the utility room (clutter.js)
   'Shoe-nami!': 'Schoenami!',
   'Whose shoe is this?': 'Van wie is deze schoen?',

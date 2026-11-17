@@ -946,7 +946,7 @@ export function buildHouse(scene, world, physMats) {
   // A little flat-roofed brick extension behind the kitchen side, as in the
   // sketch: a door from the living room, a door out into the garden, the
   // fridge with an open Kallax full of shoes beside it, and the cat's litter
-  // box with the coat rack above it (the fridge and the Kallax are in
+  // box with the coat rack above it (its coats, the fridge and the Kallax are in
   // clutter.js). The garage is behind it (buildGarage). Its
   // roof belongs to the floor-2 group, so the cutaway lifts it off when you
   // look down into the ground floor.
@@ -1581,13 +1581,11 @@ export function buildHouse(scene, world, physMats) {
       [[-3.42, 0.42, 5.195], [-2.98, 0.45, 5.695], 0xe6e1d8, { phys: false }],
       [[-3.875, 0.75, 3.2], [-3.5, 0.85, 3.6], WHITE],
       [[-3.75, 0, 3.33], [-3.63, 0.75, 3.47], WHITE],
-      // hallway: the coat rack on the toilet wall, with the family's coats on it
-      [[-2.75, 1.62, 2.92], [-1.95, 1.72, 2.96], WOOD, { phys: false }],
-      [[-2.72, 0.85, 2.74], [-2.46, 1.62, 2.92], 0xd95d39, { phys: false }],
-      [[-2.44, 0.95, 2.76], [-2.21, 1.62, 2.92], 0x2c3e5a, { phys: false }],
-      [[-2.19, 1.15, 2.78], [-1.99, 1.62, 2.92], 0xf2c14e, { phys: false }],
+      // hallway: the coat rack on the toilet wall, like the utility room's (its coats are in clutter.js)
+      [[-2.75, 1.6, 2.938], [-1.9, 1.7, 2.96], WOOD, { phys: false }],
+      ...[-2.56, -2.38, -2.2, -2.04].map((x) => [[x - 0.012, 1.615, 2.885], [x + 0.012, 1.64, 2.938], WOOD, { phys: false }]), // the hooks
       // utility room: the cat's litter box, and above it the coat rack on the
-      // back wall (the coats are loose, clutter.js; the fridge and the Kallax are there too)
+      // back wall (its coats, the fridge and the Kallax are in clutter.js)
       [[1.25, 1.6, -6.575], [2.35, 1.7, -6.553], WOOD, { phys: false }],
       ...[1.42, 1.63, 1.84, 2.03, 2.2].map((x) => [[x - 0.012, 1.615, -6.553], [x + 0.012, 1.64, -6.5], WOOD, { phys: false }]), // the hooks
       // a big litter tray, drawn only: a solid rim made Lennie bounce right out

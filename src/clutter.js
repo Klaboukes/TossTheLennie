@@ -264,7 +264,7 @@ const ATTIC_ROOF = (z) => 11 - Math.abs(z);
 const ROOM_MESS = {
   living: ['Who left their socks here?', 'Remote? What remote?', 'Movie night is cancelled!', 'Controller down!', 'Living room? Flying room!', 'Crisps for everyone!'],
   hall: ['Shoes everywhere!', 'Welcome home!', 'Wipe your feet!', 'Coming through!'],
-  utility: ['Kitty litter!', 'Meow?!', 'The cat did it!', 'Cool down, Lennie!', 'Flying boots!', 'Coats everywhere!'],
+  utility: ['Kitty litter!', 'Meow?!', 'The cat did it!', 'Cool down, Lennie!', 'Flying boots!'],
   storage: ['Spring cleaning!', 'Who keeps all this stuff?', 'Never throw anything away!', 'Cupboard avalanche!', 'Everything must go!', 'Found the Christmas stuff!'],
   garage: ['Garage sale!', "Where's my hammer?", 'Camping trip cancelled!', 'DIY disaster!', 'Junk everywhere!', 'Tools down!'],
   kitchen: ['Hagelslag avalanche!', "Who's doing the dishes?", 'Breakfast in the air!', 'Pan-demonium!', "Don't cry over spilt milk!", 'Plate-tectonics!'],
@@ -380,6 +380,8 @@ function flat(points, thick) {
   const shape = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
   return new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false }).rotateX(-Math.PI / 2);
 }
+/** A coat or jacket's outline, collar up, in metres (the coat racks, decorate()). */
+const COAT_OUTLINE = [[-0.2, -0.45], [0.2, -0.45], [0.2, -0.17], [0.28, -0.2], [0.28, 0.2], [0.2, 0.35], [0.06, 0.4], [0, 0.34], [-0.06, 0.4], [-0.2, 0.35], [-0.28, 0.2], [-0.28, -0.2], [-0.2, -0.17]];
 /** A crumpled heap of cloth: a lumpy, squashed ball. */
 function heap(r, sx, sy, sz, seed) {
   const geo = new THREE.IcosahedronGeometry(r, 1);
@@ -1340,16 +1342,7 @@ function buildCatalogue() {
   C.shirtKidPink = tint('kidShirt', 0xf2a2b8);
   C.jeans = item(flat([[-0.2, 0.5], [0.2, 0.5], [0.25, -0.5], [0.04, -0.5], [0, 0.12], [-0.04, -0.5], [-0.25, -0.5]], 0.018), cloth(0x3a5a8c));
   C.jeansKid = item(flat([[-0.2, 0.5], [0.2, 0.5], [0.25, -0.5], [0.04, -0.5], [0, 0.12], [-0.04, -0.5], [-0.25, -0.5]].map(([x, y]) => [x * 0.6, y * 0.6]), 0.016), cloth(0x8e44ad));
-  // coats and jackets, hanging flat against the wall on the coat rack (a kid's one smaller)
   // (the body down to the hem, the sleeves hanging beside it down to the cuffs)
-  const coatOutline = [[-0.2, -0.45], [0.2, -0.45], [0.2, -0.17], [0.28, -0.2], [0.28, 0.2], [0.2, 0.35], [0.06, 0.4], [0, 0.34], [-0.06, 0.4], [-0.2, 0.35], [-0.28, 0.2], [-0.28, -0.2], [-0.2, -0.17]];
-  C.coat = item(flat(coatOutline, 0.035), cloth(0xffffff));
-  C.coatKid = item(flat(coatOutline.map(([x, y]) => [x * 0.75, y * 0.75]), 0.03), cloth(0xffffff));
-  C.coatYellow = tint('coat', 0xf2c14e);
-  C.coatNavy = tint('coat', 0x2c3e5a);
-  C.coatOlive = tint('coat', 0x6b7d5a);
-  C.coatKidOrange = tint('coatKid', 0xd95d39);
-  C.coatKidBlue = tint('coatKid', 0x3a5a8c);
   const sock = [[-0.03, 0.12], [0.03, 0.12], [0.03, 0], [0.11, -0.02], [0.11, -0.07], [-0.03, -0.07]];
   C.sock = item(flat(sock, 0.012), cloth(0xffffff));
   C.sockWhite = tint('sock', 0xf4f2ee);
@@ -1470,8 +1463,6 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   const tipped = (id) => ({ tilt: _q.clone().setFromAxisAngle(ALONG_Z, Math.PI / 2), lift: half(id)[0] });
   /** Lying on its face: a bag of chips or a pizza box flat on the ground. */
   const onFace = (id) => ({ tilt: _q.clone().setFromAxisAngle(ALONG_X, -Math.PI / 2), lift: half(id)[2] });
-  /** Hanging flat against a wall behind it (-z), collar up: a coat on its hook. */
-  const hanging = (id) => ({ tilt: _q.clone().setFromAxisAngle(ALONG_X, Math.PI / 2), lift: half(id)[2] });
 
   // Furniture tops things land on (y = their top, from the floor of their storey).
   const TOPS = [
@@ -1722,11 +1713,6 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   put(utility, 'chocolade', 3.6, 1.95, -5.35, { yaw: 0.6 });
   put(utility, 'waspoeder', 1.08, 0, -6.45, { yaw: 0.2 });
   pile(utility, 'wcRol', 3.72, 0, -6.45, 3, { jitter: 0.01 }); // in the corner behind the Kallax
-  // the coats on the rack above the litter box (house.js), every other one a
-  // few cm further out and each a cm higher or lower, so the ones that overlap never share a surface
-  [['coatYellow', 1.42, 1.66], ['coatKidOrange', 1.63, 1.655], ['coatNavy', 1.84, 1.67], ['coatKidBlue', 2.03, 1.66], ['coatOlive', 2.2, 1.65]].forEach(([id, x, top], i) => {
-    put(utility, id, x, top - 2 * half(id)[2], i % 2 ? -6.48 : -6.525, { yaw: 0, ...hanging(id) });
-  });
   // a few shoes kicked off on the floor, just inside the door from the living
   // room (the rest are in the Kallax, buildKallax), and one blue boot fell over
   put(utility, 'bootBlue', 1.0, 0, -5.95, { yaw: 0.4, ...tipped('bootBlue') });
@@ -2965,6 +2951,24 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
       add(2, mesh(Cyl(0.14, 0.14, 0.034, 24).rotateX(Math.PI / 2), std({ color: glass, roughness: 0.1 }), cx, y2 + 0.42, z1 + 0.013), false);
       add(2, mesh(Box(x1 - x0 - 0.08, 0.08, 0.02), panel, cx, y2 + 0.79, z1 + 0.005), false);
     }
+
+    // The coats on the two coat racks (their boards and hooks are in house.js):
+    // just decoration, they stay on their hooks whatever Lennie does. Each hangs
+    // a few mm further out than the one before it and a cm higher or lower, so
+    // where two overlap no faces ever share a plane. [colour, x, its collar's height, a kid's?]
+    const coats = (wallZ, facing, list) => list.forEach(([color, x, top, kid], i) => {
+      const s = kid ? 0.75 : 1;
+      const t = kid ? 0.03 : 0.035; // thickness
+      const shape = new THREE.Shape(COAT_OUTLINE.map(([px, py]) => new THREE.Vector2(px * s, py * s - 0.4 * s)));
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false }).translate(0, 0, -t / 2);
+      const out = (i % 2 ? 0.095 : 0.05) + (i >> 1) * 0.006; // its middle, out from the wall
+      const coat = add(0, mesh(geo, mat(color, { roughness: 1 }), x, top, wallZ + facing * out), false);
+      if (facing < 0) coat.rotation.y = Math.PI;
+    });
+    // utility room: above the litter box, on the back wall
+    coats(-6.575, 1, [[0xf2c14e, 1.42, 1.66], [0xd95d39, 1.63, 1.655, true], [0x2c3e5a, 1.84, 1.67], [0x3a5a8c, 2.03, 1.66, true], [0x6b7d5a, 2.2, 1.65]]);
+    // the hallway: on the toilet wall, by the stairs
+    coats(2.96, -1, [[0x2c3e5a, -2.56, 1.66], [0xd95d39, -2.38, 1.655, true], [0x8a3b2e, -2.2, 1.67], [0x5a9a4f, -2.04, 1.665, true]]);
   }
 
   // ---------------------------------------------------------------- what the rest of the game uses
