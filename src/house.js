@@ -949,7 +949,9 @@ export function buildHouse(scene, world, physMats) {
   // ------------------------------------------------------------ the utility room
   // A little flat-roofed brick extension behind the kitchen side, as in the
   // sketch: a door from the living room, a door out into the garden, the
-  // fridge and the cat's litter box. The garage is behind it (buildGarage). Its
+  // fridge with an open Kallax full of shoes beside it, and the cat's litter
+  // box with the coat rack above it (the fridge and the Kallax are in
+  // clutter.js). The garage is behind it (buildGarage). Its
   // roof belongs to the floor-2 group, so the cutaway lifts it off when you
   // look down into the ground floor.
   function buildUtility() {
@@ -1593,9 +1595,10 @@ export function buildHouse(scene, world, physMats) {
       [[-2.72, 0.85, 2.74], [-2.46, 1.62, 2.92], 0xd95d39, { phys: false }],
       [[-2.44, 0.95, 2.76], [-2.21, 1.62, 2.92], 0x2c3e5a, { phys: false }],
       [[-2.19, 1.15, 2.78], [-1.99, 1.62, 2.92], 0xf2c14e, { phys: false }],
-      // utility room: the fridge, and the cat's litter box
-      [[3.15, 0, -5.85], [IN.x1, 1.95, -5.125], WHITE],
-      [[3.13, 1.1, -5.78], [3.15, 1.7, -5.72], 0x9aa3ad, { phys: false }],
+      // utility room: the cat's litter box, and above it the coat rack on the
+      // back wall (the coats are loose, clutter.js; the fridge and the Kallax are there too)
+      [[1.25, 1.6, -6.575], [2.35, 1.7, -6.553], WOOD, { phys: false }],
+      ...[1.42, 1.63, 1.84, 2.03, 2.2].map((x) => [[x - 0.012, 1.615, -6.553], [x + 0.012, 1.64, -6.5], WOOD, { phys: false }]), // the hooks
       // a big litter tray, drawn only: a solid rim made Lennie bounce right out
       // of it again, so now he lands on the floor inside it (its spot is generous too)
       [[1.3, 0.012, -6.55], [2.3, 0.03, -5.9], 0x4a7fa8, { phys: false }],
@@ -1605,7 +1608,6 @@ export function buildHouse(scene, world, physMats) {
       [[1.33, 0.03, -5.93], [2.27, 0.17, -5.9], 0x4a7fa8, { phys: false }],
       [[1.33, 0.03, -6.52], [2.27, 0.1, -5.93], 0xd8c9a3, { phys: false }],
     ]);
-    clothesRack(2.35, 3.65, -6.3); // (just clear of the litter tray)
     pianoKeys();
     sheetMusic();
     // the six dining chairs and the piano stool, loose so Lennie knocks them
@@ -1617,50 +1619,6 @@ export function buildHouse(scene, world, physMats) {
     }
     knockable([[[2.62, 0, -0.05], [3.42, 0.5, 0.3], PIANO]], 9);
 
-    // The clothes rack in the utility room: a chrome rail on two feet, from x0
-    // to x1 along the back wall (centred on z), full of coats and jackets on
-    // hangers. Loose and top-heavy, so Lennie sends it toppling over.
-    function clothesRack(x0, x1, z) {
-      const TOP = 1.6;
-      const D = 0.24; // half the feet's length
-      const chrome = std({ color: 0xc9ced3, roughness: 0.3, metalness: 0.6 });
-      const look = new THREE.Group();
-      const add = (geo, mat, x, y, zz, yaw = 0) => {
-        const m = new THREE.Mesh(geo, mat);
-        m.position.set(x, y, zz);
-        m.rotation.y = yaw;
-        m.castShadow = true;
-        look.add(m);
-      };
-      for (const x of [x0 + 0.025, x1 - 0.025]) {
-        add(new THREE.BoxGeometry(0.05, 0.04, 2 * D), chrome, x, 0.02, z); // foot
-        add(new THREE.CylinderGeometry(0.015, 0.015, TOP - 0.04, 8), chrome, x, (TOP + 0.04) / 2, z); // upright
-        for (const dz of [-D + 0.02, D - 0.02]) add(new THREE.CylinderGeometry(0.025, 0.025, 0.03, 10), col(0x2b2b2b), x, 0.015, z + dz); // wheels
-      }
-      add(new THREE.CylinderGeometry(0.015, 0.015, x1 - x0, 8).rotateZ(Math.PI / 2), chrome, (x0 + x1) / 2, TOP - 0.015, z); // the rail
-      // the coats: [colour, length], hanging side by side from the rail
-      const coats = [[0xf2c14e, 0.95], [0x2c3e5a, 0.8], [0xd95d39, 0.6], [0x6b7d5a, 0.85], [0xf2a2b8, 0.5], [0x8a8f99, 1.0], [0x3a5a8c, 0.65], [0x7fbbe8, 0.5]];
-      const step = (x1 - x0 - 0.2) / coats.length;
-      const hanger = col(0x8b6a48);
-      coats.forEach(([color, len], i) => {
-        const x = x0 + 0.1 + step * (i + 0.5);
-        const yaw = (i % 2 ? 1 : -1) * 0.06 * (1 + (i % 3));
-        const shoulder = TOP - 0.1;
-        add(new THREE.CylinderGeometry(0.004, 0.004, 0.08, 4), chrome, x, TOP - 0.05, z); // the hook
-        add(new THREE.BoxGeometry(0.02, 0.02, 0.4), hanger, x, shoulder, z, yaw);
-        add(new THREE.BoxGeometry(0.06, len, 0.42), col(color, { roughness: 0.95 }), x, shoulder - 0.01 - len / 2, z, yaw);
-        add(new THREE.BoxGeometry(0.05, len * 0.75, 0.5), col(color, { roughness: 0.95 }), x, shoulder - 0.06 - len * 0.375, z, yaw); // sleeves
-      });
-      const parts = [
-        [[x0, 0, z - D], [x0 + 0.05, 0.04, z + D]], // the feet
-        [[x1 - 0.05, 0, z - D], [x1, 0.04, z + D]],
-        [[x0 + 0.01, 0.04, z - 0.015], [x0 + 0.04, TOP, z + 0.015]], // the uprights
-        [[x1 - 0.04, 0.04, z - 0.015], [x1 - 0.01, TOP, z + 0.015]],
-        [[x0 + 0.04, TOP - 0.03, z - 0.015], [x1 - 0.04, TOP, z + 0.015]], // the rail
-        [[x0 + 0.08, 0.55, z - 0.21], [x1 - 0.08, TOP - 0.1, z + 0.21]], // the coats, as one soft-ish block
-      ];
-      loose.add(groups[0], parts, { mass: 8, surface: { kind: 'furniture' }, look });
-    }
     // burners on the hob
     for (const [x, z] of [[0.0, 4.43], [0.4, 4.43], [0.0, 4.67], [0.4, 4.67]]) {
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.012, 6, 20).rotateX(Math.PI / 2), col(0x55555a));
