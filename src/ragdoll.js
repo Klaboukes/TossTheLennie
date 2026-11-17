@@ -38,19 +38,28 @@ const SIDES = [
   { s: 'R', sign: -1, word: 'right' },
 ];
 
+// Where his shoulder joints sit on his torso, measured from its middle: how
+// high, and how far out. They're close enough in for his arms to hang against
+// his sides rather than beside them.
+const SHOULDER_Y = 0.11;
+const SHOULDER_X = 0.28;
+
 // The masses add up to his 100 kg, in roughly a real body's proportions.
 const PARTS = [
   { name: 'pelvis', label: 'hips', mass: 15, pos: [0, 1.11, 0], shapes: [{ box: [0.19, 0.09, 0.13] }] },
   {
-    // the belly is its own round shape, so he rolls over it when he lands face down
+    // the belly is its own round shape, low on his torso, so he rolls over
+    // it when he lands face down
     name: 'chest', label: 'torso', mass: 22, pos: [0, 1.41, 0],
-    shapes: [{ box: [0.22, 0.21, 0.13] }, { sphere: 0.15, offset: new CANNON.Vec3(0, -0.07, 0.065) }],
+    shapes: [{ box: [0.22, 0.21, 0.13] }, { sphere: 0.15, offset: new CANNON.Vec3(0, -0.12, 0.065) }],
   },
   { name: 'head', label: 'head', mass: 6.5, pos: [0, 1.76, 0], shapes: [{ sphere: 0.13 }] },
+  // His shoulders are 10 cm under the top of his torso (SHOULDER_Y), which
+  // leaves him a neck between them and his chin.
   ...SIDES.flatMap(({ s, sign, word }) => [
-    { name: 'upperArm' + s, label: `${word} arm`, mass: 4.5, pos: [0.315 * sign, 1.41, 0], shapes: [{ box: [0.065, 0.17, 0.065] }] },
+    { name: 'upperArm' + s, label: `${word} arm`, mass: 4.5, pos: [SHOULDER_X * sign, 1.35, 0], shapes: [{ box: [0.065, 0.17, 0.065] }] },
     {
-      name: 'lowerArm' + s, label: `${word} hand`, mass: 3.5, pos: [0.315 * sign, 1.085, 0],
+      name: 'lowerArm' + s, label: `${word} hand`, mass: 3.5, pos: [SHOULDER_X * sign, 1.025, 0],
       shapes: [{ box: [0.06, 0.155, 0.06] }, { sphere: 0.07, offset: HAND_OFFSET }],
     },
     { name: 'upperLeg' + s, label: `${word} thigh`, mass: 12, pos: [0.115 * sign, 0.78, 0], shapes: [{ box: [0.085, 0.24, 0.085] }] },
@@ -74,7 +83,7 @@ const JOINTS = [
   ...SIDES.flatMap(({ s, sign, word }) => {
     const W = word[0].toUpperCase() + word.slice(1);
     return [
-      { name: 'shoulder' + s, label: `${W} shoulder`, a: 'chest', b: 'upperArm' + s, pa: [0.315 * sign, 0.17, 0], pb: [0, 0.17, 0], angle: 2.0, twist: Math.PI / 3, range: 2.4, weight: 0.8, relaxed: [-0.65, 0.6 * sign] },
+      { name: 'shoulder' + s, label: `${W} shoulder`, a: 'chest', b: 'upperArm' + s, pa: [SHOULDER_X * sign, SHOULDER_Y, 0], pb: [0, 0.17, 0], angle: 2.0, twist: Math.PI / 3, range: 2.4, weight: 0.8, relaxed: [-0.65, 0.6 * sign] },
       { name: 'elbow' + s, label: `${W} elbow`, a: 'upperArm' + s, b: 'lowerArm' + s, pa: [0, -0.17, 0], pb: [0, 0.155, 0], angle: 1.6, twist: 0.3, range: 1.8, weight: 1, relaxed: [-1.0, 0] },
       { name: 'hip' + s, label: `${W} hip`, a: 'pelvis', b: 'upperLeg' + s, pa: [0.115 * sign, -0.09, 0], pb: [0, 0.24, 0], angle: 1.4, twist: 0.5, range: 1.7, weight: 1.1, relaxed: [-0.7, 0.2 * sign] },
       { name: 'knee' + s, label: `${W} knee`, a: 'upperLeg' + s, b: 'lowerLeg' + s, pa: [0, -0.24, 0], pb: [0, 0.23, 0], angle: 1.6, twist: 0.2, range: 1.8, weight: 1, relaxed: [0.8, 0] },
@@ -594,9 +603,11 @@ export class Ragdoll {
         this.#buildHead(g);
         break;
       case 'upperArm':
-        // Thick at the shoulder, slimmer at the elbow. The shoulder's ball sits
-        // a little under the joint, or his shoulders would stand up to his ears.
-        g.add(mesh(limb([[-0.17, 0.062], [-0.06, 0.069], [0.06, 0.075], [0.14, 0.07]]), this.#cloth('hoodie')));
+        // Thick below the shoulder, slimmer at the elbow. Its top is a smaller
+        // ball that sits under the joint, tucked under the shoulder of his
+        // hoodie (the yoke on his chest), so his shoulders slope down into
+        // his arms instead of sticking out as two balls.
+        g.add(mesh(limb([[-0.17, 0.062], [-0.06, 0.068], [0.05, 0.073], [0.125, 0.064]]), this.#cloth('hoodie')));
         break;
       case 'lowerArm':
         // the sleeve bunches up over a tighter cuff
@@ -685,52 +696,89 @@ export class Ragdoll {
 
   #buildChest(g) {
     const hoodie = this.#cloth('hoodie');
-    g.add(mesh(new RoundedBoxGeometry(0.46, 0.44, 0.27, 4, 0.1), hoodie));
-    // his shoulders: a rounded yoke from one arm to the other, rising to the neck
-    const yoke = mesh(new THREE.SphereGeometry(1, 24, 12), hoodie, [0, 0.15, -0.005]);
-    yoke.scale.set(0.28, 0.09, 0.12);
+    // His torso is turned from an outline ([height, how far out]) and is less
+    // deep than wide, like the bottom of the hoodie on his hips that it
+    // slips over, so the two meet in a level fold and his arms lie against
+    // its round sides. It stops at his shoulders, well under his chin (which
+    // is level with the neck joint, 0.21 up), so there's a neck to see.
+    const torsoRings = [[-0.225, 0.214], [-0.12, 0.216], [-0.02, 0.216], [0.06, 0.207], [0.11, 0.18], [0.145, 0.13], [0.16, 0.08]];
+    const DEPTH = 0.66;
+    g.add(mesh(tile(limb(torsoRings, { ballBottom: false, ballTop: false, radial: 32 }), 3).scale(1, 1, DEPTH), hoodie));
+    // how far forward his chest comes at a spot on it, for what lies on it
+    const side = new THREE.SplineCurve(torsoRings.map(([y, r]) => new THREE.Vector2(r, y))).getPoints((torsoRings.length - 1) * 4);
+    const front = (x, y) => {
+      const i = Math.max(1, side.findIndex((p) => p.y >= y));
+      const a = side[i - 1];
+      const b = side[i];
+      const r = a.x + ((b.x - a.x) * (y - a.y)) / (b.y - a.y);
+      return DEPTH * Math.sqrt(r * r - x * x);
+    };
+    // his shoulders: a rounded yoke that slopes down from his neck and out
+    // over the top of each arm
+    const yoke = mesh(new THREE.SphereGeometry(1, 28, 14), hoodie, [0, SHOULDER_Y - 0.025, -0.005]);
+    yoke.scale.set(SHOULDER_X + 0.045, 0.09, 0.12); // its tips end inside the tops of his arms
     g.add(yoke);
 
-    // the belly, with the hoodie's front pocket stretched over it
-    const bellyAt = [0, -0.07, 0.06];
-    const bellyScale = [1.05, 0.88, 0.82];
-    const belly = mesh(new THREE.SphereGeometry(0.19, 28, 20), hoodie, bellyAt);
-    belly.scale.set(...bellyScale);
-    g.add(belly);
-    const pocket = mesh(
-      new THREE.SphereGeometry(0.192, 20, 10, Math.PI / 2 - 0.6, 1.2, Math.PI * 0.53, Math.PI * 0.25),
-      this.#cloth('hoodie', { color: 0xd8d0cc }),
-      bellyAt,
-    );
-    pocket.scale.set(...bellyScale);
-    g.add(pocket);
+    // His neck, up out of the collar to the neck joint, where it ends in a
+    // ball just inside the one under his head: it stays closed however his
+    // head lolls.
+    const skin = material(COLORS.skin);
+    g.add(mesh(new THREE.CylinderGeometry(0.06, 0.066, 0.085, 16, 1, true), skin, [0, 0.1675, -0.01]));
+    g.add(mesh(new THREE.SphereGeometry(0.06, 16, 12), skin, [0, 0.21, -0.01]));
+
+    // The belly, with the hoodie's front pocket stretched over it. It hangs
+    // low, over the top of his hips, and leaves his chest above it flat.
+    // It's one shape turned from an outline ([height, how far out]) that
+    // comes out of his chest level with it, swells to its fullest low down
+    // and tucks back in under itself, so there's no crease along the top
+    // like a ball stuck on him would have. Its back half is squashed flat:
+    // that part is hidden inside him, and it must stay there when he bends.
+    const bellyRings = [[-0.3, 0.1], [-0.275, 0.18], [-0.225, 0.218], [-0.17, 0.224], [-0.11, 0.212], [-0.05, 0.193], [0, 0.171], [0.04, 0.149], [0.075, 0.14]];
+    const bellyAt = [0, 0, -0.02];
+    const onBelly = (geometry) => {
+      const p = geometry.scale(0.94, 1, 1.05).attributes.position;
+      for (let i = 0; i < p.count; i++) if (p.getZ(i) < 0) p.setZ(i, p.getZ(i) * 0.3);
+      return geometry;
+    };
+    g.add(mesh(onBelly(tile(limb(bellyRings, { ballBottom: false, ballTop: false, radial: 28 }), 2)), hoodie, bellyAt));
+    // the pocket: a strip of the same outline, 3 mm further out
+    const outline = new THREE.SplineCurve(bellyRings.map(([y, r]) => new THREE.Vector2(r + 0.003, y)));
+    const strip = Array.from({ length: 9 }, (_, i) => outline.getPoint(0.2 + (i / 8) * 0.3));
+    g.add(mesh(onBelly(new THREE.LatheGeometry(strip, 12, -0.5, 1)), this.#cloth('hoodie', { color: 0xd8d0cc }), bellyAt));
 
     // (the bottom of the hoodie and its hem are on his hips: see 'pelvis')
 
-    // the hood, bunched up behind his neck, and the neckline
-    const hood = mesh(new THREE.SphereGeometry(0.12, 20, 14), this.#cloth('hoodie', { color: 0xe8e2df }), [0, 0.17, -0.12]);
+    // the hood, bunched up behind his neck, and the neckline, lower at the front
+    const hood = mesh(new THREE.SphereGeometry(0.12, 20, 14), this.#cloth('hoodie', { color: 0xe8e2df }), [0, 0.125, -0.12]);
     hood.scale.set(1.4, 0.6, 0.75);
     g.add(hood);
-    const collar = mesh(new THREE.TorusGeometry(0.085, 0.032, 10, 28), hoodie, [0, 0.215, -0.005]);
-    collar.rotation.x = Math.PI / 2;
+    const collar = mesh(new THREE.TorusGeometry(0.078, 0.024, 10, 28), hoodie, [0, 0.165, -0.005]);
+    collar.rotation.x = Math.PI / 2 + 0.2;
     g.add(collar);
 
-    // drawstrings, lying on the belly
+    // drawstrings: out of the front of the collar, over the top of his chest
+    // and down it, ending above his belly (one a little longer than the other)
     const stringMat = material(0xeee6d8, { roughness: 0.8 });
     const tipMat = material(0x8b8f96, { roughness: 0.4, metalness: 0.4 });
     for (const s of [-1, 1]) {
-      const cord = new THREE.Group();
-      cord.position.set(0.042 * s, 0.195, 0.14);
-      cord.rotation.set(-0.27, 0, 0.06 * s);
-      cord.add(mesh(new THREE.CylinderGeometry(0.0065, 0.0065, 0.14, 6), stringMat, [0, -0.07, 0]));
-      cord.add(mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.025, 6), tipMat, [0, -0.15, 0]));
-      g.add(cord);
+      const end = s > 0 ? 0.035 : 0.06;
+      const path = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.035 * s, 0.15, 0.075),
+        new THREE.Vector3(0.036 * s, 0.132, 0.116),
+        new THREE.Vector3(0.04 * s, 0.09, front(0.04, 0.09) + 0.0075),
+        new THREE.Vector3(0.043 * s, end, front(0.043, end) + 0.0075),
+      ]);
+      g.add(mesh(new THREE.TubeGeometry(path, 12, 0.0065, 6), stringMat));
+      g.add(mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.025, 6), tipMat, [0.043 * s, end - 0.01, front(0.043, end) + 0.009]));
     }
 
-    // a faded, cracked print of his logo
-    const logo = new THREE.Mesh(new THREE.CircleGeometry(0.045, 32), new THREE.MeshStandardMaterial({ map: logoTexture(), roughness: 0.9 }));
-    logo.position.set(0.11, 0.08, 0.1365);
-    g.add(logo);
+    // a faded, cracked print of his logo, bent round his chest 3 mm off it
+    // (rings of points, so it follows the curve all the way across)
+    const print = new THREE.RingGeometry(0.0001, 0.045, 32, 4).translate(0.115, 0.035, 0);
+    const at = print.attributes.position;
+    for (let i = 0; i < at.count; i++) at.setZ(i, front(at.getX(i), at.getY(i)) + 0.003);
+    print.computeVertexNormals();
+    g.add(new THREE.Mesh(print, new THREE.MeshStandardMaterial({ map: logoTexture(), roughness: 0.9 })));
   }
 
   #buildHead(g) {

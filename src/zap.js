@@ -52,7 +52,7 @@ function buildBones(name) {
       for (const [y, r] of [[0.12, 0.15], [0.05, 0.16], [-0.02, 0.155], [-0.09, 0.14]]) {
         add(new THREE.TorusGeometry(r, 0.014, 6, 24), bone, [0, y, -0.01], [Math.PI / 2, 0, 0], [1, 0.62, 1]);
       }
-      add(new THREE.CylinderGeometry(0.016, 0.016, 0.36, 8), bone, [0, 0.19, 0], [0, 0, Math.PI / 2]);
+      add(new THREE.CylinderGeometry(0.016, 0.016, 0.36, 8), bone, [0, 0.13, 0], [0, 0, Math.PI / 2]);
       break;
     case 'pelvis':
       add(new THREE.TorusGeometry(0.11, 0.03, 8, 20), bone, [0, 0, 0], [Math.PI / 2 - 0.3, 0, 0], [1.2, 1, 0.8]);
