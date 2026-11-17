@@ -44,4 +44,13 @@ The game's house is wider than the real one (about 8 m instead of about 5.5 m) t
 - **The garage:** behind the utility room, its door near the utility room in the side facing the garden. Inside: shelves with camping stuff along the garden side, a table with lots of stuff against the far side, and tool shelves against the utility room. In the game the green door is shut, and breaks like the doors in the house; everything on the shelves and the table is loose and comes down when Lennie crashes into it.
 - **The back garden:** bushes all along the left fence; down the right-hand side the garage, the lounge set in the corner behind it (a corner sofa against the garage and along the fence, with a small round table in front, all under a flat see-through plastic canopy fixed to the garage wall and the fence, with a wooden post at the corner that hangs out), the round trampoline, and the three wheelie bins by the gate in the back fence, with a tree just left of them whose crown hangs over the first bin and the trampoline.
 
-Floor 2 keeps its bedroom and kids room. The stairs now arrive in a corridor along the left wall, which leads to the landing at the back, where the stairs to the attic are.
+## Floor 2
+
+*[floorplan-floor2.png](floorplan-floor2.png): the owner's sketch of floor 2, the same way round as the one above.*
+
+- **The stairs** come up along the left wall and make a quarter turn at the top (winders round a newel post) into the hallway. The stairs to the attic sit right above them and make two quarter turns: two steps up from the hallway towards the left wall, a turn, two steps back along the wall, and a turn over the top of the first stairs into the attic.
+- **The hallway** in the middle of the left half, with a door to each room. In the game the stairs stay as narrow as the ground floor needs them (the storage cupboard is beside them), so the rooms round them are fitted to the stairwell rather than measured off the sketch.
+- **Back left:** a kids room with a low cabinet under the window, a high clothes cabinet by the door, and the bed against the wall to the bedroom (plus the toy box).
+- **Back right:** the bedroom, with a bureau with a monitor and keyboard against the back wall and its chair, the two-person bed with its head against the right-hand wall, and a high clothes cabinet against the wall to the front kids room.
+- **Front left:** the bathroom, with the bath along the left wall, the toilet against the front wall, and the sink in a cabinet against the wall to the front kids room.
+- **Front right:** the other kids room, with a high clothes cabinet against the bedroom's wall, a bureau along the bathroom's wall, and the bed along the right-hand wall (plus the beanbag).

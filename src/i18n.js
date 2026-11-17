@@ -272,6 +272,7 @@ const NL = {
   'in the landing': 'op de overloop',
   'in the bedroom': 'in de slaapkamer',
   'in the kids room': 'in de kinderkamer',
+  'in the bathroom': 'in de badkamer',
   'in the attic landing': 'op de overloop',
   'in the attic study': 'in de werkkamer',
   'in the attic bathroom': 'in de badkamer',

@@ -12,8 +12,9 @@ import { parkBikes } from './bikes.js';
 // with a dormer. Footprint x ∈ [-4, 4], z ∈ [-5, 5]; the front door faces +z.
 // The ground floor follows the owner's floor plan (GF below, and
 // docs/house-design.md), with a utility room built on at the back. Floor 2
-// and the attic: a landing along the back with the stairs up, and two rooms
-// at the front split by a wall at x = 0.6. It's the second house in a block of
+// follows the owner's floor plan too (F2 below): four rooms round a hallway at
+// the top of the stairs. The attic: a landing along the back, and two rooms at
+// the front split by a wall at x = 0.6. It's the second house in a block of
 // five; the neighbours (solid, no rooms; see street.js) share one long roof.
 export const HOUSE = { x0: -4, x1: 4, z0: -5, z1: 5, H: 3, T: 0.4, stories: 3, brickStories: 2, eaveY: 6, ridgeY: 11 };
 // The roof's underside runs from the wall tops (eaveY at z = ±5) up to the ridge.
@@ -59,6 +60,17 @@ const GF = {
   stairX: -2.86, // beside the stairs (the storage cupboard's left wall, and on floor 2 the corridor's wall)
   storeZ: -0.7, // the back of the storage cupboard, where the stairs reach floor 2
 };
+// Floor 2 follows the owner's floor plan (docs/floorplan-floor2.png), fitted
+// round the stairs: they come up along the left wall and turn a quarter into
+// the hallway. Behind the stairs and the hallway a kids room, in front of them
+// the bathroom; on the right the bedroom at the back and the other kids room at
+// the front. These are the walls' centre lines.
+const F2 = {
+  midX: -0.15, // between the left-hand rooms (and the hallway) and the right-hand ones
+  backZ: GF.storeZ - INT / 2, // the back kids room's wall, its face level with the top of the stairs
+  frontZ: 1.69, // the bathroom's back wall, over the stairs' third step
+  rightZ: 0.45, // between the bedroom and the front kids room
+};
 // The utility room: a little flat-roofed extension behind the kitchen side,
 // between the house and the garage (walls' centre lines; z1 is the house's back wall).
 export const UTILITY = { x0: 0.75, x1: 4, z0: -6.7, z1: -5, top: 2.6 };
@@ -67,18 +79,33 @@ export const UTILITY = { x0: 0.75, x1: 4, z0: -6.7, z1: -5, top: 2.6 };
 // utility room's back wall). Lennie can be thrown in through the open door.
 export const GARAGE = { x0: UTILITY.x0, x1: UTILITY.x1, z0: -9.675, z1: UTILITY.z0, top: 2.6, door: [-7.92, -6.97] };
 
-// Stairs: flight A climbs storey 0→1 along −z against the left party wall,
-// from the hallway over the storage cupboard; flight B climbs 1→2 along −x in
-// the landing at the back. Flight A is a steep Dutch stair: its top stays at
-// the back of the storage cupboard (the couch is right behind it), so its
-// shorter steps leave room in the hallway to walk onto its bottom step,
-// instead of that step butting against the toilet wall.
-const STAIR = { steps: 12, rise: 0.25, run: 0.3, xLow: -1.8, xHigh: 1.8, stripB: [-3.7, HALL_Z - INT / 2], a: { x0: IN.x0, x1: -2.95, zHigh: GF.storeZ, run: 0.23 } };
-STAIR.a.zLow = STAIR.a.zHigh + STAIR.steps * STAIR.a.run;
-const HOLES = {
-  1: { x0: STAIR.a.x0, x1: STAIR.a.x1, z0: STAIR.a.zHigh, z1: STAIR.a.zLow },
-  2: { x0: STAIR.xLow, x1: STAIR.xHigh, z0: STAIR.stripB[0], z1: STAIR.stripB[1] },
-};
+// Stairs, as in the floor plans. Flight A climbs storey 0→1 along −z against
+// the left party wall, from the hallway beside the storage cupboard, and turns
+// a quarter to the right at the top: four winders fanning out from the newel,
+// the last one level with floor 2, so you step off into its hallway. It's a
+// steep Dutch stair: its top stays at the back of the storage cupboard (the
+// couch is right behind it), so its shorter steps leave room in the hallway to
+// walk onto its bottom step, instead of that step butting against the toilet wall.
+// Flight C to the attic is stacked above it and makes two quarter turns: two
+// steps up from floor 2's hallway towards the left wall, four winders in the
+// front corner of the stairwell, two steps back along the wall, and four
+// winders over the top of flight A, arriving in the attic the same way.
+const STAIR = { steps: 12, rise: 0.25, a: { x0: IN.x0, x1: -2.95, zHigh: GF.storeZ, run: 0.23, straight: 8 }, c: { first: 2, run: 0.23 } };
+STAIR.width = STAIR.a.x1 - STAIR.a.x0;
+STAIR.zTurn = STAIR.a.zHigh + STAIR.width; // where flight A's straight part meets its winders
+STAIR.a.zLow = STAIR.zTurn + STAIR.a.straight * STAIR.a.run;
+// The stairwell through floor 2 and the attic floor: over flight A from its
+// third step up (the bathroom's floor reaches over the first two), up to the bathroom wall.
+const WELL = { x0: STAIR.a.x0, x1: STAIR.a.x1, z0: STAIR.a.zHigh, z1: F2.frontZ - INT / 2 };
+const HOLES = { 1: WELL, 2: WELL };
+
+// The baths: on floor 2 along the bathroom's left wall, in the attic in the
+// dormer under its window. The beanbag in the front kids room, and the attic
+// desk, in front of the stairwell.
+const BATH2 = { x0: IN.x0, x1: -3.0, z0: 2.95, z1: IN.z1 };
+const BATH3 = { x0: 1.0, x1: 2.85, z0: 2.75, z1: 3.75 };
+const BEANBAG = { x: 1.2, z: 3.75 };
+const DESK2 = { z0: 1.75, z1: 3.55 };
 
 // White painted walls (no wallpaper) for the living room, the kitchen, the
 // toilet, the hallway and the landing, the utility room, the bedrooms and the attic: a lived-in, slightly
@@ -97,8 +124,10 @@ const ROOMS = [
   },
   {
     hall: { name: 'Landing', floor: 'wood', ...WHITE_PAINT },
-    left: { name: 'Bedroom', floor: 'wood', ...WHITE_PAINT },
-    right: { name: 'Kids room', floor: 'carpet', floorTint: 0x9fcf9a, ...WHITE_PAINT },
+    bedroom: { name: 'Bedroom', floor: 'wood', ...WHITE_PAINT },
+    kids: { name: 'Kids room', floor: 'carpet', floorTint: 0x9fcf9a, ...WHITE_PAINT },
+    kidsBack: { name: 'Kids room', floor: 'carpet', floorTint: 0xa9c6ea, ...WHITE_PAINT },
+    bath: { name: 'Bathroom', wall: 0xf3f6f8, floor: 'tiles', floorTint: 0xcfe6f0, wallTex: 'tiles' },
   },
   {
     hall: { name: 'Attic landing', floor: 'wood', ...WHITE_PAINT },
@@ -117,7 +146,11 @@ function roomOf(k, x, z) {
     if (z > GF.storeZ && x < GF.toiletX) return x < GF.stairX ? R.hall : R.storage;
     return R.left;
   }
-  if (z < HALL_Z || (k === 1 && x < GF.stairX)) return R.hall; // on floor 2 the corridor from the stairs is part of the landing
+  if (k === 1) {
+    if (x < F2.midX) return z < F2.backZ ? R.kidsBack : z < F2.frontZ ? R.hall : R.bath;
+    return z < F2.rightZ ? R.bedroom : R.kids;
+  }
+  if (z < HALL_Z) return R.hall;
   return x < MID_X ? R.left : R.right;
 }
 
@@ -138,7 +171,7 @@ const FRONT = [
   // the kitchen's window in the column (the toilet's is in its bump-out, see TOILET_OUT)
   // (the kitchen's sill is 5 mm above the 0.9 m worktop it reaches over, not level with it: that flickered)
   [{ a: COLUMN[0], b: COLUMN[1], sill: KITCHEN_SILL, bars: { v: [1 / 3, 2 / 3], h: [0.7] } }],
-  // the first small one lights the corridor from the stairs, clear of its wall
+  // the two small ones light the bathroom, the big one the front kids room
   [{ a: -3.75, b: -3.05, ...SMALL }, { a: -2.45, b: -1.25, ...SMALL }, { a: COLUMN[0], b: COLUMN[1], sill: 0.6, top: 2.5, bars: { v: [0.32], h: [] } }],
 ];
 const BACK = [{ a: -3.5, b: -2.4 }, { a: 2.3, b: 3.4 }];
@@ -613,22 +646,23 @@ export function buildHouse(scene, world, physMats) {
       ...common, run: 'x', at: HOUSE.z1, from: OUT.x0, to: OUT.x1, physOffset: off, outward: 1, line: `south-${k}`,
       // on the ground floor the toilet carries on into its bump-out, through an open gap as wide as the bump-out inside
       openings: [...FRONT[k].map(win), ...(k === 0 ? [door(FRONT_DOOR, true), { a: OUT.x0, b: TOILET_OUT.x1 - EXT, bottom: y0, top: TOILET_OUT.top, open: true }] : [])],
-      splits: k === 0 ? [GF.toiletX, GF.hallX] : [GF.stairX, MID_X],
+      splits: k === 0 ? [GF.toiletX, GF.hallX] : [F2.midX],
       mats: { pos: M.brick, neg: (x) => wallpaper(roomAt(x, IN.z1 - 0.1)), ends: M.brick },
     });
     wall({
       ...common, run: 'x', at: HOUSE.z0, from: OUT.x0, to: OUT.x1, physOffset: -off, outward: -1, line: `north-${k}`,
       openings: k === 0 ? [...BACK_GROUND.map(win), { ...door(UTILITY_DOOR, false, true), catFlap: true }] : BACK.map(win),
+      splits: k === 0 ? [] : [F2.midX],
       mats: { pos: (x) => wallpaper(roomAt(x, IN.z0 + 0.1)), neg: M.brick, ends: M.brick },
     });
     wall({
       ...common, run: 'z', at: HOUSE.x0, from: IN.z0, to: IN.z1, physOffset: -off, outward: -1, line: `west-${k}`,
-      splits: k === 0 ? [GF.storeZ, GF.toiletZ] : [HALL_Z],
+      splits: k === 0 ? [GF.storeZ, GF.toiletZ] : [F2.backZ, F2.frontZ],
       mats: { pos: (z) => wallpaper(roomAt(IN.x0 + 0.1, z)), neg: M.brick },
     });
     wall({
       ...common, run: 'z', at: HOUSE.x1, from: IN.z0, to: IN.z1, physOffset: off, outward: 1, line: `east-${k}`,
-      splits: k === 0 ? [GF.hallZ] : [HALL_Z],
+      splits: k === 0 ? [GF.hallZ] : [F2.rightZ],
       mats: { pos: M.brick, neg: (z) => wallpaper(roomAt(IN.x1 - 0.1, z)) },
     });
     }
@@ -636,27 +670,14 @@ export function buildHouse(scene, world, physMats) {
     // Interior walls
     const inner = { y0, y1, story: k, thick: INT, physThick: INT_PHYS };
     if (k === 0) buildGroundWalls(inner, R, door);
+    else if (k === 1) buildFloor2Walls(inner, R, door);
     else {
-      // On floor 2 the hall wall starts at the corridor from the stairs, which is open to the landing.
-      // Its doors stay clear of the stairs to the attic (x ±1.8 along this wall on the landing side):
-      // the bedroom's between them and the corridor; the kids room's opens onto their bottom steps, clear
-      // of the kids' bed; the attic bathroom's past their foot, not over the stairwell.
+      // the attic's landing along the back: a door to the study, behind the top
+      // of the stairs, and one to the bathroom
       wall({
-        ...inner, run: 'x', at: HALL_Z, from: k === 1 ? GF.stairX - INT / 2 : IN.x0, to: IN.x1, line: `hall-${k}`,
-        openings: [door(k === 1 ? [-2.72, -1.82] : [-3.6, -2.5]), door(k === 1 ? [0.9, 2.0] : [2.2, 3.2])],
+        ...inner, run: 'x', at: HALL_Z, from: IN.x0, to: IN.x1, line: `hall-${k}`,
+        openings: [door([-3.6, -2.5]), door([2.2, 3.2])],
         mats: { pos: (x) => wallpaper(roomAt(x, 0)), neg: wallpaper(R.hall) },
-      });
-    }
-    if (k === 1) {
-      wall({
-        ...inner, run: 'z', at: MID_X, from: HALL_Z + INT / 2, to: IN.z1, line: `mid-${k}`,
-        openings: [door([0.6, 1.8])],
-        mats: { pos: wallpaper(R.right), neg: wallpaper(R.left) },
-      });
-      // the corridor along the left wall, where the stairs come up from the hallway
-      wall({
-        ...inner, run: 'z', at: GF.stairX, from: HALL_Z + INT / 2, to: IN.z1, line: `stairs-${k}`,
-        mats: { pos: wallpaper(R.left), neg: wallpaper(R.hall) },
       });
     }
 
@@ -692,11 +713,16 @@ export function buildHouse(scene, world, physMats) {
       [{ x0: IN.x0, x1: GF.hallX, z0: GF.hallZ, z1: GF.toiletZ }, R.hall],
       [{ x0: GF.toiletX, x1: GF.hallX, z0: GF.toiletZ, z1: IN.z1 }, R.hall],
       [{ x0: IN.x0, x1: GF.toiletX, z0: GF.toiletZ, z1: IN.z1 }, R.toilet],
+    ] : k === 1 ? [
+      [{ x0: IN.x0, x1: F2.midX, z0: IN.z0, z1: F2.backZ }, R.kidsBack],
+      [{ x0: IN.x0, x1: F2.midX, z0: F2.backZ, z1: F2.frontZ }, R.hall],
+      [{ x0: IN.x0, x1: F2.midX, z0: F2.frontZ, z1: IN.z1 }, R.bath],
+      [{ x0: F2.midX, x1: IN.x1, z0: IN.z0, z1: F2.rightZ }, R.bedroom],
+      [{ x0: F2.midX, x1: IN.x1, z0: F2.rightZ, z1: IN.z1 }, R.kids],
     ] : [
-      [{ x0: k === 1 ? GF.stairX : IN.x0, x1: MID_X, z0: HALL_Z, z1: IN.z1 }, R.left],
+      [{ x0: IN.x0, x1: MID_X, z0: HALL_Z, z1: IN.z1 }, R.left],
       [{ x0: MID_X, x1: IN.x1, z0: HALL_Z, z1: IN.z1 }, R.right],
       [{ x0: IN.x0, x1: IN.x1, z0: IN.z0, z1: HALL_Z }, R.hall],
-      ...(k === 1 ? [[{ x0: IN.x0, x1: GF.stairX, z0: HALL_Z, z1: IN.z1 }, R.hall]] : []),
     ];
     for (const [rect, room] of floors) for (const r of rectMinus(rect, HOLES[k])) addFloor(r, room);
   }
@@ -732,21 +758,7 @@ export function buildHouse(scene, world, physMats) {
   }
 
   // ------------------------------------------------------------ stairs
-  const stairMats = [M.stairSide, M.stairSide, M.wood, M.stairSide, M.stairSide, M.stairSide];
-  for (let i = 0; i < STAIR.steps; i++) {
-    const A = STAIR.a;
-    const minA = [A.x0, 0, A.zLow - (i + 1) * A.run];
-    const maxA = [A.x1, (i + 1) * STAIR.rise, A.zLow - i * A.run];
-    box(minA, maxA, stairMats, { story: 0, cast: true });
-    stairBodies.push(body(minA, maxA, physMats.hard, { kind: 'stair', id: `A${i}` }));
-
-    const [zc, zd] = STAIR.stripB;
-    const xb = STAIR.xHigh - (i + 1) * STAIR.run;
-    const minB = [xb, H, zc];
-    const maxB = [xb + STAIR.run, H + (i + 1) * STAIR.rise, zd];
-    box(minB, maxB, stairMats, { story: 1, cast: true });
-    stairBodies.push(body(minB, maxB, physMats.hard, { kind: 'stair', id: `B${i}` }));
-  }
+  buildStairs();
 
   // Shared details (street.js); x = OUT.x0 + u for Lennie's house.
   const kit = { box, body, addMesh, groups, M, std, tex, physMats, world, HOUSE, OUT, EXT, ROW, DORMER };
@@ -795,6 +807,116 @@ export function buildHouse(scene, world, physMats) {
   // smash the storage cupboard's door and everything stuffed in it comes pouring out
   const storeDoor = doors.find((d) => d.story === 0 && Math.abs(d.center.x - GF.toiletX) < 0.05 && d.center.z > GF.storeZ && d.center.z < GF.hallZ);
   storeDoor.onBreak = clutter.spillStorage;
+
+  // ------------------------------------------------------------ stairs
+  // Flight A from the hallway to floor 2, and flight C stacked above it to the
+  // attic (see STAIR). A flight's steps are solid down to the floor they stand
+  // on; the ones over the stairwell are blocks about two steps deep, so their
+  // undersides step down like a real stair's.
+  function buildStairs() {
+    const { a: A, c: C, rise, width: w, zTurn } = STAIR;
+    const stairMats = [M.stairSide, M.stairSide, M.wood, M.stairSide, M.stairSide, M.stairSide];
+    const boxStep = (min, max, story, id) => {
+      box(min, max, stairMats, { story, cast: true });
+      stairBodies.push(body(min, max, physMats.hard, { kind: 'stair', id }));
+    };
+    // a winder: its outline in plan ([x, z] points), extruded from y0 up to y1
+    const wedgeStep = (pts, y0, y1, story, id) => {
+      const shape = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z)));
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: y1 - y0, bevelEnabled: false });
+      geo.rotateX(-Math.PI / 2); // the outline lies flat: (x, -z) at depth d goes to (x, d, z)
+      geo.translate(0, y0, 0);
+      const mesh = new THREE.Mesh(geo, [M.wood, M.stairSide]); // its top and bottom, then its sides
+      mesh.receiveShadow = true;
+      mesh.castShadow = true;
+      groups[story].add(mesh);
+      const n = pts.length;
+      const points = [...pts.map(([x, z]) => [x, y0, z]), ...pts.map(([x, z]) => [x, y1, z])];
+      const faces = [[...Array(n).keys()], [...Array(n).keys()].map((i) => n + i)];
+      for (let i = 0; i < n; i++) faces.push([i, (i + 1) % n, n + ((i + 1) % n), n + i]);
+      stairBodies.push(convexBody(points, faces, { kind: 'stair', id }));
+    };
+    const lerp2 = (p, q, f) => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
+    // The n winders of a quarter turn, fanning out from the newel N round the
+    // square N, A, C, B: A is the far end of the edge you come in over, C the
+    // outer corner, B the far end of the edge you leave over.
+    const winders = (N, Ain, Cout, Bout, n) => {
+      const at = (th) => (th <= Math.PI / 4 + 1e-9 ? lerp2(Ain, Cout, Math.tan(th)) : lerp2(Bout, Cout, Math.tan(Math.PI / 2 - th)));
+      return [...Array(n).keys()].map((j) => [N, at((j * Math.PI) / 2 / n), at(((j + 1) * Math.PI) / 2 / n)]);
+    };
+    const nTurn = STAIR.steps - A.straight;
+    // the turn at the top of flight A, and again (a storey up) at the top of flight C
+    const topTurn = winders([A.x1, zTurn], [A.x0, zTurn], [A.x0, A.zHigh], [A.x1, A.zHigh], nTurn);
+
+    // Flight A: straight up from the hallway, then the turn into floor 2's hallway
+    for (let i = 0; i < A.straight; i++) {
+      boxStep([A.x0, 0, A.zLow - (i + 1) * A.run], [A.x1, (i + 1) * rise, A.zLow - i * A.run], 0, `A${i}`);
+    }
+    topTurn.forEach((pts, j) => wedgeStep(pts, 0, (A.straight + j + 1) * rise, 0, `A${A.straight + j}`));
+
+    // Flight C: its steps' tops, and how deep the ones over the stairwell are
+    const top = (s) => H + (s + 1) * rise;
+    const DEEP = 2 * rise - 0.05;
+    const zFront = WELL.z1;
+    const zCorner = zFront - w; // where its front turn meets the part along the wall
+    let s = 0;
+    // two steps on floor 2's hallway floor, heading for the left wall
+    for (; s < C.first; s++) boxStep([A.x1 + (C.first - s - 1) * C.run, H, zCorner], [A.x1 + (C.first - s) * C.run, top(s), zFront], 1, `C${s}`);
+    // a quarter turn in the stairwell's front corner, towards the back
+    for (const pts of winders([A.x1, zCorner], [A.x1, zFront], [A.x0, zFront], [A.x0, zCorner], nTurn)) wedgeStep(pts, top(s) - DEEP, top(s), 1, `C${s++}`);
+    // back along the wall, over flight A
+    const along = STAIR.steps - C.first - 2 * nTurn;
+    const runAlong = (zCorner - zTurn) / along;
+    for (let i = 0; i < along; i++, s++) boxStep([A.x0, top(s) - DEEP, zCorner - (i + 1) * runAlong], [A.x1, top(s), zCorner - i * runAlong], 1, `C${s}`);
+    // and a quarter turn over the top of flight A, into the attic
+    for (const pts of topTurn) wedgeStep(pts, top(s) - DEEP, top(s), 1, `C${s++}`);
+
+    // The newel post where flight A turns, on floor 2 just clear of the steps,
+    // with a short rail to a second post by flight C's first steps.
+    const x0 = A.x1 + 0.005;
+    const post = (za, zb) => box([x0, H, za], [x0 + 0.09, H + 1.0, zb], M.stairSide, { story: 1, cast: true });
+    const [p0, p1] = [zTurn + 0.045, zCorner - 0.095]; // the posts' inner faces
+    post(zTurn - 0.045, p0);
+    post(p1, zCorner - 0.005);
+    // the rail runs into both posts, the balusters up into the rail
+    box([x0 + 0.015, H + 0.86, p0 - 0.02], [x0 + 0.075, H + 0.92, p1 + 0.02], M.wood, { story: 1, cast: true });
+    for (const f of [1 / 3, 2 / 3]) {
+      const z = p0 + (p1 - p0) * f;
+      box([x0 + 0.03, H, z - 0.015], [x0 + 0.06, H + 0.87, z + 0.015], M.stairSide, { story: 1 });
+    }
+    body([x0, H, zTurn - 0.045], [x0 + 0.09, H + 1.0, zCorner - 0.005], physMats.hard, { kind: 'furniture' });
+  }
+
+  // ------------------------------------------------------------ floor 2's own walls
+  // After the floor plan (F2): the back kids room's wall across the top of the
+  // stairs and the hallway, the bathroom's wall in front of them, the middle
+  // wall from the back to the front with the doors to the bedroom and the front
+  // kids room, and the wall between those two.
+  function buildFloor2Walls(inner, R, door) {
+    const paper = (room) => wallpaper(R[room]);
+    const { midX, backZ, frontZ, rightZ } = F2;
+    wall({
+      ...inner, run: 'x', at: backZ, from: IN.x0, to: midX - INT / 2, line: 'kidsback-1',
+      openings: [door([-1.3, -0.4])], mats: { pos: paper('hall'), neg: paper('kidsBack') },
+    });
+    wall({
+      ...inner, run: 'x', at: frontZ, from: IN.x0, to: midX - INT / 2, line: 'bathback-1',
+      openings: [door([-1.75, -0.85])], mats: { pos: paper('bath'), neg: paper('hall') },
+    });
+    wall({
+      ...inner, run: 'z', at: midX, from: IN.z0, to: IN.z1, line: 'mid-1',
+      openings: [door([-0.62, 0.27]), door([0.63, 1.52])],
+      splits: [backZ, rightZ, frontZ],
+      mats: {
+        pos: (z) => paper(z < rightZ ? 'bedroom' : 'kids'),
+        neg: (z) => paper(z < backZ ? 'kidsBack' : z < frontZ ? 'hall' : 'bath'),
+      },
+    });
+    wall({
+      ...inner, run: 'x', at: rightZ, from: midX + INT / 2, to: IN.x1, line: 'kidsfront-1',
+      mats: { pos: paper('kids'), neg: paper('bedroom') },
+    });
+  }
 
   // ------------------------------------------------------------ the ground floor's own walls
   // The toilet's two walls, the wall between the hallway and the kitchen, the
@@ -1325,6 +1447,15 @@ export function buildHouse(scene, world, physMats) {
     }
     const WOOD = 0x9b6a3f;
     const WHITE = 0xf4f2ee;
+    // A hollow tub Lennie can land in: its bottom, four sides and the water.
+    const hollowTub = (tub) => [
+      [[tub.x0, 0, tub.z0], [tub.x1, 0.12, tub.z1], WHITE],
+      [[tub.x0, 0.12, tub.z0], [tub.x0 + 0.08, 0.55, tub.z1], WHITE],
+      [[tub.x1 - 0.08, 0.12, tub.z0], [tub.x1, 0.55, tub.z1], WHITE],
+      [[tub.x0 + 0.08, 0.12, tub.z0], [tub.x1 - 0.08, 0.55, tub.z0 + 0.08], WHITE],
+      [[tub.x0 + 0.08, 0.12, tub.z1 - 0.08], [tub.x1 - 0.08, 0.55, tub.z1], WHITE],
+      [[tub.x0 + 0.08, 0.12, tub.z0 + 0.08], [tub.x1 - 0.08, 0.14, tub.z1 - 0.08], 0x8fd3f0, { phys: false }],
+    ];
 
     // --- Storey 0, after the sketch (docs/floorplan-floor1.png)
     const SOFA = 0x4a4d52; // dark grey
@@ -1615,49 +1746,116 @@ export function buildHouse(scene, world, physMats) {
       body([1.42, 0, GZ0], [3.0, 0.95, GZ0 + 0.4], physMats.hard, { kind: 'furniture' });
     }
 
-    // --- Storey 1: bedroom + kids room
+    // --- Storey 1, after the floor plan (docs/floorplan-floor2.png)
+    // A single bed along z, its head end against the wall at zh (zh < zf): mattress, duvet and pillow.
+    const bed = (x0, x1, zh, zf, frame, duvet) => {
+      const [m0, m1] = [zh + 0.12, zf - 0.05];
+      return [
+        [[x0, 0, zh], [x1, 0.86, zh + 0.09], frame], // the headboard
+        [[x0, 0, zh + 0.09], [x1, 0.32, zf], frame],
+        [[x0 + 0.03, 0.32, m0], [x1 - 0.03, 0.58, m1], WHITE, { soft: true }],
+        [[x0 + 0.01, 0.58, m1 - (m1 - m0) * 0.62], [x1 - 0.01, 0.61, m1 + 0.02], duvet, NO], // over the foot two-thirds
+        [[x0 + 0.1, 0.58, m0 + 0.05], [x1 - 0.1, 0.69, m0 + 0.45], 0xffffff, NO],
+      ];
+    };
+    // A bed across x (the big one), head end at xh against the wall.
+    const bedX = (xh, xf, z0, z1, frame, duvet) => [
+      [[xh - 0.09, 0, z0], [xh, 0.9, z1], frame],
+      [[xf, 0, z0], [xh - 0.09, 0.32, z1], frame],
+      [[xf + 0.05, 0.32, z0 + 0.03], [xh - 0.12, 0.58, z1 - 0.03], WHITE, { soft: true }],
+      [[xf + 0.03, 0.58, z0 + 0.01], [xf + 0.05 + (xh - xf) * 0.62, 0.61, z1 - 0.01], duvet, NO],
+      [[xh - 0.57, 0.58, z0 + 0.1], [xh - 0.17, 0.69, (z0 + z1) / 2 - 0.04], 0xffffff, NO],
+      [[xh - 0.57, 0.58, (z0 + z1) / 2 + 0.04], [xh - 0.17, 0.69, z1 - 0.1], 0xffffff, NO],
+    ];
+    // A tall cabinet with its doors facing `face` (±1 along z): body, door seams and knobs.
+    const cabinet = (x0, x1, z0, z1, h, color, face, doors) => {
+      const zf = face > 0 ? z1 : z0;
+      const parts = [[[x0, 0, z0], [x1, h, z1], color]];
+      const dw = (x1 - x0) / doors;
+      const seam = (a, b) => [[a, 0.04, face > 0 ? zf : zf - 0.004], [b, h - 0.04, face > 0 ? zf + 0.004 : zf], 0x6b5340, NO];
+      for (let i = 1; i < doors; i++) parts.push(seam(x0 + i * dw - 0.004, x0 + i * dw + 0.004));
+      for (let i = 0; i < doors; i++) {
+        const kx = x0 + i * dw + (i % 2 ? 0.07 : dw - 0.07);
+        parts.push([[kx - 0.012, h * 0.48, face > 0 ? zf : zf - 0.025], [kx + 0.012, h * 0.48 + 0.1, face > 0 ? zf + 0.025 : zf], 0xc9ced3, NO]);
+      }
+      return parts;
+    };
+    const { midX, backZ, rightZ } = F2;
+    const [L1, R1] = [midX - INT / 2, midX + INT / 2]; // the middle wall's faces
     piece(1, [
-      // the bed, its head against the wall of the corridor from the stairs
-      [[-2.765, 0, 0.6], [-2.67, 0.86, 2.4], WOOD],
-      [[-2.67, 0, 0.6], [-0.59, 0.32, 2.4], WOOD],
-      [[-2.64, 0.32, 0.65], [-0.64, 0.58, 2.35], WHITE, { soft: true }],
-      [[-1.79, 0.58, 0.62], [-0.61, 0.61, 2.38], 0x7c6bc4, { phys: false }],
-      [[-2.59, 0.58, 0.8], [-2.14, 0.68, 2.2], 0xffffff, { phys: false }],
-      [[-2.74, 0, 2.55], [-2.29, 0.5, 3.0], WOOD],
-      [[-0.1, 0, 2.6], [0.49, 2.0, 4.4], 0xb48a5c],
-      // kids room
-      [[2.0, 0, -2.25], [IN.x1, 0.3, -1.2], 0xf2c14e],
-      [[2.05, 0.3, -2.2], [3.85, 0.52, -1.25], 0x5b8def, { soft: true }],
-      [[1.2, 0, 4.2], [2.2, 0.5, 4.85], 0xe24a4a],
+      // the back kids room: a low cabinet under the window, the bed against
+      // the middle wall, a high clothes cabinet by the door, and the toy box
+      [[IN.x0, 0, IN.z0], [-3.3, 0.8, -3.3], 0xd9c3a0],
+      [[-3.3, 0.06, -4.8], [-3.296, 0.74, -4.07], 0xc2a77f, NO], // its two doors' faces, apart
+      [[-3.3, 0.06, -4.03], [-3.296, 0.74, -3.36], 0xc2a77f, NO],
+      ...bed(-1.2, L1 - 0.01, IN.z0, -2.85, 0x7d9cc0, 0x3fa7d6),
+      ...cabinet(IN.x0, -2.55, -1.5, backZ - INT / 2 - 0.005, 2.0, 0xe9e4da, -1, 2),
+      [[-2.25, 0, IN.z0], [-1.3, 0.5, -4.25], 0xe24a4a],
+      // the bedroom: the bureau against the back wall, the big bed with its
+      // head against the right-hand wall, a nightstand, and a high clothes
+      // cabinet against the front kids room's wall
+      ...table(R1 + 0.06, IN.z0, 1.9, -4.3, 0.76, WOOD),
+      [[0.7, 0.86, -4.8], [1.3, 1.22, -4.77], 0x111114], // the monitor, on its stand
+      [[0.97, 0.76, -4.82], [1.03, 0.86, -4.7], 0x2a2a2e, NO],
+      [[0.9, 0.765, -4.86], [1.1, 0.775, -4.66], 0x2a2a2e, NO],
+      [[0.73, 0.765, -4.58], [1.27, 0.785, -4.42], 0x2f3035, NO], // the keyboard
+      ...bedX(IN.x1, 1.7, -3.55, -1.65, WOOD, 0x7c6bc4),
+      [[3.425, 0, -1.6], [IN.x1, 0.5, -1.15], WOOD],
+      ...cabinet(1.2, IN.x1, -0.25, rightZ - INT / 2 - 0.005, 2.1, 0xb48a5c, -1, 4),
+      // the front kids room: a high clothes cabinet against the bedroom's wall,
+      // the bureau along the middle wall, and the bed along the right-hand wall
+      ...cabinet(1.8, IN.x1, rightZ + INT / 2 + 0.005, 1.15, 2.0, 0xe9e4da, 1, 2),
+      ...table(R1 + 0.005, 2.7, 0.6, 4.3, 0.76, 0xf2f2ee),
+      ...bed(2.9, IN.x1, 2.75, IN.z1, 0x5aa36a, 0xf2a03d),
+      // the bathroom: the tub along the left wall, the loo against the front,
+      // and the sink cabinet against the middle wall
+      ...hollowTub(BATH2),
+      [[-2.2, 0, 4.3], [-1.72, 0.42, 4.85], WHITE],
+      [[-2.24, 0.42, 4.75], [-1.68, 0.85, IN.z1], WHITE],
+      [[-0.75, 0, 3.0], [L1 - 0.005, 0.85, 4.3], 0xf2f2ee],
+      [[-0.754, 0.08, 3.05], [-0.75, 0.78, 3.63], 0xdcdcd6, NO], // its two doors, apart
+      [[-0.754, 0.08, 3.67], [-0.75, 0.78, 4.25], 0xdcdcd6, NO],
     ]);
-    rug(1, -0.55, 0.6, 0.4, 2.6, 0xe8d6f5);
-    rug(1, 1.2, 1.6, 3.4, 3.8, 0xffe08a, true);
+    // the sink: a white basin set in the cabinet's top, with a tap from the wall side
+    const basin = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.17, 0.05, 24), col(0xffffff, { roughness: 0.3 }));
+    basin.scale.set(0.8, 1, 1.15);
+    basin.position.set(-0.5, H + 0.876, 3.65);
+    const tap = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.2, 10).rotateZ(Math.PI / 2), col(0xc9ced3, { roughness: 0.3, metalness: 0.6 }));
+    tap.position.set(-0.36, H + 1.0, 3.65);
+    const tapFoot = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 10), tap.material);
+    tapFoot.position.set(-0.28, H + 0.925, 3.65);
+    // the mirror above it, just off the wall
+    const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.75, 0.9), col(0xbfd3dc, { roughness: 0.08, metalness: 0.7 }));
+    mirror.position.set(L1 - 0.007, H + 1.6, 3.65);
+    for (const m of [basin, tap, tapFoot, mirror]) {
+      m.receiveShadow = true;
+      groups[1].add(m);
+    }
+    rug(1, 0.55, -3.6, 1.6, -1.6, 0xe8d6f5); // beside the big bed
+    rug(1, 0.95, 1.75, 2.75, 3.55, 0xffe08a, true); // in the front kids room
+    rug(1, -2.6, -3.9, -1.45, -2.4, 0xf4b6c8, true); // in the back kids room
+    rug(1, -2.85, 2.95, -2.1, 3.7, 0x8fc6dc); // the bath mat
     const beanbag = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 16), col(0xff7f50));
     beanbag.scale.set(1, 0.7, 1);
-    beanbag.position.set(2.6, H + 0.35, 3.0);
+    beanbag.position.set(BEANBAG.x, H + 0.35, BEANBAG.z);
     beanbag.castShadow = true;
     groups[1].add(beanbag);
     const bb = new CANNON.Body({ mass: 0, material: physMats.soft, shape: new CANNON.Sphere(0.42) });
-    bb.position.set(2.6, H + 0.3, 3.0);
+    bb.position.set(BEANBAG.x, H + 0.3, BEANBAG.z);
     bb.surface = { kind: 'cushion' };
     world.addBody(bb);
 
     // --- Storey 2: the attic study + bathroom, kept clear of the sloping roof
-    const tub = { x0: 1.0, x1: 2.85, z0: 2.75, z1: 3.75 };
+    // (the desk stands in front of the stairwell, under the roof)
     piece(2, [
-      ...table(-3.875, -1.6, -3.1, 0.2, 0.76, WOOD),
-      [[-3.8, 0.76, -1.0], [-3.74, 1.2, -0.3], 0x111114],
-      ...chair(-2.6, -0.7, -1, 0x2f3e57),
+      ...table(-3.875, DESK2.z0, -3.1, DESK2.z1, 0.76, WOOD),
+      [[-3.8, 0.76, DESK2.z0 + 0.6], [-3.74, 1.2, DESK2.z0 + 1.3], 0x111114],
+      ...chair(-2.6, DESK2.z0 + 0.9, -1, 0x2f3e57),
       [[-2.3, 0, -2.3], [-0.7, 1.9, -1.95], WOOD],
       [[-1.58, 0, 2.2], [0.47, 0.45, 3.4], 0xc75b7a, { soft: true }],
       [[-1.58, 0.45, 3.1], [0.47, 1.0, 3.4], 0xc75b7a, { soft: true }],
       // bathroom: a hollow tub Lennie can land in, in the dormer under its window
-      [[tub.x0, 0, tub.z0], [tub.x1, 0.12, tub.z1], WHITE],
-      [[tub.x0, 0.12, tub.z0], [tub.x0 + 0.08, 0.55, tub.z1], WHITE],
-      [[tub.x1 - 0.08, 0.12, tub.z0], [tub.x1, 0.55, tub.z1], WHITE],
-      [[tub.x0 + 0.08, 0.12, tub.z0], [tub.x1 - 0.08, 0.55, tub.z0 + 0.08], WHITE],
-      [[tub.x0 + 0.08, 0.12, tub.z1 - 0.08], [tub.x1 - 0.08, 0.55, tub.z1], WHITE],
-      [[tub.x0 + 0.08, 0.12, tub.z0 + 0.08], [tub.x1 - 0.08, 0.14, tub.z1 - 0.08], 0x8fd3f0, { phys: false }],
+      ...hollowTub(BATH3),
       [[3.2, 0, -1.6], [3.75, 0.42, -1.1], WHITE],
       [[3.65, 0.42, -1.65], [IN.x1, 0.85, -1.05], WHITE],
       [[3.0, 0, 0.2], [IN.x1, 0.85, 1.4], 0x6a9fb5],
@@ -1702,14 +1900,17 @@ export function buildHouse(scene, world, physMats) {
   // Boxes are [min, max] in world space, just above each piece of furniture.
   const S = (id, label, value, say, min, max) => ({ id, label, value, say, min, max });
   const spots = [
-    S('bath', 'In the bath!', 500, 'SPLASH!', [1.0, 2 * H, 2.75], [2.85, 2 * H + 1.0, 3.75]),
+    S('bath', 'In the bath!', 500, 'SPLASH!', [BATH3.x0, 2 * H, BATH3.z0], [BATH3.x1, 2 * H + 1.0, BATH3.z1]),
+    S('bath', 'In the bath!', 500, 'SPLASH!', [BATH2.x0, H, BATH2.z0], [BATH2.x1, H + 1.0, BATH2.z1]),
     S('loo', 'On the loo!', 500, 'OOPS!', [3.05, 2 * H + 0.3, -1.8], [3.9, 2 * H + 1.1, -0.95]),
-    S('desk', 'Asleep on the desk', 200, 'ZZZ', [-3.9, 2 * H + 0.7, -1.65], [-3.05, 2 * H + 1.4, 0.25]),
+    S('loo', 'On the loo!', 500, 'OOPS!', [-2.3, H + 0.3, 4.2], [-1.62, H + 1.1, 4.9]),
+    S('desk', 'Asleep on the desk', 200, 'ZZZ', [-3.9, 2 * H + 0.7, DESK2.z0 - 0.05], [-3.05, 2 * H + 1.4, DESK2.z1 + 0.05]),
     S('armchair', 'Comfy in the armchair', 150, 'AHH!', [-1.63, 2 * H + 0.3, 2.15], [0.52, 2 * H + 1.2, 3.45]),
-    S('bed', 'Tucked into bed', 250, 'NIGHT!', [-2.74, H + 0.3, 0.55], [-0.54, H + 1.1, 2.45]),
-    S('bed', 'Tucked into bed', 250, 'NIGHT!', [1.95, H + 0.25, -2.3], [3.9, H + 1.05, -1.15]),
-    S('beanbag', 'Beanbag flop!', 250, 'FLUMP!', [2.0, H + 0.4, 2.4], [3.2, H + 1.2, 3.6]),
-    S('toybox', 'On the toy box!', 250, 'TOYS!', [1.15, H + 0.45, 4.15], [2.25, H + 1.2, 4.9]),
+    S('bed', 'Tucked into bed', 250, 'NIGHT!', [1.65, H + 0.3, -3.6], [3.9, H + 1.1, -1.6]),
+    S('bed', 'Tucked into bed', 250, 'NIGHT!', [-1.25, H + 0.3, -4.85], [-0.2, H + 1.1, -2.8]),
+    S('bed', 'Tucked into bed', 250, 'NIGHT!', [2.85, H + 0.3, 2.7], [3.9, H + 1.1, 4.9]),
+    S('beanbag', 'Beanbag flop!', 250, 'FLUMP!', [BEANBAG.x - 0.6, H + 0.4, BEANBAG.z - 0.6], [BEANBAG.x + 0.6, H + 1.2, BEANBAG.z + 0.6]),
+    S('toybox', 'On the toy box!', 250, 'TOYS!', [-2.3, H + 0.45, -4.9], [-1.25, H + 1.2, -4.2]),
     S('table', 'On the dinner table!', 200, 'DINNER!', [1.85, 0.75, -2.25], [3.05, 1.45, -0.25]),
     S('counter', 'On the kitchen counter', 200, 'CHEF!', [-0.35, 0.88, 4.15], [3.9, 1.55, 4.9]),
     S('counter', 'On the kitchen counter', 200, 'CHEF!', [3.15, 0.88, 2.0], [3.9, 1.55, 4.2]),

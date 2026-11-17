@@ -571,7 +571,7 @@ export class Effects {
   #splash() {
     if (this.#cool('splash', 1)) return;
     const c = this.#center();
-    const bath = this.zones.bath[0];
+    const bath = this.zones.bath.find((b) => inBox(c, b, 0.5)) ?? this.zones.bath[0]; // the one he's in (floor 2's or the attic's)
     const floor = bath ? bath.min[1] + 0.2 : floorOf(c.y);
     this.sfx.splash(Math.min(1, this.ragdoll.coreSpeed() / 7 + 0.4));
     this.#burst(60, c, { colors: WATER, size: [0.02, 0.04], speed: [0.6, 2.4], up: [2, 4.5], floor, life: [0.8, 1.4], spread: 0.3 });
