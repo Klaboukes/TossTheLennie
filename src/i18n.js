@@ -429,6 +429,7 @@ const NL = {
   'CRASH!': 'BAM!',
   'SMASH!': 'KLETTER!',
   'JUGGLE ×{n}': 'GEVANGEN ×{n}',
+  'UP THE STAIRS!': 'DE TRAP OP!',
   'OOF!': 'OEF!',
   'BONK!': 'BONK!',
   'WHEE!': 'JIEHAA!',

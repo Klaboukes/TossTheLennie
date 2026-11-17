@@ -952,7 +952,7 @@ lennie.onCollide = (partName, e) => {
 
   const flying = toss.state === 'flying';
   if (flying && surf.kind === 'trampoline' && v > TRAMP_MIN_SPEED && Math.abs(e.contact.ni.y) > 0.7) trampHit = Math.max(trampHit, v);
-  if (flying && surf.kind === 'stair' && v > 1.5) toss.stairs.add(surf.id);
+  if (flying && surf.kind === 'stair' && v > 1.5 && !aim.lift) toss.stairs.add(surf.id); // (tumbling down, not carried up)
   if (flying && v > BOUNCE_IMPACT && now - toss.lastBounceAt > 250) {
     toss.bounces += 1;
     toss.lastBounceAt = now;
@@ -1331,7 +1331,7 @@ function startGrab(pick, pointerId, pointerType = 'mouse') {
   canvas.style.cursor = 'grabbing';
   grabLine.visible = grabDot.visible = true;
   hideAim();
-  aim.guide = aim.through = null;
+  aim.guide = aim.through = aim.lift = null;
   camAnim = null;
 }
 
@@ -1454,7 +1454,7 @@ function startSling(pick, e) {
   grabLine.visible = grabDot.visible = true;
   hideAim();
   aim.pin = null;
-  aim.guide = aim.through = null;
+  aim.guide = aim.through = aim.lift = null;
   camAnim = null;
 }
 
@@ -1531,7 +1531,11 @@ function updateSling() {
     return;
   }
   const from = centerOfMass(_aimFrom);
-  const end = traceArc(from, shot.v, SLING.arcTime);
+  // Up the stairs: the dots go up the stairwell, then off where he's let go.
+  const lift = slingLift(from, shot.v);
+  const end = lift
+    ? traceArc(liftPoint(lift, lift.end, new THREE.Vector3()), lift.exit, lift.exitTime, null, dotLift(lift))
+    : traceArc(from, shot.v, SLING.arcTime);
   placeRing(aimRing, end.point, end.normal);
   aimRing.material.color.setHex(0xff6b4a);
   aimMark.visible = false;
@@ -1558,7 +1562,9 @@ function endSling(throwIt = true) {
   controls.enabled = true;
   if (!throwIt) return;
   const shot = slingShot(s);
-  if (shot) launch(shot.v);
+  const lift = shot && slingLift(centerOfMass(_aimFrom), shot.v);
+  if (lift) launchLift(lift);
+  else if (shot) launch(shot.v);
   else toast(t('Pull Lennie back, then let go to throw him'), 1800);
 }
 
@@ -1733,6 +1739,7 @@ const aim = {
   shot: null, // { v, blocked, tooFar, through } for the current pointer target
   pin: null, // touch screens: the tapped target, { point, normal, body, x, y }
   guide: null, // the launch still being steered, { v, t0, spin }
+  lift: null, // the throw being carried up the stairs (see guideLift)
   through: null, // the door or window the flying Lennie was aimed through, until he smashes it
 };
 
@@ -1879,11 +1886,12 @@ function placeRing(ring, point, normal) {
  * Draws the dotted arc of a launch from `from` at `v`, for up to `maxTime`
  * seconds, through the scenery until it hits something. It goes on through
  * `pass` (the body of a door or window he'll crash through), a bit slower
- * after it. Returns where it ends: { point, normal, impact, passed }, with
+ * after it. Its dots come after the first `dots0` (a lift's, up the stairs).
+ * Returns where it ends: { point, normal, impact, passed }, with
  * `impact` (point, normal, body) if it hit something, and `passed` if it went through `pass`.
  */
-function traceArc(from, v, maxTime, pass = null) {
-  let dots = 0;
+function traceArc(from, v, maxTime, pass = null, dots0 = 0) {
+  let dots = dots0;
   let carry = 0;
   let impact = null;
   let passed = false;
@@ -1951,8 +1959,13 @@ function updateAim() {
     const low = through.center.y - through.height / 2 + DOOR_AIM_LOW;
     if (to.y < low) to = _aimTo.copy(to).setY(low);
   }
-  const shot = solveShot(from, to, facing, through ? THROUGH_IMPACT : AIM_MIN_IMPACT);
-  const { impact, point, passed } = traceArc(from, shot.v, shot.time + 1.5, through ? target.body : null);
+  const minImpact = through ? THROUGH_IMPACT : AIM_MIN_IMPACT;
+  // Up the stairs: the dots go up the stairwell, then on from where he's let go.
+  const lift = aimLift(from, target, to, minImpact);
+  const shot = lift ? { v: lift.exit, time: lift.exitTime, tooFar: lift.tooFar } : solveShot(from, to, facing, minImpact);
+  const { impact, point, passed } = lift
+    ? traceArc(liftPoint(lift, lift.end, new THREE.Vector3()), shot.v, shot.time + 1.5, through ? target.body : null, dotLift(lift))
+    : traceArc(from, shot.v, shot.time + 1.5, through ? target.body : null);
 
   // Falling short of the pointer means something is in the way (or it's out
   // of reach). Through a door or window, the ring shows where he ends up.
@@ -1962,7 +1975,7 @@ function updateAim() {
   aimRing.material.color.setHex(shot.tooFar || blocked ? 0xffffff : 0xff6b4a);
   if (shot.tooFar || blocked || passed) placeRing(aimMark, target.point, target.normal);
   else aimMark.visible = false;
-  aim.shot = { v: shot.v, tooFar: shot.tooFar, blocked, through: passed ? through : null };
+  aim.shot = { v: shot.v, tooFar: shot.tooFar, blocked, through: passed ? through : null, lift };
 }
 
 function aimThrow() {
@@ -1984,7 +1997,8 @@ function aimThrow() {
   aim.pin = null;
   if (!shot) return;
   sfx.squeak();
-  launch(shot.v, shot.through);
+  if (shot.lift) launchLift(shot.lift, shot.through);
+  else launch(shot.v, shot.through);
 }
 
 /**
@@ -2053,6 +2067,229 @@ function guideLaunch() {
     b.velocity.x += dx;
     b.velocity.y += dy;
     b.velocity.z += dz;
+  }
+}
+
+// ---------------------------------------------------------------- the helping hand up the stairs
+// Thrown up a flight of stairs (from the hallway at its foot, or from on it),
+// Lennie's centre is carried up the stairwell along the flight's path
+// (house.stairRuns) and let go at the top, rather than flying free: up that
+// steep, narrow stairwell a free throw nearly always caught on the floor over
+// the bottom steps or the flight overhead, and he tumbled straight back down.
+// His limbs still flail and bump along the steps on the way.
+const LIFT = {
+  minAngle: THREE.MathUtils.degToRad(15), // a flatter slingshot throw is a line drive, not up the stairs
+  look: 4, // m: how far ahead a slingshot throw may cross the foot of the flight
+  speed: [4.5, 6], // m/s along the path, gentle to hard throws
+  pull: 8, // 1/s: how hard his centre is drawn back onto the path when something knocks him off it
+  full: 6, // m/s: a slingshot throw this fast goes all the way up, a gentler one only part of the way...
+  minShare: 0.3, // ...but at least this share of it
+  exit: [2.5, 6], // m/s off the top, for slingshot throws
+  letGo: 1, // m/s: let go short of the top (a gentle slingshot throw, or aimed at a step), he's just let go there
+};
+const _liftP = new THREE.Vector3();
+const _liftD = new THREE.Vector3();
+const _liftC = new THREE.Vector3();
+const _liftW = new THREE.Vector3();
+
+const inRange = (v, [lo, hi]) => v >= lo && v <= hi;
+
+/** The flight Lennie's centre `from` is at the foot of (and, given the throw's heading `dir` in plan, thrown up), or null. */
+function liftRun(from, dir = null) {
+  for (const run of house.stairRuns) {
+    const { zone, foot, up } = run;
+    if (!inRange(from.x, zone.x) || !inRange(from.y, zone.y) || !inRange(from.z, zone.z)) continue;
+    if (!dir) return run;
+    // On the flight already: thrown up it. Otherwise: thrown across its foot.
+    if (inRange(from.x, foot.x) && inRange(from.z, foot.z)) {
+      if (dir.x * up[0] + dir.z * up[1] > 0.3) return run;
+      continue;
+    }
+    let t0 = 0;
+    let t1 = LIFT.look;
+    for (const [o, d, [lo, hi]] of [[from.x, dir.x, foot.x], [from.z, dir.z, foot.z]]) {
+      if (Math.abs(d) < 1e-6) {
+        if (o < lo || o > hi) t1 = -1;
+        continue;
+      }
+      const a = (lo - o) / d;
+      const b = (hi - o) / d;
+      t0 = Math.max(t0, Math.min(a, b));
+      t1 = Math.min(t1, Math.max(a, b));
+    }
+    if (t0 <= t1) return run;
+  }
+  return null;
+}
+
+/**
+ * The way up `run` (and on up the flight above it, with `onUp`) from Lennie's
+ * centre `from`: straight to the nearest point of its path, then along it.
+ * Null if a wall or a door is in the way of getting onto it.
+ * Returns { pts, cum (the distance along it to each point), total }.
+ */
+function liftPath(from, run, onUp = false) {
+  const next = onUp ? house.stairRuns.find((r) => r.level === run.level + 1) : null;
+  const path = next ? [...run.path, ...next.path] : run.path;
+  let best = Infinity;
+  let join = null;
+  let at = 1;
+  const q = new THREE.Vector3();
+  const line = new THREE.Line3();
+  for (let i = 1; i < path.length; i++) {
+    line.set(path[i - 1], path[i]).closestPointToPoint(from, true, q);
+    const d = q.distanceToSquared(from);
+    if (d < best) {
+      best = d;
+      join = q.clone();
+      at = i;
+    }
+  }
+  _from.set(from.x, from.y, from.z);
+  _to.set(join.x, join.y, join.z);
+  _rayHit.reset();
+  if (world.raycastClosest(_from, _to, SCENERY_ONLY, _rayHit)) return null;
+  const pts = [];
+  for (const p of [from.clone(), join, ...path.slice(at)]) {
+    if (!pts.length || p.distanceTo(pts[pts.length - 1]) > 0.01) pts.push(p);
+  }
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
+  const total = cum[cum.length - 1];
+  return total > 0.5 ? { pts, cum, total } : null;
+}
+
+/** The point `s` metres along a lift's path (and in `dir`, which way it heads there). */
+function liftPoint(lift, s, out, dir = null) {
+  const { pts, cum } = lift;
+  let i = 1;
+  while (i < pts.length - 1 && cum[i] < s) i++;
+  const k = clamp((s - cum[i - 1]) / (cum[i] - cum[i - 1]), 0, 1);
+  out.lerpVectors(pts[i - 1], pts[i], k);
+  if (dir) dir.subVectors(pts[i], pts[i - 1]).normalize();
+  return out;
+}
+
+/** How far along a lift's path its point nearest `p` is. */
+function liftNearest(lift, p) {
+  let best = Infinity;
+  let at = 0;
+  for (let s = 0; s <= lift.total; s += 0.05) {
+    const d = liftPoint(lift, s, _liftP).distanceToSquared(p);
+    if (d < best) {
+      best = d;
+      at = s;
+    }
+  }
+  return at;
+}
+
+/** A slingshot throw at `v` from Lennie's centre `from`, up the stairs if it heads up a flight: the lift's plan, or null. */
+function slingLift(from, v) {
+  const flat = Math.hypot(v.x, v.z);
+  if (flat < 1e-3 || Math.atan2(v.y, flat) < LIFT.minAngle) return null;
+  const run = liftRun(from, { x: v.x / flat, z: v.z / flat });
+  const lift = run && liftPath(from, run);
+  if (!lift) return null;
+  const speed = v.length();
+  const share = clamp((speed - SLING.minSpeed) / (LIFT.full - SLING.minSpeed), LIFT.minShare, 1);
+  lift.end = share * lift.total;
+  lift.speed = clamp(speed * 0.6, ...LIFT.speed);
+  // Off the top the way the path heads, harder for a harder throw; short of the top, he's just let go.
+  liftPoint(lift, lift.end, _liftP, _liftD);
+  lift.exit = _liftD.clone().multiplyScalar(share < 1 ? LIFT.letGo : clamp(speed * 0.5, ...LIFT.exit));
+  lift.exitTime = 2;
+  return lift;
+}
+
+/**
+ * An aimed throw from Lennie's centre `from` at `target` (as aimTarget gives
+ * it) up the stairs, if it's up a flight he's at the foot of: at a step of it
+ * (he's let go above that step), or at anything on a floor above (he goes on
+ * from the top, up the next flight too if need be). Its plan, or null.
+ */
+function aimLift(from, target, to, minImpact) {
+  const run = liftRun(from);
+  if (!run || to.y < from.y + 1) return null;
+  const step = target.body?.surface?.kind === 'stair' && run.steps.has(target.body.surface.id);
+  const level = house.isInside(to) ? house.levelOf(_liftC.copy(to).setY(to.y + 0.05)) : -1;
+  if (!step && level <= run.level) return null;
+  const lift = liftPath(from, run, level > run.level + 1);
+  if (!lift) return null;
+  lift.end = step ? liftNearest(lift, to) : lift.total;
+  lift.speed = LIFT.speed[1];
+  const start = liftPoint(lift, lift.end, new THREE.Vector3());
+  if (step) {
+    // let go just above it, rather than thrown at it (aimed at its side, he'd go off the side of the stairs)
+    liftPoint(lift, lift.end, _liftP, _liftD);
+    lift.exit = _liftD.clone().multiplyScalar(LIFT.letGo);
+    lift.exitTime = 1;
+    lift.tooFar = false;
+  } else {
+    // he hits the side facing where he's let go
+    const facing = target.normal.clone();
+    if (facing.dot(_liftW.subVectors(start, to)) < 0) facing.negate();
+    const shot = solveShot(start, to, facing, minImpact);
+    lift.exit = shot.v;
+    lift.exitTime = shot.time;
+    lift.tooFar = shot.tooFar;
+  }
+  return lift;
+}
+
+/** Lays the aim dots along a lift's path, up to where he's let go. Returns how many. */
+function dotLift(lift) {
+  let dots = 0;
+  for (let s = AIM_DOT_GAP; s <= lift.end && dots < AIM_DOTS; s += AIM_DOT_GAP) {
+    liftPoint(lift, s, _liftP);
+    _aimM.makeTranslation(_liftP.x, _liftP.y, _liftP.z);
+    aimDots.setMatrixAt(dots++, _aimM);
+  }
+  return dots;
+}
+
+/** Throws Lennie up the stairs as `lift` plans, through the door or window `through` at the end if given. */
+function launchLift(lift, through = null) {
+  liftPoint(lift, 0, _liftP, _liftD);
+  launch(_liftD.clone().multiplyScalar(lift.speed), through);
+  const { spin } = aim.guide;
+  aim.guide = null;
+  aim.lift = { ...lift, t0: world.time, spin };
+  popAt(_liftP, 'UP THE STAIRS!', 'good');
+}
+
+/** While he's carried up the stairs: steers his centre along the path, and lets go at its end. */
+function guideLift() {
+  const lift = aim.lift;
+  if (toss.state !== 'flying') {
+    aim.lift = null;
+    return;
+  }
+  const s = Math.min(lift.end, lift.speed * (world.time - lift.t0));
+  const done = s >= lift.end;
+  if (done) _liftW.copy(lift.exit);
+  else {
+    liftPoint(lift, s, _liftP, _liftD);
+    _liftW.copy(_liftD).multiplyScalar(lift.speed).addScaledVector(_liftP.sub(centerOfMass(_liftC)), LIFT.pull);
+  }
+  let mass = 0;
+  _liftC.set(0, 0, 0);
+  for (const b of lennie.bodies) {
+    _liftC.x += b.velocity.x * b.mass;
+    _liftC.y += b.velocity.y * b.mass;
+    _liftC.z += b.velocity.z * b.mass;
+    mass += b.mass;
+  }
+  _liftW.addScaledVector(_liftC, -1 / mass);
+  for (const b of lennie.bodies) {
+    b.velocity.x += _liftW.x;
+    b.velocity.y += _liftW.y;
+    b.velocity.z += _liftW.z;
+  }
+  if (done) {
+    aim.lift = null;
+    applySpin(lift.spin);
+    lennie.fling(lift.exit);
   }
 }
 
@@ -2237,7 +2474,7 @@ function dropLennie(level, seated = false) {
   else lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
   zap.clear();
   guard.forget();
-  aim.guide = aim.through = null;
+  aim.guide = aim.through = aim.lift = null;
   if (!seated) nudge();
   lennie.setExpression('normal');
   toss.state = 'idle';
@@ -2466,7 +2703,7 @@ addEventListener('resize', () => {
 function playReplay() {
   if (grab || sling || replay.playing || !replay.play(0.4)) return;
   camAnim = null;
-  aim.guide = aim.through = null;
+  aim.guide = aim.through = aim.lift = null;
   hideAim();
   hideResult();
   ui.replayBadge.hidden = false;
@@ -3012,7 +3249,8 @@ function subStep(h) {
     trampHit = 0;
   }
   effects.afterStep();
-  if (aim.guide) guideLaunch();
+  if (aim.lift) guideLift();
+  else if (aim.guide) guideLaunch();
   const guarded = guard.check();
   if (guarded === 'lost') rescueLost();
   else if (guarded === 'rescued' && hold) {
@@ -3086,7 +3324,7 @@ function placedBack(message) {
   stopReplay();
   replay.stop(false);
   guard.forget();
-  aim.guide = aim.through = null;
+  aim.guide = aim.through = aim.lift = null;
   nudge();
   lennie.setExpression('normal');
   toss.state = 'idle';
@@ -3262,6 +3500,7 @@ requestAnimationFrame(frame);
 window.lennie = {
   lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, effects, trolley, cars, cat, replay,
   FEEL, launch, dropLennie, // (throw him at a THREE.Vector3 velocity, put him back on a floor)
+  slingLift, aimLift, launchLift, centerOfMass, // (the helping hand up the stairs: plan a throw, then throw him as planned)
   advance(seconds) {
     for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60, performance.now());
   },

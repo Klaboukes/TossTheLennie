@@ -168,8 +168,11 @@ const COLUMN = [0.8, 3.0];
 // The low windows (the bedroom's small high ones and the dormer's) look as
 // small as the real ones, but give Lennie some slack to get through (see `wall`).
 const SLACK = { side: 0.15, below: 0.35, above: 0.2 };
-// A doorway gets a little too: a tumbling Lennie's arms and legs snagged on its frame.
-const DOOR_SLACK = { side: 0.12, below: 0, above: 0.15 };
+// A doorway gets some too: a tumbling Lennie's arms and legs snagged on its
+// frame, and at 12 cm a side a throw at it still often bounced back.
+const DOOR_SLACK = { side: 0.25, below: 0, above: 0.3 };
+// Between two openings side by side, at least this much of the wall stays solid.
+const SLACK_PILLAR = 0.1;
 const SMALL = { sill: 1.45, top: 2.25, bars: { v: [], h: [] }, slack: SLACK };
 const KITCHEN_SILL = 0.905;
 const FRONT = [
@@ -234,6 +237,7 @@ export function buildHouse(scene, world, physMats) {
   const windows = [];
   const doors = [];
   const stairBodies = [];
+  const stairRuns = []; // the helping hand up each flight (see buildStairs)
 
   // ------------------------------------------------------------ materials
   const std = (opts) => new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0, ...opts });
@@ -362,9 +366,10 @@ export function buildHouse(scene, world, physMats) {
   /**
    * A wall with a non-rectangular outline: the attic walls under the sloping
    * roof. `poly` is a convex outline as [along, y] points; mats.pos / mats.neg
-   * face along +normal / -normal. Physics is one convex prism.
+   * face along +normal / -normal. Physics is one convex prism, of `physPoly`
+   * if it's given (to leave a doorway's slack, see `wall`).
    */
-  function prismWall({ run, at, poly, thick, physThick = thick, physOffset = 0, mats, story, line }) {
+  function prismWall({ run, at, poly, physPoly = poly, thick, physThick = thick, physOffset = 0, mats, story, line }) {
     registerLine(line, story);
     const shape = new THREE.Shape(poly.map(([a, y]) => new THREE.Vector2(a, y)));
     const d = thick / 2;
@@ -389,8 +394,8 @@ export function buildHouse(scene, world, physMats) {
     const n0 = at + physOffset - physThick / 2;
     const n1 = at + physOffset + physThick / 2;
     const P = (a, y, n) => (run === 'x' ? [a, y, n] : [n, y, a]);
-    const m = poly.length;
-    const points = [...poly.map(([a, y]) => P(a, y, n0)), ...poly.map(([a, y]) => P(a, y, n1))];
+    const m = physPoly.length;
+    const points = [...physPoly.map(([a, y]) => P(a, y, n0)), ...physPoly.map(([a, y]) => P(a, y, n1))];
     const faces = [[...Array(m).keys()], [...Array(m).keys()].map((i) => m + i)];
     for (let i = 0; i < m; i++) faces.push([i, (i + 1) % m, m + ((i + 1) % m), m + i]);
     convexBody(points, faces, { kind: 'wall' });
@@ -435,14 +440,22 @@ export function buildHouse(scene, world, physMats) {
     };
     // An opening with `slack` has a bigger hole in the physics than you see: its
     // glass or door reaches into the frame around it, so once that's smashed a
-    // flailing Lennie fits through instead of snagging on it.
-    const physHole = (o) => (o.slack ? {
-      ...o,
-      a: Math.max(from, o.a - o.slack.side),
-      b: Math.min(to, o.b + o.slack.side),
-      bottom: Math.max(y0, o.bottom - o.slack.below),
-      top: Math.min(y1, o.top + o.slack.above),
-    } : o);
+    // flailing Lennie fits through instead of snagging on it. It stops short of
+    // the next opening along, so the wall between two doors stays solid.
+    const physHole = (o) => {
+      if (!o.slack) return o;
+      const i = ops.indexOf(o);
+      const [prev, next] = [ops[i - 1], ops[i + 1]];
+      const left = prev ? Math.min(o.a, (prev.b + o.a + SLACK_PILLAR) / 2) : from;
+      const right = next ? Math.max(o.b, (o.b + next.a - SLACK_PILLAR) / 2) : to;
+      return {
+        ...o,
+        a: Math.max(left, o.a - o.slack.side),
+        b: Math.min(right, o.b + o.slack.side),
+        bottom: Math.max(y0, o.bottom - o.slack.below),
+        top: Math.min(y1, o.top + o.slack.above),
+      };
+    };
 
     const pick = (m, along) => (typeof m === 'function' ? m(along) : m);
     const cut = (pieces) => pieces.flatMap(([a, b, ya, yb]) => {
@@ -881,6 +894,47 @@ export function buildHouse(scene, world, physMats) {
       box([x0 + 0.03, H, z - 0.015], [x0 + 0.06, H + 0.87, z + 0.015], M.stairSide, { story: 1 });
     }
     body([x0, H, zTurn - 0.045], [x0 + 0.09, H + 1.0, zCorner - 0.005], physMats.hard, { kind: 'furniture' });
+
+    // The helping hand up the stairs (main.js liftPlan). A real throw up this
+    // steep, narrow stairwell nearly always fails: the floor over the bottom
+    // steps and the flight overhead catch his flailing limbs, and he tumbles
+    // back down. So a throw up a flight carries Lennie's centre along `path`
+    // instead, clear of all that, and lets go at its end, heading off the top
+    // into the hallway or the attic. He must be in `zone` (x, y, z ranges) when
+    // thrown, and the throw must head across `foot` (x, z ranges: the bottom of
+    // the flight). `up` is the way the flight's first steps climb, in plan.
+    const xc = (A.x0 + A.x1) / 2; // the middle of the stairwell
+    const zMid = (zCorner + zFront) / 2; // the middle of flight C's first steps
+    const overA = (z) => (rise * (A.zLow - z)) / A.run + 0.95; // a hand above flight A's nosings
+    const exitZ = zTurn - 0.47; // between the top winders' back wall and the newel post
+    const run = (level, zone, foot, up, steps, path) => stairRuns.push({ level, zone, foot, up, steps: new Set(steps), path: path.map((p) => new THREE.Vector3(...p)) });
+    run(
+      0,
+      { x: [IN.x0, GF.hallX], y: [-0.5, 2.2], z: [zTurn, GF.toiletZ] }, // the hallway, and the flight itself
+      { x: [A.x0, A.x1], z: [zTurn, A.zLow] },
+      [0, -1],
+      [...Array(STAIR.steps).keys()].map((i) => `A${i}`),
+      [
+        [xc, overA(WELL.z1 + 0.35) + 0.15, WELL.z1 + 0.35], // in under the floor over the bottom steps
+        [xc, overA(1.0), 1.0],
+        [xc, H + 0.45, zTurn - 0.42], // over the top winders
+        [A.x1 + 0.55, H + 0.65, exitZ], // and off them into floor 2's hallway
+      ],
+    );
+    run(
+      1,
+      { x: [IN.x0, F2.midX], y: [H - 0.5, H + 2.2], z: [A.zHigh, WELL.z1] }, // floor 2's hallway
+      { x: [A.x0, A.x1 + C.first * C.run], z: [zCorner, zFront] }, // the first steps and the turn in the front corner
+      [-1, 0],
+      [...Array(STAIR.steps).keys()].map((i) => `C${i}`),
+      [
+        [A.x1 + 0.2, H + 0.95, zMid], // over the first steps
+        [xc, H + 1.7, zMid], // over the turn
+        [xc, H + 2.6, zTurn + 0.08], // back along the wall
+        [xc, 2 * H + 0.45, zTurn - 0.42], // over the top winders
+        [A.x1 + 0.55, 2 * H + 0.65, exitZ], // and off them onto the attic's landing
+      ],
+    );
   }
 
   // ------------------------------------------------------------ floor 2's own walls
@@ -1072,15 +1126,19 @@ export function buildHouse(scene, world, physMats) {
     prismWall({ run: 'z', at: HOUSE.x0, poly: gable, thick: EXT, physThick: EXT_PHYS, physOffset: -off, mats: { pos: left, neg: M.brick }, story: k, line: `west-${k}` });
     prismWall({ run: 'z', at: HOUSE.x1, poly: gable, thick: EXT, physThick: EXT_PHYS, physOffset: off, mats: { pos: M.brick, neg: bedroom }, story: k, line: `east-${k}` });
 
-    // the middle wall from the back to the front, with its door near the top of the stairs
+    // the middle wall from the back to the front, with its door near the top of
+    // the stairs (with a doorway's slack in the physics, like the other doors)
     const line = `mid-${k}`;
     const [d0, d1] = ATTIC.door;
     const dTop = y0 + DOOR_TOP;
-    const mid = (poly) => prismWall({ run: 'z', at: ATTIC.midX, poly, thick: INT, physThick: INT_PHYS, mats: { pos: bedroom, neg: left }, story: k, line });
-    mid([[IN.z0, y0], [d0, y0], [d0, underside(d0)], [IN.z0, underside(IN.z0)]]);
-    mid([[d0, dTop], [d1, dTop], [d1, underside(d1)], [d0, underside(d0)]]);
-    mid([[d1, y0], [IN.z1, y0], [IN.z1, underside(IN.z1)], [0, HOUSE.ridgeY], [d1, underside(d1)]]);
-    addDoor('z', ATTIC.midX, { a: d0, b: d1, bottom: y0, top: dTop }, INT_PHYS, 0, k, line);
+    const [p0, p1, pTop] = [d0 - DOOR_SLACK.side, d1 + DOOR_SLACK.side, dTop + DOOR_SLACK.above];
+    const mid = (poly, physPoly) => prismWall({ run: 'z', at: ATTIC.midX, poly, physPoly, thick: INT, physThick: INT_PHYS, mats: { pos: bedroom, neg: left }, story: k, line });
+    mid([[IN.z0, y0], [d0, y0], [d0, underside(d0)], [IN.z0, underside(IN.z0)]], [[IN.z0, y0], [p0, y0], [p0, underside(p0)], [IN.z0, underside(IN.z0)]]);
+    mid([[d0, dTop], [d1, dTop], [d1, underside(d1)], [d0, underside(d0)]], [[p0, pTop], [p1, pTop], [p1, underside(p1)], [p0, underside(p0)]]);
+    const right = [[IN.z1, y0], [IN.z1, underside(IN.z1)], [0, HOUSE.ridgeY]];
+    mid([[d1, y0], ...right, [d1, underside(d1)]], [[p1, y0], ...right, [p1, underside(p1)]]);
+    const door = { a: d0, b: d1, bottom: y0, top: dTop };
+    addDoor('z', ATTIC.midX, door, INT_PHYS, 0, k, line, { ...door, a: p0, b: p1, top: pTop });
     for (const [a, b, ya, yb] of [[d0 - 0.07, d0, y0, dTop + 0.07], [d1, d1 + 0.07, y0, dTop + 0.07], [d0 - 0.07, d1 + 0.07, dTop, dTop + 0.07]]) {
       const [min, max] = extents('z', ATTIC.midX, a, b, ya, yb, INT + 0.05);
       box(min, max, M.trim, { story: k, line });
@@ -2025,6 +2083,7 @@ export function buildHouse(scene, world, physMats) {
     windows,
     doors,
     stairBodies,
+    stairRuns,
     isInside,
     isOnRoof,
     levelOf,
