@@ -61,7 +61,7 @@ export function prewarmFades(renderer, scene, camera, mats) {
 }
 
 /** Splits a mesh with one material per face group into [geometry, material] pairs, all without an index. */
-function pieces(mesh) {
+export function pieces(mesh) {
   const geo = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry;
   if (!Array.isArray(mesh.material)) return [[geo, mesh.material]];
   const out = [];
@@ -80,7 +80,7 @@ function pieces(mesh) {
 }
 
 /** Turns triangles inside out, for a mirrored mesh whose mirroring is baked into the vertices. */
-function flipWinding(geo) {
+export function flipWinding(geo) {
   for (const attr of Object.values(geo.attributes)) {
     const n = attr.itemSize;
     const a = attr.array;

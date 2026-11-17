@@ -6,11 +6,47 @@
 // fresh, press keys, click, take screenshots, and run code in the page.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const ADB = [process.env.ADB, `${process.env.LOCALAPPDATA}/Android/Sdk/platform-tools/adb.exe`].find((p) => p && existsSync(p)) ?? 'adb';
+
+// One script at a time. Several Claude sessions may share the one tablet, and
+// a second script restarting Chrome ends the first one's measurement halfway
+// (it happened: both got odd numbers and a lost connection). The script that
+// has the tablet leaves its process id in a file in the temp folder; the next
+// one waits here until that process has ended.
+const TURN = join(tmpdir(), 'toss-the-lennie-tablet.turn');
+let myTurn = false;
+async function waitForTurn() {
+  if (myTurn) return;
+  const holder = () => {
+    try {
+      return Number(readFileSync(TURN, 'utf8'));
+    } catch {
+      return 0; // nobody has it
+    }
+  };
+  for (let said = false; ; said = true) {
+    const pid = holder();
+    if (!pid || pid === process.pid) break;
+    try {
+      process.kill(pid, 0); // (signal 0 only asks whether the process is there)
+    } catch {
+      break; // that script has ended
+    }
+    if (!said) console.error(`waiting for another tablet script to finish (process ${pid})`);
+    await sleep(3000);
+  }
+  writeFileSync(TURN, String(process.pid));
+  myTurn = true;
+  process.on('exit', () => {
+    if (holder() === process.pid) rmSync(TURN, { force: true });
+  });
+}
 
 /**
  * Closes Chrome on the tablet and starts it again with one light tab, so the
@@ -27,6 +63,7 @@ export async function restartChrome() {
   } catch {
     return false;
   }
+  await waitForTurn();
   adb('shell', 'am', 'force-stop', 'com.android.chrome');
   await sleep(2000);
   // (a folder's listing from the game's server: nearly nothing, and on the address connect() looks for)
@@ -49,6 +86,7 @@ export const GAME = 'http://localhost:5173/index.html';
  * memory and Android closed Chrome.
  */
 export async function connect({ match = 'localhost:5173' } = {}) {
+  await waitForTurn();
   const list = await (await fetch('http://127.0.0.1:9222/json')).json();
   const page = list.find((p) => p.type === 'page' && p.url.includes(match)) ?? list.find((p) => p.type === 'page');
   if (!page) throw new Error('No Chrome tab found. Is the tablet plugged in, Chrome open, and `adb forward tcp:9222 localabstract:chrome_devtools_remote` done?');

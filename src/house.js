@@ -8,6 +8,7 @@ import { hangDrawings, hangPainting, hangWhiteboard } from './drawings.js';
 import { createLoose } from './loose.js';
 import { parkBikes } from './bikes.js';
 import { setFade } from './batching.js';
+import { farCopy } from './farview.js';
 
 // A Dutch terraced house: two brick storeys and an attic under a steep roof,
 // with a dormer. Footprint x ∈ [-4, 4], z ∈ [-5, 5]; the front door faces +z.
@@ -255,9 +256,19 @@ function grilleTexture(length) {
 
 export function buildHouse(scene, world, physMats) {
   const tex = textures();
-  const groups = [0, 1, 2, 3].map(() => {
+  // Each storey (and the roof) is built in a group of its own, inside an outer
+  // group that the cutaway hides as a whole (updateView). The inner one is
+  // switched off while the house is seen from across the road, when a cheap
+  // copy stands in for it (finish(), farview.js); what has to stay itself then
+  // (the front's windows and doors, the loose furniture) moves to the outer one.
+  const storeys = [0, 1, 2, 3].map(() => {
     const g = new THREE.Group();
     scene.add(g);
+    return g;
+  });
+  const groups = storeys.map((storey) => {
+    const g = new THREE.Group();
+    storey.add(g);
     return g;
   });
   const lines = new Map();
@@ -2111,7 +2122,12 @@ export function buildHouse(scene, world, physMats) {
       const k = storyAt(target.y);
       if (camera.position.y > underCeiling(camera, k)) level = k;
     }
-    groups.forEach((g, k) => (g.visible = k <= level));
+    storeys.forEach((g, k) => (g.visible = k <= level));
+    if (farView) {
+      const z = camera.position.z;
+      const wanted = farAllowed && (far ? target.z > FAR.targetOff && z > FAR.cameraOff : target.z > FAR.target && z > FAR.camera);
+      if (wanted !== far) setFar(wanted);
+    }
 
     const a = [target.x, target.y, target.z];
     const b = [camera.position.x, camera.position.y, camera.position.z];
@@ -2153,6 +2169,55 @@ export function buildHouse(scene, world, physMats) {
     }
   }
 
+  // ------------------------------------------------------------ view: from across the road
+  // With the camera's target across the road (in the supermarket, mostly) and
+  // the camera in front of the house too, the house is a small part of the
+  // picture, and nothing of it can be between the two. Then a cheap copy of
+  // its fixed parts is drawn instead (farview.js): a few meshes in place of
+  // several hundred. The clutter and the loose furniture indoors aren't drawn
+  // at all then; the front's windows and doors stay themselves, so a broken
+  // one stays broken.
+  // `target` and `camera` are where (in z) it switches on, the others where it
+  // switches back: the road starts past the grass verge, at z = 18.5.
+  const FAR = { target: 19.5, targetOff: 17, camera: 9, cameraOff: 7.5 };
+  let farView = null;
+  let far = false;
+  let farAllowed = true; // (allowFar(false) keeps the real parts in the picture, to measure what the copy saves)
+
+  /** A loose piece is only drawn from afar when it lies out in front of the house. */
+  function showLoose() {
+    for (const { body, group } of loose.items) group.visible = !far || body.position.z > OUT.z1;
+  }
+
+  function setFar(on) {
+    far = on;
+    for (const g of groups) g.visible = !on;
+    farView.visible = on;
+    showLoose();
+  }
+
+  /**
+   * Makes the far copy. main.js calls it once everything is built and the
+   * scenery has been combined (batching.js): the copy is made of those
+   * combined meshes.
+   */
+  function finish() {
+    // a window or door in the front wall, or up in the roof's front half
+    const inFront = (piece) => piece.center.z > IN.z1 - 0.3 || (piece.center.z > 1 && piece.center.y > HOUSE.eaveY);
+    for (const piece of [...windows, ...doors]) {
+      const k = groups.indexOf(piece.group.parent);
+      if (k >= 0 && inFront(piece)) storeys[k].add(piece.group);
+    }
+    for (const { group } of loose.items) {
+      const k = groups.indexOf(group.parent);
+      if (k >= 0) storeys[k].add(group);
+    }
+    const fixed = groups.flatMap((g) => g.children.filter((o) => o.isMesh && !o.isInstancedMesh && !o.userData.products && o.visible));
+    farView = farCopy(fixed);
+    farView.visible = false;
+    scene.add(farView);
+  }
+
   /**
    * The underside of the ceiling over `p` (Lennie) while the camera is below
    * it too, else Infinity. The see-through window around him leaves that
@@ -2170,7 +2235,8 @@ export function buildHouse(scene, world, physMats) {
 
   /** True when a mesh is hidden by the cutaway or faded out of the way, so aiming looks past it. */
   function isFaded(mesh) {
-    for (let o = mesh; o; o = o.parent) if (!o.visible) return true;
+    // (a storey that's only swapped for the far copy still counts as there)
+    for (let o = mesh; o; o = o.parent) if (!o.visible && !groups.includes(o)) return true;
     const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
     const entry = matLine.get(mat) ?? lines.get(mesh.userData.line);
     return !!entry && entry.opacity < 0.5;
@@ -2214,6 +2280,7 @@ export function buildHouse(scene, world, physMats) {
       piece.group.visible = true;
       world.addBody(piece.body);
     }
+    showLoose();
   }
 
   return {
@@ -2230,6 +2297,10 @@ export function buildHouse(scene, world, physMats) {
     homeSeat,
     spots,
     updateView,
+    finish,
+    get farView() { return farView; },
+    get far() { return far; },
+    allowFar(on) { farAllowed = on; },
     fadeMaterials: () => [...lines.values()].flatMap((e) => [...e.mats]),
     ceilingOver,
     isFaded,

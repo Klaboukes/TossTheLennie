@@ -41,8 +41,8 @@ Lennie in aim mode (T, then a click), which repeats well from run to run.
 
 | Script | What it tells you |
 |---|---|
-| `tosses.mjs [url] [throws] [first]` | The standard test: 5 throws in the house, 5 in the supermarket, 5 after R. Frames per second and hitches per throw, and any errors. The game picks its own sharpness and shading, as for a player; with `first` it forgets what it remembered, as on a first visit. |
-| `ab.mjs <url> base base <variant>…` | A/B experiments: change one thing in the page (hide the clutter, cheaper shading, lower resolution…) and measure 3 house throws, with physics time per frame. `q0`…`q4` hold the game at one step of its own sharpness-and-shading list. |
+| `tosses.mjs [url] [throws] [first] [nofar]` | The standard test: 5 throws in the house, 5 in the supermarket, 5 after R. Frames per second and hitches per throw, and any errors. The game picks its own sharpness and shading, as for a player; with `first` it forgets what it remembered, as on a first visit. With `nofar` the house and the shop are drawn in full from across the road too (see *Fourth round*). |
+| `ab.mjs <url> base base <variant>…` | A/B experiments: change one thing in the page (hide the clutter, cheaper shading, lower resolution…) and measure 3 house throws, with physics time per frame. `q0`…`q4` hold the game at one step of its own sharpness-and-shading list; `nofar` switches the far copies off. |
 | `memory.mjs [url]` | What the game keeps in memory, counted in the page. See [memory.md](memory.md). |
 | `profile.mjs [url]` | A CPU profile of 3 house throws: where the main thread's time goes, by file, by function, and by function with everything it calls. |
 | `draws.mjs [url]` | How many separate things are drawn per frame, by kind, from the start view and turned round. |
@@ -67,6 +67,14 @@ Lennie in aim mode (T, then a click), which repeats well from run to run.
   `ab.mjs`, `tosses.mjs`, `still.mjs` and `memory.mjs` now close Chrome and
   start it again first (`restartChrome()` in `cdp.mjs`); `same.mjs`,
   `profile.mjs` and `draws.mjs` don't yet.
+- **One script at a time, across sessions too.** Two Claude sessions shared
+  the tablet one evening, and each script restarting Chrome ended the other's
+  measurement halfway: a lost connection (Node says "unsettled top-level
+  await") or odd numbers. In the tablet's log (`adb logcat -d -b all`) it shows
+  as two `am force-stop com.android.chrome` lines seconds apart. `cdp.mjs` now
+  leaves the running script's process id in a file in the temp folder
+  (`toss-the-lennie-tablet.turn`), and the next script waits until that process
+  has ended. That only works between sessions whose scripts have it.
 - **Aim mode costs something by itself.** The throws are aimed (T), and with
   aim mode on the game works out the aim every frame while Lennie lies waiting.
   In flight it doesn't.
@@ -279,12 +287,80 @@ So the house is at 30 on the tablet now; the supermarket isn't (24–26). At
 0.75 with simple shading the tablet is back at the main processor's limit:
 even at sharpness 0.4 it did 30.7.
 
+## Fourth round: what's across the road
+
+With Lennie in the supermarket, about half of everything drawn was his own
+house across the road: every wall and floor that fades by itself, every colour
+of furniture, the clutter on three storeys, for a house that fills a corner of
+the picture. The other way round the same: from the living room looking at the
+street, the shop was 240 of 770 draw calls.
+
+Now each of the two is drawn as a cheap copy while the camera's target is
+across the road from it and the camera isn't near it either (`farview.js`;
+`updateView()` in `house.js` and `supermarket.js` does the switching, with
+some slack so it doesn't flap). The copy is made once the game is built, from
+the combined scenery: each part's colour goes into its corners, so everything
+without a picture is one mesh and everything with the same picture another.
+The house's copy is 36 meshes (16,600 triangles, 1.4 MB), the shop's 66 (8,500
+triangles, 0.7 MB).
+
+- **The house from the shop:** the copy, plus the front's windows and doors
+  as they are (a broken one stays broken). Its clutter, loose furniture and
+  inner doors aren't drawn. Side by side the outside is the same; through the
+  windows the rooms keep their walls and furniture and lose their mess.
+- **The shop from the house:** the copy, plus the shop window's panes and all
+  the products, which were a few meshes already. The glass fridge doors and
+  counters inside aren't drawn. Side by side from the front garden no
+  difference could be found.
+- Aiming still looks at the real parts (the copy isn't hit by the pointer's
+  ray), and nothing between the camera and Lennie can be part of a copy, so
+  fading and the see-through circle go on as before.
+
+Draw calls in Chrome on the PC, five thrown tosses each, the copies switched
+off and on in the same build (`allowFar()` on `lennie.house` and
+`lennie.shop`):
+
+| | Copies off | Copies on |
+|---|---|---|
+| Supermarket throws: draw calls per frame (most) | 973 (1,017) | 315 (365) |
+| Supermarket throws: triangles per frame | 786,000 | 595,000 |
+| 56 fixed views in and round the house | 332 | 280 |
+| ...of those, the living room looking at the street | 775 | 535 |
+
+(The thrown tosses don't end the same from one page load to the next here, so
+the house's own average isn't comparable between runs; the fixed views are.)
+
+On the tablet, the standard test (`tosses.mjs`, a later visit: sharpness 0.75
+with the simple shading), with the copies, without (`nofar`) and with again,
+back to back:
+
+| Frames/s | With | Without | With |
+|---|---|---|---|
+| 5 house throws after loading | 29.8 | 33.9 | 30.3 |
+| 5 supermarket throws | 36.2 | 30.5 | 42.4 |
+| 5 house throws after R | 31.5 | 32.2 | 29.3 |
+
+So the supermarket went from about 30 that evening (24–26 in the third round)
+to 36–42, with no frame over 100 ms in the last run. The house's numbers
+looked a little lower with the copies, so that was measured by itself
+(`ab.mjs base nofar base nofar`, three house throws each): 33.5 and 32.1 with,
+28.4 and 31.7 without. No loss there; the house's 30 to 34 is the spread
+between runs, with frames falling on either side of three screen refreshes.
+
+What's left in the supermarket after this is its own products: about 400,000
+triangles in seven meshes, drawn whole whenever the shop is in view (from the
+house too). Whether that many triangles hold the tablet back hasn't been
+measured; if they do, splitting the baked meshes by aisle, or fewer of the
+same thing per shelf, would be the next step there.
+
 ## Next ideas (not done)
 
-- The supermarket, and anything more in the house, is the main processor
-  again: three.js's work per draw call (400–550 calls in flight) and the
-  physics. Fewer calls would mean fewer separate fading walls or hiding
-  storeys in view; `draws.mjs` and `profile.mjs` show where they are.
+- Anything more is the main processor again: three.js's work per draw call
+  (300–550 calls in flight) and the physics. Fewer calls would mean fewer
+  separate fading walls or hiding storeys in view; `draws.mjs` and
+  `profile.mjs` show where they are.
+- The neighbours' houses and the street could get the same cheap copy as the
+  house and the shop (*Fourth round*); they're about 60 draw calls.
 - With simple shading, kinds of products that differ only in how rough or
   metallic they are could share a baked page (`DRAWN` in `products.js` keeps
   them apart): fewer draw calls, on weak devices only. Not looked into.

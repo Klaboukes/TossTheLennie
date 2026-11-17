@@ -52,6 +52,9 @@ for (let q = 0; q < 5; q++) VARIANTS[`q${q}`] = `JSON.stringify(lennie.holdQuali
 // Sharpness 0.75 with the full shading, which isn't a step of the list (it's where the game ended up before simple shading).
 VARIANTS.full075 = '(() => { lennie.holdQuality(4); lennie.setSimpleShading(false); return "0.75 full"; })()';
 
+// The house and the shop drawn in full from across the road too, as before their cheap copies (farview.js).
+VARIANTS.nofar = '(() => { lennie.house.allowFar(false); lennie.shop.allowFar(false); return "no far copies"; })()';
+
 const url = process.argv[2];
 const names = process.argv.slice(3);
 if (!url || !names.length || names.some((n) => !(n in VARIANTS))) {

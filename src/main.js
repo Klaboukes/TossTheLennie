@@ -2438,6 +2438,9 @@ bakeStocks();
 // Everything is built: glue the scenery that never moves into a few big
 // meshes, so weak tablets and phones have far less to draw (batching.js).
 combineScenery(scene, notScenery);
+// (and from those, the cheap copies of the house and the shop for when they're seen from across the road)
+house.finish();
+shop.finish();
 if (DEV) setTimeout(() => reportFlicker(builtParts), 1500);
 const seeThrough = createSeeThrough(scene, renderer, notScenery);
 const blobShadow = createBlobShadow(scene, world, SCENERY_ONLY);
@@ -3551,7 +3554,11 @@ function frame(now) {
     loading.remove();
     loading = null;
     // (now, while the game is still starting, rather than the first time a wall fades)
+    // (and with the far copies in the picture, so the first trip across the road doesn't stall either)
+    house.farView.visible = shop.farView.visible = true;
     prewarmFades(renderer, scene, camera, [...house.fadeMaterials(), ...shop.fadeMaterials()]);
+    house.farView.visible = house.far;
+    shop.farView.visible = shop.far;
     // Products only drawn once knocked (products.js bakes them in place): their
     // pictures go to the graphics chip now, not all at once when a shelf comes down.
     scene.traverse((o) => {
@@ -3612,7 +3619,7 @@ requestAnimationFrame(frame);
 // Handy for debugging from the console. advance() runs the game loop by hand,
 // e.g. when the tab is in the background and requestAnimationFrame is paused.
 window.lennie = {
-  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, effects, trolley, cars, cat, replay, renderer,
+  lennie, world, camera, controls, toss, stats, house, shop, guard, aim, aimRing, zap, effects, trolley, cars, cat, replay, renderer,
   FEEL, launch, dropLennie, // (throw him at a THREE.Vector3 velocity, put him back on a floor)
   simpleShading, setSimpleShading: (on) => setSimpleShading(on, scene), // (the scenery without its shine, as on a slow device)
   holdQuality, quality: () => quality, // (the step of sharpness and shading the game is at; hold it at one for measuring)

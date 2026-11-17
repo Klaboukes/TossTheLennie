@@ -2,7 +2,7 @@
 // supermarket, 5 more in the house after tidying up (R). Prints frames per
 // second and hitches for each, and any errors.
 //
-//   node scripts/tablet/tosses.mjs [url] [throws per place] [first]
+//   node scripts/tablet/tosses.mjs [url] [throws per place] [first] [nofar]
 //
 // url defaults to the main checkout's game; for a worktree use
 // http://localhost:5173/.claude/worktrees/<name>/index.html
@@ -15,8 +15,15 @@ const t = await connect();
 // With `first` as the third argument the game forgets what it remembered about
 // this device's speed, so it starts as on a first visit: full sharpness and
 // shading, stepping down while the test runs.
-if (process.argv[4] === 'first') await t.eval("localStorage.removeItem('toss-the-lennie:quality'), true");
+const flags = process.argv.slice(4);
+if (flags.includes('first')) await t.eval("localStorage.removeItem('toss-the-lennie:quality'), true");
 await t.open(url, 1500);
+// With `nofar` the house and the shop are drawn in full from across the road
+// too, as before farview.js: run it with and without to see what the copies save.
+if (flags.includes('nofar')) {
+  await sleep(3000);
+  console.log('far copies off:', await t.eval('lennie.house.allowFar(false), lennie.shop.allowFar(false), true'));
+}
 await t.eval(FRAME_RECORDER);
 await sleep(12000);
 const info = await t.eval(`(() => {

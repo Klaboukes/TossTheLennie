@@ -4,6 +4,7 @@ import { floorGeometry, meterBoxUVs } from './textures.js';
 import { createStock, ASSORTMENT, PRODUCTS, halfSize } from './products.js';
 import { CLEAR_NEAR, CLEAR_FAR } from './house.js';
 import { setFade } from './batching.js';
+import { farCopy } from './farview.js';
 
 // The supermarket across the road, after the real one: a long orange box
 // under a zigzag of grey gables, with a brick-and-glass entrance and a big
@@ -181,7 +182,15 @@ function fridgeTexture() {
   });
 }
 
-export function buildSupermarket(scene, world, physMats, { std, tex }) {
+export function buildSupermarket(root, world, physMats, { std, tex }) {
+  // The shop is built in a group of its own (`scene` from here on), which is
+  // switched off while the shop is seen from across the road: a cheap copy of
+  // its fixed parts stands in for it then (finish(), farview.js). What has to
+  // stay itself goes in the outer group: the products, and the shop window's panes.
+  const outer = new THREE.Group();
+  root.add(outer);
+  const scene = new THREE.Group();
+  outer.add(scene);
   // ---------------------------------------------------------------- fading
   // Like the house: each "line" (a wall, the roof) is a plane with an extent;
   // it fades when the sight line from the camera target to the camera crosses
@@ -487,7 +496,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const crateTables = crateXs.map(([x0, x1]) => ({ x0, x1, z0: CRATE.z0, z1: CRATE.z1, y: CRATE.top }));
   // the bakery's table of bread baskets, by the bread rack
   const breadTable = { x0: -20.1, x1: -18.8, z0: 32.3, z1: 34.4, y: 0.72 };
-  const stock = createStock(scene, { bounds: IN, tables: [...crateTables, breadTable] });
+  const stock = createStock(outer, { bounds: IN, tables: [...crateTables, breadTable] });
   const _mid = new THREE.Vector3();
   /**
    * A table piled with loose products (fruit, rolls) in compartments, one kind
@@ -1318,7 +1327,47 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const isInside = (p) => p.y > -1 && p.y < IN.y1 && p.x > IN.x0 && p.x < IN.x1 && p.z > IN.z0 && p.z < IN.z1;
   const isOnRoof = (p) => p.y > IN.y1 && p.x > SHOP.x0 - 0.5 && p.x < SHOP.x1 + 0.5 && p.z > SHOP.z0 - 0.5 && p.z < SHOP.z1 + 0.5;
 
+  // From across the road (see house.js, which does the same the other way):
+  // with the camera's target on the house's side of the cycle path and the
+  // camera well short of the shop too, the shop's fixed parts are drawn as a
+  // cheap copy, a few meshes in place of a few hundred. The products on the
+  // shelves are a few meshes already and stay as they are; the glass doors and
+  // counters inside aren't drawn then. `target` and `camera` are where (in z)
+  // it switches on, the others where it switches back.
+  const FAR = { target: 12.5, targetOff: 15, camera: 22, cameraOff: 24 };
+  let farView = null;
+  let far = false;
+  let farAllowed = true; // (allowFar(false) keeps the real parts in the picture, to measure what the copy saves)
+
+  /** Makes the far copy. main.js calls it once everything is built and the scenery has been combined. */
+  function finish() {
+    // (a pane of the shop window stays itself, so a broken one stays broken)
+    for (const piece of windows) if (piece.center.z < IN.z0 + 0.2) outer.add(piece.group);
+    const panes = new Set(windows.map((piece) => piece.group));
+    const fixed = [];
+    const collect = (parent) => {
+      for (const o of parent.children) {
+        if (!o.visible || panes.has(o)) continue;
+        if (!o.isMesh) collect(o);
+        else if (!o.isInstancedMesh && !o.userData.products) fixed.push(o);
+      }
+    };
+    collect(scene);
+    farView = farCopy(fixed);
+    farView.visible = false;
+    root.add(farView);
+  }
+
   function updateView(camera, target, dt) {
+    if (farView) {
+      const z = camera.position.z;
+      const wanted = farAllowed && (far ? target.z < FAR.targetOff && z < FAR.cameraOff : target.z < FAR.target && z < FAR.camera);
+      if (wanted !== far) {
+        far = wanted;
+        scene.visible = !far;
+        farView.visible = far;
+      }
+    }
     const a = [target.x, target.y, target.z];
     const b = [camera.position.x, camera.position.y, camera.position.z];
     for (const entry of lines.values()) {
@@ -1413,7 +1462,12 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   const spawnPoint = () => ({ x: -4.5, z: 34.4, height: 0.05 });
 
   const fadeMaterials = () => [...lines.values()].flatMap((e) => [...e.mats]);
-  const api = { isInside, isOnRoof, spawnPoint, updateView, fadeMaterials, isFaded, spots, windows, breakPiece, repairAll, update };
+  const api = {
+    finish,
+    get farView() { return farView; },
+    get far() { return far; },
+    allowFar(on) { farAllowed = on; },
+    isInside, isOnRoof, spawnPoint, updateView, fadeMaterials, isFaded, spots, windows, breakPiece, repairAll, update };
   for (const piece of windows) piece.owner = api;
   return api;
 }
