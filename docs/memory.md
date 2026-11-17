@@ -164,6 +164,13 @@ first picture appears about 7 s after the load starts in both. The standard
 test (`tosses.mjs`) ran three times without errors (house 27–31, supermarket
 25–35, house after R 31–35 frames a second).
 
+**Together with the far view** (the cheap copies of what's across the road,
+`farview.js`, which landed just before this): one run on the tablet as a
+player gets it, 816 MB after loading (graphics memory 288); a lost context
+comes back in 2.7 s, also with a copy in view (the copies use the same
+pictures as the real parts); `tosses.mjs` house 34.5, supermarket 39.8,
+house after R 31.2 frames a second, no errors.
+
 **Pitfall while measuring this:** the "before" was first taken from another
 session's worktree, which was still being worked on. Halfway through it had
 got faster in the supermarket, which looked like a slowdown here. Compare
