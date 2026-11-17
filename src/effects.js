@@ -571,7 +571,7 @@ export class Effects {
   #splash() {
     if (this.#cool('splash', 1)) return;
     const c = this.#center();
-    const bath = this.zones.bath.find((b) => inBox(c, b, 0.5)) ?? this.zones.bath[0]; // the one he's in (floor 2's or the attic's)
+    const bath = this.zones.bath.find((b) => inBox(c, b, 0.5)) ?? this.zones.bath[0]; // the one he's in
     const floor = bath ? bath.min[1] + 0.2 : floorOf(c.y);
     this.sfx.splash(Math.min(1, this.ragdoll.coreSpeed() / 7 + 0.4));
     this.#burst(60, c, { colors: WATER, size: [0.02, 0.04], speed: [0.6, 2.4], up: [2, 4.5], floor, life: [0.8, 1.4], spread: 0.3 });
@@ -631,11 +631,11 @@ export class Effects {
     }
     if (s.t < SPIN_TIME) return;
     this.spinning = null;
-    // done: flung off into the bathroom, clean and dizzy
+    // done: flung off the front of the machine into the attic's loft (low, under its sloping roof), clean and dizzy
     if (physics && this.hooks.free()) {
-      const side = rand(-1.2, 1.2);
+      const side = rand(0, 1.5); // away from the side wall
       this.#kick((b) => {
-        b.velocity.set(-4 + rand(-0.4, 0.4), 4.5 + rand(-0.4, 0.4), side + rand(-0.4, 0.4));
+        b.velocity.set(side + rand(-0.4, 0.4), 3 + rand(-0.4, 0.4), 4 + rand(-0.4, 0.4));
         b.angularVelocity.set(rand(-8, 8), rand(-8, 8), rand(-8, 8));
       });
       this.sfx.voice('fly');

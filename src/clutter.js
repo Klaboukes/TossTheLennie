@@ -250,9 +250,14 @@ const ROOMS = {
   kids: { k: 1, x0: -0.06, x1: 3.875, z0: 0.54, z1: 4.875 },
   kidsBack: { k: 1, x0: -3.875, x1: -0.24, z0: -4.875, z1: -0.88 },
   bathroom: { k: 1, x0: -3.875, x1: -0.24, z0: 1.78, z1: 4.875 },
-  study: { k: 2, x0: -3.875, x1: 0.51, z0: -2.31, z1: 3.9 }, // the roof slopes down towards the front
-  bath: { k: 2, x0: 0.69, x1: 3.875, z0: -2.31, z1: 3.8 },
+  // the attic follows its floor plan too (house.js): the loft on the left of
+  // the middle wall, the bedroom on the right (in front only as far as the
+  // dormer's window wall). Things flying about bounce off the sloping roof.
+  attic: { k: 2, x0: -3.875, x1: -0.39, z0: -4.6, z1: 4.6, ceil: (z) => ATTIC_ROOF(z) },
+  atticBed: { k: 2, x0: -0.21, x1: 3.875, z0: -4.6, z1: 3.8, ceil: (z) => ATTIC_ROOF(z) },
 };
+// The roof's underside over the attic: the ridge at 11 m, the eaves at 6 m, 5 m out (house.js).
+const ATTIC_ROOF = (z) => 11 - Math.abs(z);
 
 // What pops up when Lennie sends a room's mess flying (main.js mixes in a few
 // general shouts and never says the same thing twice in a row).
@@ -265,16 +270,21 @@ const ROOM_MESS = {
   kitchen: ['Hagelslag avalanche!', "Who's doing the dishes?", 'Breakfast in the air!', 'Pan-demonium!', "Don't cry over spilt milk!", 'Plate-tectonics!'],
   bedroom: ['Laundry day!', 'Sock it to me!', 'Lost a slipper!', 'Wake-up call!', 'Bedtime? Not yet!', 'Bed head!'],
   kids: ['Teddy, nooo!', 'Clean your room, Lennie!', 'Art attack!', 'Playtime!', 'Ouch, building blocks!', 'Teddy takes flight!'],
-  study: ['Homework destroyed!', 'Out of office!', 'Box office smash!', 'Working from home!', 'Paperwork? Flying work!', 'Undo! Undo!'],
-  bath: ['Rubber duck rescue!', 'Splish splash!', 'Quack attack!', 'Toilet roll tornado!', 'Bath time!', 'Squeaky clean... not!'],
+  bathroom: ['Rubber duck rescue!', 'Splish splash!', 'Quack attack!', 'Toilet roll tornado!', 'Bath time!', 'Squeaky clean... not!'],
+  attic: ['Box office smash!', 'Who keeps all this stuff?', 'Never throw anything away!', 'Found the Christmas stuff!', 'Attic avalanche!', 'Box tower down!'],
+  atticBed: ['Box office smash!', 'Pillow fight!', 'Bed head!', 'Attic avalanche!', 'Box tower down!', 'Guest room? Mess room!'],
 };
 ROOM_MESS.kidsBack = ROOM_MESS.kids;
-ROOM_MESS.bathroom = ROOM_MESS.bath;
 
 // The chair at the bureau in the bedroom, buried under clothes (its seat's
 // middle), the laundry basket beside the wardrobe, and the front kids room's
 // beanbag (house.js puts it there).
 const CHAIR = { x: 0.95, z: -3.95 };
+// The washing machine and the dryer, side by side at the back of the attic's
+// loft, their doors to the front (house.js has the rest of the floor plan).
+const WASHER = { x0: -3.85, x1: -3.22, z0: -3.75, z1: -3.15, h: 0.85 };
+const DRYER = { x0: -3.17, x1: -2.54 };
+const LOW3_TOP = 0.55; // the top of the attic bedroom's low cabinet (house.js)
 const BASKET = { x: 3.5, z: -0.7 };
 const BEANBAG = { x: 1.2, z: 3.75 };
 
@@ -302,8 +312,8 @@ const FURNITURE = {
   kids: [[1.75, 3.875, 0.54, 1.2], [-0.06, 0.65, 2.65, 4.35], [2.85, 3.875, 2.7, 4.875], [0.65, 1.75, 3.2, 4.3]], // wardrobe, bureau, bed, beanbag
   kidsBack: [[-3.875, -3.25, -4.875, -3.25], [-1.25, -0.24, -4.875, -2.8], [-3.875, -2.5, -1.55, -0.88], [-2.3, -1.25, -4.875, -4.2]], // low cabinet, bed, wardrobe, toy box
   bathroom: [[-3.875, -2.95, 1.78, 4.875], [-2.3, -1.62, 4.25, 4.875], [-0.8, -0.24, 2.95, 4.35]], // tub, loo, sink cabinet
-  study: [[-3.875, -3.0, 1.65, 3.65], [-2.95, -2.25, 2.3, 3.0], [-2.4, -0.6, -2.31, -1.85], [-1.68, 0.51, 2.1, 3.9], [-3.875, -2.85, -0.75, 1.65]], // desk, desk chair, bookshelf, armchair, the stairwell
-  bath: [[0.9, 2.95, 2.65, 3.8], [3.1, 3.875, -1.75, -0.95], [2.9, 3.875, 0.1, 1.5], [3.2, 3.875, -0.85, -0.05]], // tub, loo, cabinet, washing machine
+  attic: [[-3.875, -2.5, -3.8, -3.1], [-3.875, -2.85, -0.75, 1.65]], // the washing machine and the dryer, the stairwell
+  atticBed: [[2.4, 3.875, 0.25, 2.55], [0.5, 3.3, 2.6, 3.9]], // the bed, the dormer with its low cabinet and its sides
 };
 
 const mats = new Map();
@@ -1422,6 +1432,20 @@ function buildCatalogue() {
   C.screwdriverBlue = screwdriver(0x2f6fb5);
   C.screwdriverGreen = screwdriver(0x2f8a5b);
   C.spanner = parts([[Box(0.025, 0.24, 0.006), toolSteel], [at(new THREE.TorusGeometry(0.022, 0.007, 6, 12), 0, 0.13, 0), toolSteel], [at(new THREE.TorusGeometry(0.018, 0.006, 6, 12), 0, -0.13, 0), toolSteel]]);
+  // the attic: an older, greyer box, Christmas baubles (in the box of Christmas
+  // things), and old suitcases (one model each, coloured per item)
+  C.doosOld = tint('doos', 0xd2c6b4);
+  C.bauble = item(Sph(0.04), mat(0xffffff, { roughness: 0.15, metalness: 0.4 }));
+  C.baubleRed = tint('bauble', 0xd8312a);
+  C.baubleGold = tint('bauble', 0xe0b13a);
+  C.baubleBlue = tint('bauble', 0x2f6fb5);
+  C.baubleGreen = tint('bauble', 0x2f8a5b);
+  C.baubleSilver = tint('bauble', 0xc9ced3);
+  const caseM = mat(0xffffff, { roughness: 0.5 });
+  C.suitcase = parts([[Box(0.5, 0.2, 0.68), caseM], [at(Box(0.18, 0.03, 0.03), 0, 0.115, 0), caseM], [at(Box(0.02, 0.03, 0.03), -0.08, 0.1, 0), caseM], [at(Box(0.02, 0.03, 0.03), 0.08, 0.1, 0), caseM]]);
+  C.suitcaseRed = tint('suitcase', 0xb8352f);
+  C.suitcaseBlue = tint('suitcase', 0x3a5a8c);
+  C.suitcaseBrown = tint('suitcase', 0x8a6a4a);
 
   // tiny things cast no shadows (there are hundreds of them)
   for (const [id, p] of Object.entries(C)) {
@@ -1477,10 +1501,10 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     [1, 2.93, 3.845, 2.87, 4.825, 0.61], // the front kids room's bed
     [1, -0.055, 0.6, 2.7, 4.3, 0.76], // its bureau
     [1, -0.75, -0.245, 3.0, 4.3, 0.85], // the sink cabinet
-    [2, -3.875, -3.1, 1.75, 3.55, 0.76], // desk
-    [2, -1.58, 0.47, 2.2, 3.1, 0.45], // armchair
-    [2, 3.0, 3.875, 0.2, 1.4, 0.85], // bathroom cabinet
-    [2, 3.25, 3.875, -0.75, -0.15, 0.85], // washing machine
+    [2, WASHER.x0, WASHER.x1, WASHER.z0, WASHER.z1, WASHER.h], // the washing machine
+    [2, DRYER.x0, DRYER.x1, WASHER.z0, WASHER.z1, WASHER.h], // the dryer
+    [2, 2.48, 3.845, 0.42, 2.45, 0.6], // the attic bed (its duvet)
+    [2, 0.72, 3.08, 3.32, 3.89, LOW3_TOP], // the low cabinet in the dormer
   ];
   const stocks = [0, 1, 2].map((k) => createStock(groups[k], {
     bounds: ROOMS.living,
@@ -1850,42 +1874,98 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   put(bathroom, 'wcRol', -1.2, 0, 3.3, tipped('wcRol'));
   strew(bathroom, ['towelWhite', 'towelBlue', 'heapGrey', 'sockWhite', 'underpants', 'shirtKid', 'shampoo'], 10, { how: lying });
 
-  // ---------------------------------------------------------------- attic study
-  // (its desk stands in front of the stairwell, DZ further to the front than it used to)
-  const study = 'study';
-  const DZ = 3.35;
-  put(study, 'pizzaBox', -3.48, 0.76, -0.5 + DZ, { yaw: 0.1 });
-  put(study, 'limo', -3.3, 0.76, -1.35 + DZ, tipped('limo'));
-  put(study, 'icetea', -3.6, 0.76, 0.05 + DZ);
-  put(study, 'cola', -3.25, 0.76, -0.9 + DZ);
-  put(study, 'mugWhite', -3.3, 0.76, 0.0 + DZ);
-  for (const [x, z, r] of [[-3.55, -1.25, 0.1], [-3.45, -1.2, -0.3], [-3.5, 0.05, 1.5]]) put(study, 'paper', x, 0.76, z + DZ, { yaw: r });
-  pile(study, 'bookGreen', -3.6, 0.76, -1.45 + DZ, 3);
-  strew(study, ['paper', 'paper', 'bookRed', 'bookBlue', 'limo', 'icetea', 'heapGrey', 'sockBlack', 'chipsPaprika', 'magazine'], 20, {
-    area: { x0: ROOMS.study.x0, x1: ROOMS.study.x1, z0: ROOMS.study.z0, z1: 2.6 },
-    how: (id) => (id.startsWith('chips') ? onFace(id) : lying(id)),
-  });
-  // boxes of stuff, waiting to go up to the loft since the day they moved in
-  const doos = put(study, 'doos', -2.0, 0, 0.9, { yaw: 0.15 });
-  put(study, 'doos', -1.95, 0.32, 0.88, { yaw: -0.1, on: doos });
-  put(study, 'doos', 0.1, 0, -1.6, { yaw: 0.4 });
-  put(study, 'blanket', -0.53, 0.45, 2.6, { yaw: 1.0 }); // in the armchair
-  put(study, 'bookBlue', -0.08, 0.45, 2.3, { yaw: 0.4 });
+  // ---------------------------------------------------------------- the attic: the loft and the bedroom
+  // Boxes stacked everywhere the floor plan leaves free, as high as the
+  // sloping roof lets them, each with its stuff inside (it comes flying out
+  // when Lennie knocks the box over), and junk on the floor between them.
+  // Kept clear: the top of the stairs, the way from there to the middle
+  // wall's door, and on the other side the way from that door to the bed.
+  const BOXES = ['doos', 'doosOld', 'doosKerst', 'doosLego', 'doosBoeken', 'doosDiversen', 'doosBaby'];
+  const CLOTHES = ['sock', 'sockRed', 'shirtBlue', 'shirtGreen', 'kidShirt', 'jeansKid', 'heapGrey', 'towelBlue'];
+  const CONTENTS = {
+    doos: CLOTHES,
+    doosOld: ['bookRed', 'bookGreen', 'magazine', 'paper', 'drawing', 'comicA', 'comicB'],
+    doosKerst: ['baubleRed', 'baubleGold', 'baubleBlue', 'baubleGreen', 'baubleSilver'],
+    doosLego: ['lego', 'legoRed', 'legoBlue', 'legoYellow', 'legoGreen', 'brickRed', 'brickBlue'],
+    doosBoeken: ['bookRed', 'bookBlue', 'bookGreen', 'comicA', 'magazine'],
+    doosBaby: ['duck', 'blockA', 'blockB', 'blockC', 'blockD', 'ball', 'sockWhite'],
+    doosDiversen: ['remote', 'phone', 'crayonRed', 'crayonBlue', 'carRed', 'carBlue', 'headphones', 'gameCaseA', 'screwTin'],
+  };
+  const pickOf = (list) => list[Math.floor(rnd() * list.length)];
+  const roofAbove = (z) => ATTIC_ROOF(z) - 2 * H; // the roof's height above the attic floor
+  /** A stack of boxes at (x, z), each filled with its stuff, no higher than the roof over its outer edge. */
+  function boxStack(room, x, z) {
+    const maxH = roofAbove(Math.abs(z) + 0.28) - 0.06;
+    const yaw = (rnd() < 0.5 ? 0 : Math.PI / 2) + (rnd() - 0.5) * 0.2;
+    let below = null;
+    let h = 0;
+    for (let i = 0; i < 4; i++) {
+      const id = pickOf(BOXES);
+      const [bx, by, bz] = half(id);
+      if (h + 2 * by > maxH) break;
+      // put() lifts the low ones off the floorboards itself; the ones higher up rest on the box below
+      const boxItem = put(room, id, x + (rnd() - 0.5) * 0.03, h < 0.35 ? h : h + FLOOR, z + (rnd() - 0.5) * 0.03, { yaw: yaw + (rnd() - 0.5) * 0.12, on: below });
+      // what's in it, out of sight until it spills
+      const fits = CONTENTS[id].filter((pid) => {
+        const [px, py, pz] = half(pid);
+        return Math.max(px, pz) < Math.min(bx, bz) - 0.01 && py < by - 0.01;
+      });
+      const c = boxItem.home;
+      for (let n = 2 + Math.floor(rnd() * 3); n > 0 && fits.length; n--) {
+        const pid = pickOf(fits);
+        const py = half(pid)[1];
+        stocks[2].place(pid, c.x + (rnd() - 0.5) * 0.1, c.y - py, c.z + (rnd() - 0.5) * 0.1, rnd() * TAU, null, 0, { inside: boxItem, lift: py });
+      }
+      below = boxItem;
+      h += 2 * by;
+    }
+    if (below) strewn.push({ k: 2, x, z, size: 0.3 }); // the junk on the floor stays clear of it
+  }
+  /** Stacks of boxes on a grid of centres, most spots taken. */
+  function boxField(room, x0, x1, z0, z1, keep = 0.8) {
+    const STEP = 0.58; // the biggest box, a little turned, is under 0.54 m across
+    for (let x = x0; x <= x1 + 1e-6; x += STEP) {
+      for (let z = z0; z <= z1 + 1e-6; z += STEP) if (rnd() < keep) boxStack(room, x + (rnd() - 0.5) * 0.04, z + (rnd() - 0.5) * 0.04);
+    }
+  }
+  const junk = ['sleepingBagRed', 'sleepingBagBlue', 'sleepingBagGreen', 'tentBag', 'coolBox', 'campChair', 'lantern', 'bottleCrate', 'paintWhite', 'paintBlue',
+    'suitcase', 'suitcaseRed', 'suitcaseBrown', 'teddy', 'beachBall', 'cushion', 'heapGrey', 'heapBlue', 'bookRed', 'magazine', 'baubleRed', 'baubleGold',
+    'toolbox', 'emmer', 'carRed', 'blockA', 'tub', 'gasCan'];
+  const loftHow = (id) => (/^(suitcase|sleepingBag|tentBag)/.test(id) ? {} : lying(id));
 
-  // ---------------------------------------------------------------- attic bathroom
-  const bath = 'bath';
-  put(bath, 'duck', 1.55, 0.14, 3.2, { yaw: 0.4 }); // in the tub
-  put(bath, 'duck', 2.25, 0.14, 3.0, { yaw: 2.5 });
-  put(bath, 'shampoo', 2.79, 0.55, 2.82); // on its rim
-  put(bath, 'douchegel', 1.06, 0.55, 3.68);
-  put(bath, 'tandpasta', 3.4, 0.85, 0.5, { yaw: 1.3 }); // on the cabinet
-  put(bath, 'mugWhite', 3.6, 0.85, 0.9);
-  put(bath, 'douchegel', 3.65, 0.85, 1.2, tipped('douchegel'));
-  put(bath, 'waspoeder', 3.55, 0.85, -0.45, { yaw: -Math.PI / 2 }); // on the washing machine
-  pile(bath, 'wcRol', 3.0, 0, -1.6, 3, { jitter: 0.01 });
-  put(bath, 'wcRol', 2.6, 0, -0.6, tipped('wcRol'));
-  put(bath, 'emmer', 2.7, 0, 1.9);
-  strew(bath, ['towelWhite', 'towelBlue', 'heapGrey', 'sockWhite', 'underpants', 'shirtWhite', 'shampoo', 'wcRol'], 12, { how: lying });
+  // the loft: behind the washing machine and the dryer, along the back,
+  // beside the stairwell and all over the front, where the roof comes down
+  const loft = 'attic';
+  boxField(loft, -3.55, -2.97, -4.32, -4.32, 0.9);
+  boxField(loft, -2.2, -0.68, -4.25, -3.09);
+  boxField(loft, -2.66, -0.92, 0.62, 1.2);
+  boxField(loft, -3.6, -0.68, 1.9, 4.22);
+  // the washing: powder on the machine, a heap of laundry on the dryer, more in front of them
+  put(loft, 'waspoeder', -3.45, WASHER.h, -3.42, { yaw: 0.2 });
+  put(loft, 'heapBlue', -2.85, WASHER.h, -3.45);
+  put(loft, 'emmer', -2.25, 0, -2.7);
+  strew(loft, CLOTHES, 6, { area: { x0: -3.875, x1: -2.2, z0: -3.1, z1: -2.2 }, how: lying });
+  strew(loft, junk, 26, { area: { x0: -3.875, x1: -0.39, z0: -4.5, z1: 4.4 }, how: loftHow });
+
+  // the bedroom: boxes all over the back, and along the side wall up to the
+  // bed, and a few in the corners beside the dormer
+  const attic = 'atticBed';
+  boxField(attic, 0.07, 3.55, -4.25, -2.51, 0.75);
+  boxField(attic, 1.52, 3.26, -1.9, -1.32, 0.75);
+  boxField(attic, 0.1, 0.1, 2.9, 4.06, 0.9);
+  boxField(attic, 3.6, 3.6, 2.95, 3.53, 0.9);
+  // on the bed, and on the low cabinet under the window
+  put(attic, 'teddy', 3.2, 0.69, 0.75, { yaw: Math.PI });
+  put(attic, 'blanket', 3.05, 0.61, 1.95, { yaw: 0.3 });
+  put(attic, 'bookBlue', 2.8, 0.61, 1.4, { yaw: 1.2 });
+  put(attic, 'plantPothos', 1.0, LOW3_TOP, 3.62);
+  pile(attic, 'bookGreen', 1.6, LOW3_TOP, 3.6, 3);
+  put(attic, 'lantern', 2.75, LOW3_TOP, 3.62);
+  put(attic, 'baubleGold', 2.3, LOW3_TOP, 3.55);
+  strew(attic, ['shirtBlue', 'jeans', 'sock', 'sockRed', 'heapRed', 'towelWhite', 'slipper', 'magazine', 'cushion', 'suitcaseBlue', 'baubleBlue', 'lantern', 'teddy', 'campChair'], 18, {
+    area: { x0: -0.21, x1: 3.875, z0: -4.5, z1: 3.3 },
+    how: loftHow,
+  });
 
   // ---------------------------------------------------------------- the board game closet
   const closet = buildCloset();
@@ -2870,15 +2950,21 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     box([cx0, cy + 0.46, cz1 - 0.04], [cx1, cy + 0.95, cz1], chairM, { story: 1, cast: true });
     body([cx0, cy, cz0], [cx1, cy + 0.46, cz1], physMats.hard, { kind: 'furniture' });
     body([cx0, cy + 0.46, cz1 - 0.04], [cx1, cy + 0.95, cz1], physMats.hard, { kind: 'furniture' });
-    // the washing machine up in the attic bathroom, against the right-hand wall (solid)
+    // the washing machine and the dryer side by side at the back of the attic's loft (solid), their doors to the front
     const y2 = 2 * H;
     const white = std({ color: 0xf4f2ee, roughness: 0.4 });
-    box([3.25, y2, -0.75], [3.875, y2 + 0.85, -0.15], white, { story: 2, cast: true });
-    body([3.25, y2, -0.75], [3.875, y2 + 0.85, -0.15], physMats.hard, { kind: 'furniture' });
-    const door = add(2, mesh(Cyl(0.19, 0.19, 0.03, 24).rotateZ(Math.PI / 2), std({ color: 0x9aa3ad, roughness: 0.3, metalness: 0.5 }), 3.24, y2 + 0.42, -0.45));
-    door.castShadow = false;
-    add(2, mesh(Cyl(0.14, 0.14, 0.035, 24).rotateZ(Math.PI / 2), std({ color: 0x3b4a5a, roughness: 0.1 }), 3.235, y2 + 0.42, -0.45), false);
-    add(2, mesh(Box(0.02, 0.08, 0.5), std({ color: 0xd9dcdf, roughness: 0.4 }), 3.245, y2 + 0.79, -0.45), false);
+    const panel = std({ color: 0xd9dcdf, roughness: 0.4 });
+    const { z0, z1, h } = WASHER;
+    for (const [x0, x1, rim, glass] of [[WASHER.x0, WASHER.x1, 0x9aa3ad, 0x3b4a5a], [DRYER.x0, DRYER.x1, 0xe4e6e8, 0x55606b]]) {
+      const cx = (x0 + x1) / 2;
+      box([x0, y2, z0], [x1, y2 + h, z1], white, { story: 2, cast: true });
+      body([x0, y2, z0], [x1, y2 + h, z1], physMats.hard, { kind: 'furniture' });
+      // the round door stands 2.5 cm out of the front, its glass 3 cm, the control strip 1.5 cm
+      const door = add(2, mesh(Cyl(0.19, 0.19, 0.03, 24).rotateX(Math.PI / 2), std({ color: rim, roughness: 0.3, metalness: 0.5 }), cx, y2 + 0.42, z1 + 0.01));
+      door.castShadow = false;
+      add(2, mesh(Cyl(0.14, 0.14, 0.034, 24).rotateX(Math.PI / 2), std({ color: glass, roughness: 0.1 }), cx, y2 + 0.42, z1 + 0.013), false);
+      add(2, mesh(Box(x1 - x0 - 0.08, 0.08, 0.02), panel, cx, y2 + 0.79, z1 + 0.005), false);
+    }
   }
 
   // ---------------------------------------------------------------- what the rest of the game uses
@@ -2910,7 +2996,7 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   }
 
   const spots = [
-    { id: 'washer', label: 'In the wash!', value: 250, say: 'SPIN!', min: [3.2, 2 * H + 0.8, -0.8], max: [3.9, 2 * H + 1.5, -0.1] },
+    { id: 'washer', label: 'In the wash!', value: 250, say: 'SPIN!', min: [WASHER.x0 - 0.05, 2 * H + WASHER.h - 0.05, WASHER.z0 - 0.05], max: [WASHER.x1 + 0.05, 2 * H + WASHER.h + 0.65, WASHER.z1 + 0.05] },
   ];
 
   return {

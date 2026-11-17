@@ -38,7 +38,7 @@ The game's house is wider than the real one (about 8 m instead of about 5.5 m) t
 - **The back, all across:** the living room, with white walls and ceiling, the kids' drawings and paintings on the walls (and handprints, smudges and crayon scribbles right on them), and a big black-and-white painting of a medieval town on the wall behind the dining table. The TV (showing a blocky building game) on a low cabinet in the back left corner, turned towards the dark grey corner couch, which is as long as the low white cabinet behind it, with a small round side table in front of it; the dark grey comfy chair and the tall board game cabinet against the back wall; the dining table with six chairs; the piano against the side wall, with its back to the bar. No rug.
 - **The back wall:** one big window frame onto the garden, a wide pane with a side window at the TV's end, and a convector heating trench with a wooden grille in the floor along it (a little way out from the wall), from the TV's corner to the comfy chair.
 - **Floors:** the laminate runs from the front to the back.
-- **Walls and ceilings:** the living room, the kitchen, the toilet (tiles only on its floor), the hallway and the landing, the utility room, the bedrooms and the attic have white painted walls, a bit grubby and lived-in; the ceilings everywhere are a light off-white, just set apart from the walls, and a bit grubby too. The attic bathroom keeps its own tiles.
+- **Walls and ceilings:** the living room, the kitchen, the toilet (tiles only on its floor), the hallway and the landing, the utility room, the bedrooms and the attic have white painted walls, a bit grubby and lived-in; the ceilings everywhere are a light off-white, just set apart from the walls, and a bit grubby too.
 - **Doors:** all the inside doors are white. The doors to the hallway, the utility room and the garden have glass panes, top and bottom.
 - **Built on at the back (right):** the utility room with the fridge (trashable: its doors fly off and the food comes out) and an open Ikea Kallax full of shoes and boots next to it, the cat's litter box with the coat rack on the wall above it, and shoes kicked off on the floor. A door from the living room, a door out to the garden.
 - **The garage:** behind the utility room, its door near the utility room in the side facing the garden. Inside: shelves with camping stuff along the garden side, a table with lots of stuff against the far side, and tool shelves against the utility room. In the game the green door is shut, and breaks like the doors in the house; everything on the shelves and the table is loose and comes down when Lennie crashes into it.
@@ -54,3 +54,15 @@ The game's house is wider than the real one (about 8 m instead of about 5.5 m) t
 - **Back right:** the bedroom, with a bureau with a monitor and keyboard against the back wall and its chair, the two-person bed with its head against the right-hand wall, and a high clothes cabinet against the wall to the front kids room.
 - **Front left:** the bathroom, with the bath all along the left wall (a shower over its end by the door, with a small glass screen on the bath's edge), the toilet against the front wall, and the sink in a cabinet against the wall to the front kids room.
 - **Front right:** the other kids room, with a high clothes cabinet against the bedroom's wall, a bureau along the bathroom's wall, and the bed along the right-hand wall (plus the beanbag).
+
+## Floor 3, the attic
+
+![Sketch of the attic](floorplan-attic.png)
+
+*[floorplan-attic.png](floorplan-attic.png): the owner's sketch of the attic, the same way round as the ones above.*
+
+- **The roof** slopes down to the floor at the front and the back, so the rooms are tall in the middle and low along the front and the back.
+- **A wall from the back to the front** splits the attic in two, with a door near the top of the stairs.
+- **Left:** the stairs come up along the left wall, and the washing machine and the dryer stand side by side at the back. The rest is the junk attic, full of boxes and odds and ends.
+- **Right:** the attic bedroom, with the bed along the right-hand wall and a low cabinet at the front, which in the game stands in the dormer under its window. The free space at the back is full of boxes too.
+- In the game the stairs stay where the floors below need them, and every box and bit of junk is loose: Lennie knocks the stacks over and the boxes spill what's in them.

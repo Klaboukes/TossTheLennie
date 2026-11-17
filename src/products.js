@@ -1159,6 +1159,15 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
         const bounds = boundsOf(item);
         if (item.pos.x < bounds.x0 + 0.1 || item.pos.x > bounds.x1 - 0.1) { item.pos.x = Math.min(bounds.x1 - 0.1, Math.max(bounds.x0 + 0.1, item.pos.x)); item.vel.x *= -0.3; }
         if (item.pos.z < bounds.z0 + 0.1 || item.pos.z > bounds.z1 - 0.1) { item.pos.z = Math.min(bounds.z1 - 0.1, Math.max(bounds.z0 + 0.1, item.pos.z)); item.vel.z *= -0.3; }
+        // a sloping roof overhead (the attic's): it bounces back down off it
+        if (bounds.ceil) {
+          const [hx, hy, hz] = item.k.half;
+          const top = bounds.ceil(item.pos.z) - Math.max(hx, hy, hz);
+          if (item.pos.y > top) {
+            item.pos.y = top;
+            if (item.vel.y > 0) item.vel.y *= -0.3;
+          }
+        }
         const low = lowest(item);
         // both judged from where it was before this step, so landing on a table top isn't hitting its side
         keepOutOfTables(item, low + item.vel.y * dt);
