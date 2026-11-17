@@ -62,19 +62,56 @@ const PARTS = [
 
 // range = how far (radians) the joint can comfortably bend; used to normalise
 // the contortion score. angle/twist are the physical cone-twist limits.
+// relaxed = [pitch, roll]: where part b hangs from part a when every muscle is
+// slack, the pose a floating astronaut drifts into (NASA's neutral body
+// posture): knees and hips bent, arms out in front with bent elbows, head and
+// back a little forward. Pitch turns about the part's x axis (negative swings
+// a limb forward), roll about z (towards `sign` swings it out to the side).
 const JOINTS = [
-  { name: 'neck', label: 'Neck', a: 'head', b: 'chest', pa: [0, -0.14, 0], pb: [0, 0.21, 0], angle: Math.PI / 4, twist: Math.PI / 4, range: 1.2, weight: 1.2 },
-  { name: 'spine', label: 'Spine', a: 'chest', b: 'pelvis', pa: [0, -0.21, 0], pb: [0, 0.09, 0], angle: Math.PI / 5, twist: Math.PI / 6, range: 0.9, weight: 1.5 },
+  { name: 'neck', label: 'Neck', a: 'head', b: 'chest', pa: [0, -0.14, 0], pb: [0, 0.21, 0], angle: Math.PI / 4, twist: Math.PI / 4, range: 1.2, weight: 1.2, relaxed: [-0.3, 0] },
+  { name: 'spine', label: 'Spine', a: 'chest', b: 'pelvis', pa: [0, -0.21, 0], pb: [0, 0.09, 0], angle: Math.PI / 5, twist: Math.PI / 6, range: 0.9, weight: 1.5, relaxed: [-0.15, 0] },
   ...SIDES.flatMap(({ s, sign, word }) => {
     const W = word[0].toUpperCase() + word.slice(1);
     return [
-      { name: 'shoulder' + s, label: `${W} shoulder`, a: 'chest', b: 'upperArm' + s, pa: [0.315 * sign, 0.17, 0], pb: [0, 0.17, 0], angle: 2.0, twist: Math.PI / 3, range: 2.4, weight: 0.8 },
-      { name: 'elbow' + s, label: `${W} elbow`, a: 'upperArm' + s, b: 'lowerArm' + s, pa: [0, -0.17, 0], pb: [0, 0.155, 0], angle: 1.6, twist: 0.3, range: 1.8, weight: 1 },
-      { name: 'hip' + s, label: `${W} hip`, a: 'pelvis', b: 'upperLeg' + s, pa: [0.115 * sign, -0.09, 0], pb: [0, 0.24, 0], angle: 1.4, twist: 0.5, range: 1.7, weight: 1.1 },
-      { name: 'knee' + s, label: `${W} knee`, a: 'upperLeg' + s, b: 'lowerLeg' + s, pa: [0, -0.24, 0], pb: [0, 0.23, 0], angle: 1.6, twist: 0.2, range: 1.8, weight: 1 },
+      { name: 'shoulder' + s, label: `${W} shoulder`, a: 'chest', b: 'upperArm' + s, pa: [0.315 * sign, 0.17, 0], pb: [0, 0.17, 0], angle: 2.0, twist: Math.PI / 3, range: 2.4, weight: 0.8, relaxed: [-0.65, 0.6 * sign] },
+      { name: 'elbow' + s, label: `${W} elbow`, a: 'upperArm' + s, b: 'lowerArm' + s, pa: [0, -0.17, 0], pb: [0, 0.155, 0], angle: 1.6, twist: 0.3, range: 1.8, weight: 1, relaxed: [-1.0, 0] },
+      { name: 'hip' + s, label: `${W} hip`, a: 'pelvis', b: 'upperLeg' + s, pa: [0.115 * sign, -0.09, 0], pb: [0, 0.24, 0], angle: 1.4, twist: 0.5, range: 1.7, weight: 1.1, relaxed: [-0.7, 0.2 * sign] },
+      { name: 'knee' + s, label: `${W} knee`, a: 'upperLeg' + s, b: 'lowerLeg' + s, pa: [0, -0.24, 0], pb: [0, 0.23, 0], angle: 1.6, twist: 0.2, range: 1.8, weight: 1, relaxed: [0.8, 0] },
     ];
   }),
 ];
+
+// A plain ragdoll's joints swing freely up to a hard stop, which looks limp
+// and weightless. These three cheap touches (after Lincoln Margison's
+// "Improving ragdolls forever") give Lennie some muscle tone; see tense() and
+// fling(). Set one to 0 to switch that touch off (window.lennie.FEEL in the
+// console, to compare).
+export const FEEL = {
+  // Soft limits: from this share of a joint's limit on, it brakes...
+  softStart: 0.65,
+  // ...shedding its speed towards the limit at up to this rate (1/s), so it
+  // eases into the stop rather than slamming into it and bouncing back.
+  softRate: 45,
+  // The relaxed pose, only while he flies: how hard each joint is drawn to it
+  // (1/s²), how much that calms his flailing (1/s), and the angle (radians)
+  // beyond which it pulls no harder. Kept gentle: over 200 test tosses a
+  // firmer pull (25, damping 3) landed him about a tenth less contorted.
+  relaxPull: 18,
+  relaxDamp: 1.5,
+  relaxMax: 1.2,
+  // How hard a launch flings his arms and legs about.
+  kick: 1,
+};
+const FLUNG = [['upperArmL', 5], ['upperArmR', 5], ['upperLegL', 3.5], ['upperLegR', 3.5], ['head', 2]];
+const UP = new CANNON.Vec3(0, 1, 0);
+const X_AXIS = new CANNON.Vec3(1, 0, 0);
+const Z_AXIS = new CANNON.Vec3(0, 0, 1);
+const _ya = new CANNON.Vec3();
+const _yb = new CANNON.Vec3();
+const _n = new CANNON.Vec3();
+const _t = new CANNON.Vec3();
+const _qa = new CANNON.Quaternion();
+const _qb = new CANNON.Quaternion();
 
 const vec = (a) => new CANNON.Vec3(a[0], a[1], a[2]);
 const material = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0, ...extra });
@@ -321,7 +358,103 @@ export class Ragdoll {
     });
     constraint.collideConnected = false;
     this.world.addConstraint(constraint);
-    this.joints.push({ ...def, bodyA, bodyB, constraint });
+    // For tense(): the relaxed pose as a rotation of b seen from a, and how
+    // heavy the two parts are to turn about this joint.
+    const relaxed = new CANNON.Quaternion().setFromAxisAngle(Z_AXIS, def.relaxed[1])
+      .mult(new CANNON.Quaternion().setFromAxisAngle(X_AXIS, def.relaxed[0]));
+    const heft = (body, pivot) => (body.inertia.x + body.inertia.z) / 2 + body.mass * vec(pivot).lengthSquared();
+    const ia = heft(bodyA, def.pa);
+    const ib = heft(bodyB, def.pb);
+    this.joints.push({ ...def, bodyA, bodyB, constraint, relaxed, inertia: (ia * ib) / (ia + ib) });
+  }
+
+  /**
+   * Muscle tone, called before every physics step (it only adds torques, a
+   * few sums per joint).
+   *
+   * Soft limits, always: a joint swinging towards its limit brakes over the
+   * last stretch, like muscles and tendons reaching their full stretch.
+   * Coming back from the limit it's free.
+   *
+   * The relaxed pose, as far as `relax` (0 to 1) says: each joint is drawn
+   * gently towards its relaxed angle. That's for while he flies, where it
+   * makes him a floppy person rather than a stiff plank; on the ground it
+   * would untangle him, and tangled is what scores.
+   */
+  tense(dt, relax = 0) {
+    const { softStart, softRate, relaxPull, relaxDamp, relaxMax } = FEEL;
+    for (const j of this.joints) {
+      const A = j.bodyA;
+      const B = j.bodyB;
+      const wa = A.angularVelocity;
+      const wb = B.angularVelocity;
+      const rx = wb.x - wa.x;
+      const ry = wb.y - wa.y;
+      const rz = wb.z - wa.z;
+
+      if (softRate > 0) {
+        // the swing is the angle between the two bones, as the cone limit measures it
+        A.quaternion.vmult(UP, _ya);
+        B.quaternion.vmult(UP, _yb);
+        const cos = _ya.dot(_yb);
+        const start = j.angle * softStart;
+        if (cos < Math.cos(start)) {
+          _ya.cross(_yb, _n); // turning b about this axis swings it further out
+          const sin = _n.length();
+          const rate = sin > 1e-4 ? (rx * _n.x + ry * _n.y + rz * _n.z) / sin : 0;
+          if (rate > 0) {
+            _n.scale(1 / sin, _n);
+            const k = Math.min(1, (Math.atan2(sin, cos) - start) / (j.angle - start));
+            // A share of the speed per step, never more than all of it, so it can't overshoot.
+            const shed = 1 - Math.exp(-softRate * k * k * dt);
+            let free = A.invInertiaWorld.vmult(_n, _t).dot(_n);
+            free += B.invInertiaWorld.vmult(_n, _t).dot(_n);
+            if (free > 1e-9) {
+              const torque = (shed * rate) / (free * dt);
+              B.torque.addScaledVector(-torque, _n, B.torque);
+              A.torque.addScaledVector(torque, _n, A.torque);
+            }
+          }
+        }
+      }
+
+      if (relax > 0 && relaxPull > 0) {
+        // the turn that would take b from where it is to its relaxed place on a
+        A.quaternion.mult(j.relaxed, _qa);
+        B.quaternion.conjugate(_qb);
+        _qa.mult(_qb, _qa);
+        const s = Math.hypot(_qa.x, _qa.y, _qa.z);
+        const angle = Math.min(relaxMax, 2 * Math.atan2(s, Math.abs(_qa.w)));
+        const pull = s > 1e-6 ? (relax * relaxPull * j.inertia * angle * Math.sign(_qa.w || 1)) / s : 0;
+        const damp = relax * relaxDamp * j.inertia;
+        _t.set(_qa.x * pull - rx * damp, _qa.y * pull - ry * damp, _qa.z * pull - rz * damp);
+        B.torque.vadd(_t, B.torque);
+        A.torque.vsub(_t, A.torque);
+      }
+    }
+  }
+
+  /**
+   * A launch flings his arms, legs and head about: they lag behind, swinging
+   * back from the way `v` he's sent, each with a random twirl of its own, so
+   * no two throws look alike. Turning the parts about their own middles
+   * leaves his flight path alone.
+   */
+  fling(v, strength = 1) {
+    const k = FEEL.kick * strength;
+    if (!(k > 0)) return;
+    const speed = Math.hypot(v.x, v.y, v.z);
+    const lag = speed > 1e-3 ? (Math.min(1, speed / 12) * 4 * k) / speed : 0;
+    const r = (a) => (Math.random() - 0.5) * 2 * a * k;
+    for (const [name, twirl] of FLUNG) {
+      const body = this.parts[name].body;
+      const w = body.angularVelocity;
+      // the limb hangs down its bone (-_ya): turn it towards pointing straight back
+      body.quaternion.vmult(UP, _ya);
+      _t.set(v.x, v.y, v.z).cross(_ya, _n).scale(-lag, _n);
+      if (name === 'head') _n.setZero();
+      w.set(w.x + _n.x + r(twirl), w.y + _n.y + r(twirl), w.z + _n.z + r(twirl));
+    }
   }
 
   // Every part gets its own materials (sharing only textures), so the hover

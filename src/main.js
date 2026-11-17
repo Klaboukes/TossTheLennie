@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildHouse, HOUSE } from './house.js';
 import { buildYard, YARD } from './yard.js';
 import { STREET } from './streetscape.js';
-import { Ragdoll } from './ragdoll.js';
+import { Ragdoll, FEEL } from './ragdoll.js';
 import { measureContortion, evaluateToss, chainMultiplier } from './scoring.js';
 import { Sfx } from './audio.js';
 import { StuckGuard } from './guard.js';
@@ -1056,7 +1056,9 @@ function launchByTrampoline(v) {
     b.velocity.x *= 0.85;
     b.velocity.z *= 0.85;
   }
+  lennie.fling(_flingUp.set(0, up, 0), 0.6);
 }
+const _flingUp = new THREE.Vector3();
 
 let lastMessAt = 0;
 let lastClatterAt = 0;
@@ -2019,7 +2021,10 @@ function guideLaunch() {
   const t = world.time - g.t0;
   if (t >= AIM_GUIDE_TIME || toss.state !== 'flying') {
     aim.guide = null;
-    if (toss.state === 'flying') applySpin(g.spin);
+    if (toss.state === 'flying') {
+      applySpin(g.spin);
+      lennie.fling(g.v);
+    }
     return;
   }
   const decay = Math.exp(-DRAG * t);
@@ -2940,6 +2945,15 @@ let acc = 0;
 let last = performance.now();
 const bodies = lennie.bodies;
 
+let airTone = 0; // 0 to 1: how far his muscles relax into the floating pose (lennie.tense)
+/** Did the last physics step have Lennie touching anything but himself? */
+function touchingAnything() {
+  for (const c of world.contacts) {
+    if (lennieBodies.has(c.bi) !== lennieBodies.has(c.bj)) return true;
+  }
+  return false;
+}
+
 function stepPhysics(h) {
   // Fast-moving limbs get smaller steps so they don't sink deep into walls.
   const n = lennie.maxSpeed() > FAST_SUBSTEP_SPEED ? 2 : 1;
@@ -2956,7 +2970,13 @@ function subStep(h) {
     handBody.velocity.copy(v);
   }
   bodies.forEach((b, i) => preStep[i].copy(b.velocity));
+  lennie.tense(h, airTone);
   world.step(h);
+  // In the air (touching nothing) his limbs drift to their relaxed pose; it
+  // lets go quickly once he lands, so it never untangles him on the ground.
+  const inAir = toss.state === 'flying' && !hold && !touchingAnything();
+  airTone += ((inAir ? 1 : 0) - airTone) * (1 - Math.exp(-h / (inAir ? 0.2 : 0.06)));
+  if (airTone < 0.01 && !inAir) airTone = 0;
   if (pendingBreaks.size) {
     // Lennie crashes through: undo this step's bounce, minus a little drag
     // (more for a door, less for the one he was aimed through).
@@ -3226,6 +3246,7 @@ requestAnimationFrame(frame);
 // e.g. when the tab is in the background and requestAnimationFrame is paused.
 window.lennie = {
   lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, effects, trolley, cars, cat, replay,
+  FEEL, launch, dropLennie, // (throw him at a THREE.Vector3 velocity, put him back on a floor)
   advance(seconds) {
     for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60, performance.now());
   },
