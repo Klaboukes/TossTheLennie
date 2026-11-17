@@ -112,12 +112,27 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 // looks nearly as sharp and is far less work. If the game still runs slowly,
 // watchSpeed() steps it down further.
 const SHARPNESS = [1.5, 1.25, 1, 0.75];
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, SHARPNESS[0]));
+// A device that had to step down last time starts one step above where it
+// ended up, rather than at the top again: at full sharpness a budget tablet
+// managed 11 frames a second, and spent the first twenty seconds or so of
+// every visit stepping down from it. (One step above, so a device that was only slow for a moment
+// last time, with something else running, gets back up over a few visits.)
+const SHARPNESS_KEY = 'toss-the-lennie:sharpness';
+function rememberSharpness(value) {
+  try { localStorage.setItem(SHARPNESS_KEY, String(value)); } catch { /* storage unavailable */ }
+}
+let startSharpness = SHARPNESS[0];
+try {
+  const i = SHARPNESS.indexOf(Number(localStorage.getItem(SHARPNESS_KEY)));
+  if (i > 0) startSharpness = SHARPNESS[i - 1];
+} catch { /* storage unavailable */ }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, startSharpness));
 renderer.setSize(innerWidth, innerHeight);
 const SLOW_FRAME = 1 / 28; // seconds: slower than about 28 frames a second on average is too slow
-const speed = { wait: 3, frames: 0, time: 0 }; // wait: seconds before measuring (the first frames are slow anyway)
+const CRAWL_FRAME = 1 / 16; // slower than this, it goes down two steps at once
+const speed = { wait: 3, frames: 0, time: 0, good: 0 }; // wait: seconds before measuring (the first frames are slow anyway)
 
-/** On a device that can't keep up, draws the picture a bit less sharp (it never goes back up). */
+/** On a device that can't keep up, draws the picture a bit less sharp (it never goes back up during a visit). */
 function watchSpeed(seconds) {
   if (document.hidden || seconds > 0.25) return; // a tab switch or a hiccup, not the game being slow
   if (speed.wait > 0) {
@@ -126,16 +141,38 @@ function watchSpeed(seconds) {
   }
   speed.frames++;
   speed.time += seconds;
-  if (speed.frames < 90) return;
-  const slow = speed.time / speed.frames > SLOW_FRAME;
+  // (90 frames, or 2 seconds' worth on a device so slow that 90 frames take much longer)
+  if (speed.frames < 90 && (speed.time < 2 || speed.frames < 20)) return;
+  const frame = speed.time / speed.frames;
   speed.frames = speed.time = 0;
-  if (!slow) return;
-  const next = SHARPNESS.find((s) => s < renderer.getPixelRatio() - 0.01);
-  if (next === undefined) return;
+  if (frame <= SLOW_FRAME) {
+    // Keeping up for a good while at this sharpness: that's where the next visit may start from.
+    if (++speed.good === 10) rememberSharpness(SHARPNESS.find((s) => s <= renderer.getPixelRatio() + 0.01) ?? SHARPNESS.at(-1));
+    return;
+  }
+  speed.good = 0;
+  const lower = SHARPNESS.filter((s) => s < renderer.getPixelRatio() - 0.01);
+  if (!lower.length) return;
+  const next = lower[frame > CRAWL_FRAME ? Math.min(1, lower.length - 1) : 0];
   renderer.setPixelRatio(next);
   renderer.setSize(innerWidth, innerHeight);
+  rememberSharpness(next);
   speed.wait = 1;
 }
+// Solid scenery is drawn in the order of its shader programs (then its
+// materials, as three.js does by itself): a few dozen programs are shared by
+// hundreds of materials, and each switch from one to the next has the graphics
+// driver set up the camera and the lights again. In material order alone that
+// was 175 switches a frame; this way it's one per program.
+const programOf = (material) => {
+  if (material.programFrame !== renderer.info.render.frame) {
+    material.programFrame = renderer.info.render.frame;
+    material.programId = renderer.properties.get(material).currentProgram?.id ?? 0;
+  }
+  return material.programId;
+};
+renderer.setOpaqueSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder
+  || programOf(a.material) - programOf(b.material) || a.material.id - b.material.id || a.z - b.z || a.id - b.id);
 // No real shadows: they made every frame several times more work, too much
 // for low-end tablets. Lennie gets a soft spot under him instead (blobshadow.js).
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1941,12 +1978,38 @@ function traceArc(from, v, maxTime, pass = null, dots0 = 0) {
   return { point, normal: impact?.normal ?? new THREE.Vector3(0, 1, 0), impact, passed };
 }
 
+// Working out the aim (a ray through the whole scene to find what's under the
+// pointer, then the arc through the physics) was the heaviest thing in a frame
+// while Lennie lies waiting: about a tenth of it on a budget tablet. So as long
+// as the pointer, the camera and Lennie stay where they were, the aim on screen
+// is kept, and only looked at again a few times a second (a wall may have
+// faded, a chair may have rolled into the arc).
+const AIM_KEEP = 150; // ms
+const aimSeen = { at: -Infinity, x: NaN, y: NaN, loft: NaN, pin: null, camera: new THREE.Vector3(), turn: new THREE.Quaternion(), from: new THREE.Vector3() };
+function aimUnchanged(from) {
+  const s = aimSeen;
+  const now = performance.now();
+  if (now - s.at < AIM_KEEP && s.x === ndc.x && s.y === ndc.y && s.loft === aim.loft && s.pin === aim.pin
+    && s.camera.distanceToSquared(camera.position) < 1e-6 && Math.abs(s.turn.dot(camera.quaternion)) > 1 - 1e-9
+    && s.from.distanceToSquared(from) < 4e-4) return true;
+  s.at = now;
+  s.x = ndc.x;
+  s.y = ndc.y;
+  s.loft = aim.loft;
+  s.pin = aim.pin;
+  s.camera.copy(camera.position);
+  s.turn.copy(camera.quaternion);
+  s.from.copy(from);
+  return false;
+}
+
 function updateAim() {
   if (sling) return updateSling();
   if (!aim.on || (!aim.hover && !aim.pin) || grab || hoverPart || isAirborne()) return hideAim();
+  const from = centerOfMass(_aimFrom);
+  if (aim.shot && aimUnchanged(from)) return;
   const target = aim.pin ?? aimTarget();
   if (!target) return hideAim();
-  const from = centerOfMass(_aimFrom);
   // Lennie hits the side facing him, which may not be the side facing the camera.
   const facing = target.normal.clone();
   if (facing.dot(_aimA.subVectors(from, target.point)) < 0) facing.negate();
@@ -3437,7 +3500,11 @@ const carSounds = {
 
 function frame(now) {
   requestAnimationFrame(frame);
-  const seconds = (now - last) / 1000;
+  // Never negative: the first frame's time can lie before `last` (the browser
+  // stamped that frame while the game was still being built, which takes
+  // seconds on a slow tablet). A negative step sent the camera flying off, to
+  // end up 32 m behind the house, drawing the whole neighbourhood at once.
+  const seconds = Math.max(0, (now - last) / 1000);
   const dt = Math.min(seconds, 0.1);
   last = now;
   watchSpeed(seconds);

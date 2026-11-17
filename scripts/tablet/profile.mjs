@@ -42,9 +42,25 @@ for (const n of prof.nodes) {
   const fn = `${f.functionName || '(anonymous)'}  ${file}:${f.lineNumber + 1}`;
   byFn.set(fn, (byFn.get(fn) ?? 0) + us);
 }
+// The same by function, with everything it calls counted in: shows which part
+// of a frame the time belongs to (the physics, the drawing, the aiming...).
+const byId = new Map(prof.nodes.map((n) => [n.id, n]));
+const parent = new Map();
+for (const n of prof.nodes) for (const c of n.children ?? []) parent.set(c, n.id);
+const whole = new Map();
+for (const [id, us] of self) {
+  const seen = new Set();
+  for (let at = id; at !== undefined; at = parent.get(at)) {
+    const f = byId.get(at).callFrame;
+    const fn = `${f.functionName || '(anonymous)'}  ${f.url.split('/').pop() || '(native)'}:${f.lineNumber + 1}`;
+    if (seen.has(fn)) continue;
+    seen.add(fn);
+    whole.set(fn, (whole.get(fn) ?? 0) + us);
+  }
+}
 const top = (m, n) => [...m].sort((a, b) => b[1] - a[1]).slice(0, n)
   .map(([k, v]) => `${(v / 1000).toFixed(0).padStart(6)} ms ${((100 * v) / total).toFixed(1).padStart(5)}%  ${k}`).join('\n');
-console.log(`--- by file\n${top(byFile, 15)}\n--- by function\n${top(byFn, 30)}`);
+console.log(`--- by file\n${top(byFile, 15)}\n--- by function\n${top(byFn, 30)}\n--- by function, with what it calls\n${top(whole, 40)}`);
 console.log(t.errors.length ? t.errors.join('\n') : 'no errors');
 t.close();
 process.exit(0);

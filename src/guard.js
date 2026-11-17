@@ -32,7 +32,10 @@ export class StuckGuard {
   /** Call once the house and yard are built. */
   collectScenery() {
     this.scenery = this.world.bodies.filter((b) => b.type === CANNON.Body.STATIC && b.surface);
-    for (const b of this.scenery) b.updateAABB();
+    for (const b of this.scenery) {
+      b.updateAABB();
+      b.guarded = true; // (nearScenery() tells them from scenery added later this way)
+    }
   }
 
   /** Forget the saved pose, e.g. after Lennie was teleported. */
@@ -60,8 +63,11 @@ export class StuckGuard {
     }
     const near = this.near;
     near.length = 0;
-    for (const b of this.scenery) {
-      if (!b.world) continue;
+    // (from the scenery around him that the physics has just picked out, if
+    // it has: a few dozen pieces to go through instead of all of them)
+    const around = this.world.broadphase.sceneryAround?.(x0, y0, z0, x1, y1, z1);
+    for (const b of around ?? this.scenery) {
+      if (!b.world || !b.guarded) continue;
       if (b.shapes[0].type !== PLANE) {
         const lo = b.aabb.lowerBound;
         const hi = b.aabb.upperBound;

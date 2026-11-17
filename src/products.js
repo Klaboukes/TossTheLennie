@@ -1539,11 +1539,6 @@ const _bc = new THREE.Color();
 const _rs = new THREE.Sphere();
 const _rayMesh = new THREE.Mesh();
 const _rayHits = [];
-// (once a baked mesh's normals, picture positions and colours are on the graphics chip, they're never needed again here)
-function dropArray() {
-  this.array = null;
-}
-
 /**
  * One mesh with a copy of every product of `jobs` (a part of a kind each) in
  * its place: positions, normals, picture positions and, if any is tinted, its
@@ -1607,10 +1602,14 @@ function bakeMesh(jobs, pageMat) {
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', position);
-  geometry.setAttribute('normal', normal.onUpload(dropArray));
-  geometry.setAttribute('uv', uv.onUpload(dropArray));
-  if (color) geometry.setAttribute('color', color.onUpload(dropArray));
-  geometry.setIndex(index.onUpload(dropArray));
+  // The arrays stay in memory after they've gone to the graphics chip (about
+  // 8 MB for all the baked meshes together). A weak device now and then drops
+  // its graphics context and asks for everything again; without them every
+  // frame after that failed and the game stayed blank.
+  geometry.setAttribute('normal', normal);
+  geometry.setAttribute('uv', uv);
+  if (color) geometry.setAttribute('color', color);
+  geometry.setIndex(index);
   geometry.computeBoundingSphere();
   const material = pageMat.clone();
   material.vertexColors = tinted;

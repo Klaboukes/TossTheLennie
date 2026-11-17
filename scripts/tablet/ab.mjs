@@ -33,6 +33,19 @@ const VARIANTS = {
     o.traverse((m) => { if (m.isMesh) m.material = Array.isArray(m.material) ? m.material.map(conv) : conv(m.material); }); return swap.size; })()`,
 };
 
+// The shock's lamp (zap.js) taken out of every shader: it's lit at 0 all the time.
+VARIANTS.noPoint = '(() => { lennie.zap.light.visible = false; return 1; })()';
+// Solid scenery drawn nearest first (by the near side of each mesh's bounding ball), so hidden pixels fail the depth
+// test, instead of in the order of its shader programs (the game's own order, see setOpaqueSort in main.js).
+VARIANTS.sortNear = `(() => { const r = lennie.renderer, cam = lennie.camera; const v = cam.position.clone();
+  const depth = (it) => { const o = it.object, f = r.info.render.frame; if (o.__sf !== f) { o.__sf = f; const s = o.boundingSphere ?? it.geometry.boundingSphere ?? (it.geometry.computeBoundingSphere(), it.geometry.boundingSphere);
+    v.copy(s.center).applyMatrix4(o.matrixWorld); const sc = o.matrixWorld.getMaxScaleOnAxis(); o.__sd = v.distanceTo(cam.position) - s.radius * sc; } return o.__sd; };
+  r.setOpaqueSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder || depth(a) - depth(b) || a.id - b.id); return 1; })()`;
+// three.js's own order (by material), as the game had it.
+VARIANTS.sortMaterial = '(() => { lennie.renderer.setOpaqueSort((a, b) => a.groupOrder - b.groupOrder || a.renderOrder - b.renderOrder || a.material.id - b.material.id || a.z - b.z || a.id - b.id); return 1; })()';
+// Half the solver's work per physics step (changes how Lennie tumbles; only to see what it's worth).
+VARIANTS.iter10 = '(() => { lennie.world.solver.iterations = 10; return 10; })()';
+
 const url = process.argv[2];
 const names = process.argv.slice(3);
 if (!url || !names.length || names.some((n) => !(n in VARIANTS))) {
@@ -54,18 +67,19 @@ for (const name of names) {
   await t.key('KeyR');
   await sleep(2500);
   const changed = VARIANTS[name] ? await t.eval(VARIANTS[name]) : '';
+  await sleep(5000); // (a variant that makes the shaders compile again stalls for a few seconds first)
   await t.eval(FRAME_RECORDER);
   await t.eval(`(() => {
-    const S = window.__ab = { phys: 0, guard: 0 };
+    const S = window.__ab = { phys: 0, guard: 0, steps: 0 };
     const w = lennie.world; const step = w.step.bind(w);
-    w.step = (...a) => { const t0 = performance.now(); step(...a); S.phys += performance.now() - t0; };
+    w.step = (...a) => { const t0 = performance.now(); step(...a); S.phys += performance.now() - t0; S.steps++; };
     const g = lennie.guard; const check = g.check.bind(g);
     g.check = () => { const t0 = performance.now(); const r = check(); S.guard += performance.now() - t0; return r; };
     return true;
   })()`);
   await t.key('KeyT');
   await sleep(500);
-  await t.eval('__frames.length = 0, __ab.phys = __ab.guard = 0, true');
+  await t.eval('__frames.length = 0, __ab.phys = __ab.guard = __ab.steps = 0, true');
   for (const at of TARGETS.slice(0, 3)) {
     await t.click(...at);
     await sleep(5000);
@@ -73,7 +87,9 @@ for (const name of names) {
   const r = await t.eval(`(() => {
     const f = __frames; const ms = f.reduce((a, b) => a + b, 0); const s = [...f].sort((a, b) => a - b);
     return { fps: +(1000 * f.length / ms).toFixed(1), p95Ms: Math.round(s[Math.floor(s.length * 0.95)]),
-      physicsMsPerFrame: +(__ab.phys / f.length).toFixed(1), stuckCheckMsPerFrame: +(__ab.guard / f.length).toFixed(2),
+      physicsMsPerFrame: +(__ab.phys / f.length).toFixed(1), physicsMsPerStep: +(__ab.phys / __ab.steps).toFixed(2), stuckCheckMsPerStep: +(__ab.guard / __ab.steps).toFixed(2),
+      // how much of real time the physics got through: under 1 the game plays in slow motion
+      gameSpeed: +(__ab.steps / 120 / (ms / 1000)).toFixed(2),
       sharpness: +(document.getElementById('scene').width / innerWidth).toFixed(2) };
   })()`);
   console.log(name.padEnd(14), JSON.stringify(r), changed !== '' ? `(changed ${changed})` : '', t.errors.length ? `ERRORS: ${t.errors[0]}` : '');

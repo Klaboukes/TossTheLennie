@@ -60,10 +60,15 @@ export async function connect({ match = 'localhost:5173' } = {}) {
      * measure code that's no longer there.
      */
     async open(url, wait = 18000) {
-      await send('Page.navigate', { url });
+      await send('Network.enable');
+      await send('Network.setCacheDisabled', { cacheDisabled: true });
+      // An empty page first, so the game that was running is let go of before
+      // the next one loads: two at once ran the tablet out of memory, and the
+      // tab crashed ("Aw, Snap!", after which nothing here gets an answer).
+      await send('Page.navigate', { url: 'about:blank' });
       await sleep(1500);
-      await send('Page.reload', { ignoreCache: true });
-      await sleep(wait);
+      await send('Page.navigate', { url });
+      await sleep(wait + 1500);
     },
     async key(code) {
       const [key, vk] = KEYS[code];

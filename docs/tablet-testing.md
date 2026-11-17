@@ -43,21 +43,34 @@ Lennie in aim mode (T, then a click), which repeats well from run to run.
 |---|---|
 | `tosses.mjs [url]` | The standard test: 5 throws in the house, 5 in the supermarket, 5 after R. Frames per second and hitches per throw, and any errors. |
 | `ab.mjs <url> base base <variant>…` | A/B experiments: change one thing in the page (hide the clutter, cheaper shading, lower resolution…) and measure 3 house throws, with physics time per frame. |
-| `profile.mjs [url]` | A CPU profile of 3 house throws: where the main thread's time goes. |
+| `profile.mjs [url]` | A CPU profile of 3 house throws: where the main thread's time goes, by file, by function, and by function with everything it calls. |
 | `draws.mjs [url]` | How many separate things are drawn per frame, by kind, from the start view and turned round. |
+| `still.mjs [url]` | Lennie sitting still in the start view: frames per second, and what limits them (other sharpnesses, nothing drawn, everything drawn into 8 pixels). |
+| `same.mjs <url A> <url B>` | Is the physics still exactly the same? Twenty tosses with the dice fixed in two versions, compared to the last digit. For changes to `broadphase.js` and `guard.js`. Runs fine in a headless Chrome on the PC too (`chrome --headless=new --remote-debugging-port=9222`, with the tablet unplugged). |
 
 ## Measuring without fooling yourself
 
 - **Load fresh.** Python's server sends no cache headers, so Chrome may run old
-  copies of the modules after a plain reload. The scripts reload with the cache
-  bypassed; do the same by hand. Some early numbers here were wrong because of it.
-- **One game tab.** The game uses about 550 MB of JavaScript memory. With two
-  copies open, Android's low-memory cleaner closed Chrome mid-test.
+  copies of the modules after a plain reload. The scripts load with the cache
+  switched off; do the same by hand. Some early numbers here were wrong because of it.
+- **One game at a time.** With two copies open, Android's low-memory cleaner
+  closed Chrome mid-test; loading the game straight over a running one (as the
+  scripts first did: open, then reload) crashed the tab the same way ("Aw,
+  Snap!"). The scripts now go by way of an empty page. A script that hangs
+  without printing anything usually means the tab has crashed, or the tablet
+  has dropped off USB (`adb devices` shows nothing): look at the tablet.
+- **Aim mode costs something by itself.** The throws are aimed (T), and with
+  aim mode on the game works out the aim every frame while Lennie lies waiting.
+  In flight it doesn't.
+- **On localhost the game is heavier than for players**: the flicker check runs
+  for about 15 s after loading and keeps a copy of the scenery in memory.
 - **Compare back to back.** The same code varies by 1–3 frames a second between
   runs. Run `base` twice, and the version to compare against right before or after.
 - **A suspiciously perfect result means a crash.** 90 frames a second with
   identical numbers every run meant the game loop had stopped (the screen runs
   at 90 Hz, so the empty page did too). The scripts print errors; read them.
+  70 frames a second with an error from three.js meant the tablet had dropped
+  the graphics context and the game drew nothing after it (fixed, see below).
 - **The first seconds are slow anyway**: `watchSpeed()` lowers the sharpness in
   steps (1.5 → 0.75 on this tablet, each step a short stall), and on localhost
   the flicker check runs for about 15 s. Measure after that.
@@ -102,13 +115,138 @@ frame, waiting. Experiments (`ab.mjs`), house throws, all against ~16–17:
 steps of 1/120 s, 20 solver iterations), close to `PHYSICS_BUDGET`. It shrinks
 by itself as the frame rate rises (fewer steps per frame).
 
+## Second round: it's the main processor
+
+A second look (branch `worktree-low-end-speed`) found the first round's
+conclusion, "limited by the graphics chip", only half true. `still.mjs`, with
+Lennie sitting in the start view at sharpness 0.75:
+
+| | Frames/s | Frame | Drawing, main thread | Physics |
+|---|---|---|---|---|
+| As it is | 26.6 | 37.6 ms | 11.8 ms | 14.2 ms |
+| Sharpness 0.4 | 30.4 | 32.9 ms | | |
+| Sharpness 1 | 24 | 41.6 ms | | |
+| Sharpness 1.5 (where every visit started) | 10.9 | 91 ms | | |
+| Everything drawn into 8 pixels | 32.3 | 30.9 ms | 11.6 ms | 11.9 ms |
+| Nothing drawn | 86 | 11.6 ms | 2.2 ms | 4.5 ms |
+
+With no pixels to fill at all, the tablet still only reaches 32 frames a
+second: about 31 ms of each frame is the main processor, and filling the
+pixels adds 7 ms at 0.75. (The first round's experiments all ended up near 21
+frames a second, whatever they took away from the graphics chip: that was this
+ceiling.) Two things fill those 31 ms:
+
+- **Physics**, 12–16 ms: a step cost about 3 ms, so even with Lennie sitting
+  still the physics used up its whole allowance (`PHYSICS_BUDGET`) every frame.
+  In flight it couldn't keep up at all: the game played at about half speed.
+  Raising the frame rate needs the same steps in less time per frame, so this
+  is what holds everything else back.
+- **Drawing on the main thread**, about 12 ms for 360 draw calls (33 µs each):
+  three.js's own work per mesh and per material, before the graphics chip
+  sees anything.
+
+And one plain bug: **the first frame's time step was negative** on a slow
+device. The browser stamps the first frame while the game is still being
+built (seconds, on the tablet), which is before the game's own clock starts.
+The camera's "follow Lennie" turned that into a jump of millions of metres,
+after which it came to rest 32 m behind the house, looking at the whole
+neighbourhood: 1,300 draw calls and 790,000 triangles instead of 360 and
+225,000, 15–18 frames a second with nothing happening, until the first toss
+or R brought the camera back. (The scripts press R first, so the first round
+measured past it.)
+
+Done in this round, all leaving the game exactly as it plays:
+
+- The negative step is gone (`frame()` in `main.js`).
+- The physics no longer walks all ~520 pieces of scenery ten times a step
+  (`broadphase.js`): the solver and the wiping of forces only go through what
+  can move, the scenery around Lennie is picked out once and kept while he's
+  near it, the stuck check uses that pick too, and rays run through the
+  scenery's boxes as plain numbers. On the PC a step went from about 0.52 ms to
+  0.30 ms; `same.mjs` shows twenty tosses ending the same to the last digit.
+- Solid scenery is drawn in the order of its shader programs: 24 program
+  switches a frame instead of 175. (Tried on the tablet before the rest: 19.5
+  to 21 frames a second in flight.)
+- The aim isn't worked out again every frame while nothing moves (it was 6% of
+  all the time in the profile, a tenth of a frame while Lennie lies waiting).
+- The sharpness a device ends up at is remembered, and the next visit starts
+  one step above it; a device that crawls goes down two steps at once. At
+  full sharpness the tablet did 11 frames a second, and spent the first twenty
+  seconds or so of every visit stepping down from it (worked out from the
+  step-down rule, not timed).
+
+On the tablet, main (`d9bfedf`) against the branch, back to back:
+
+| | main | branch |
+|---|---|---|
+| Sitting still after loading (`still.mjs`) | 19 frames/s (the camera behind the house: 1,300 draw calls) | 36 frames/s |
+| Physics per frame, sitting still | 16 ms | 6.5 ms |
+| Three house throws (`ab.mjs base`, 2 and 4 runs) | 20.4–21.4 frames/s | 21.9–24.9 frames/s |
+| A physics step, in flight | 3.0–3.6 ms | 1.6–1.9 ms |
+| The stuck check, per step | 0.3 ms | 0.06 ms |
+| Steps done, of what real time asks for (`gameSpeed`) | 0.64–0.85: slow motion | 0.97–1.1: all of them |
+| Twenty tosses with fixed dice (`same.mjs`) | | end exactly the same |
+| `tosses.mjs`: the first 5 house throws after loading | 14.6 frames/s, 35 frames over 100 ms | 19.8 frames/s, 13 over 100 ms |
+| `tosses.mjs`: 5 supermarket throws | 23.3 frames/s | 22.9 frames/s |
+| `tosses.mjs`: 5 house throws after R | 20.4 frames/s | 23.9 frames/s |
+
+(`gameSpeed` goes a little over 1 because a fast flight takes half steps.) So
+sitting still is past 30 now. In flight the frame rate only went up by two or
+three, but the game no longer plays in slow motion there: main showed its 21
+frames a second of a toss at two thirds of its speed. What's left of a frame
+in flight is about 9 ms of physics and 35 ms of drawing: more is in view while
+the camera follows him (400–550 draw calls instead of 360), and walls fade.
+The supermarket didn't change (and was nearer 23 than the first round's 30
+that afternoon, on main as well).
+
+**A lost graphics context left the game blank** (on main too). Now and then
+the tablet takes the game's graphics memory away and gives it back a few
+seconds later (caught at 19 s after loading, while the sharpness stepped down
+from 1.5 with the whole neighbourhood in view; several of the measuring runs
+that afternoon had it). three.js then sends everything to
+the chip again, but the baked product meshes had thrown their normals, picture
+positions and indices away once they were on the chip, to save about 8 MB:
+every frame after that failed (`Cannot read properties of null (reading
+'byteLength')`) and nothing was drawn until the page was reloaded. In the
+scripts that showed as an error and an impossibly high frame rate. The arrays
+are kept now (`bakeMesh` in `products.js`); with the context lost and restored
+on purpose (`WEBGL_lose_context`) the game comes back by itself on the tablet
+and the PC.
+
+Tried and not worth it:
+
+- Taking the shock's lamp (`zap.js`, a PointLight that's always on at 0) out
+  of the shaders: 19.6 against 18.5–19.5 frames a second, within the noise.
+- Drawing solid scenery nearest first: no gain (18.4). The combined meshes are
+  too big to sort usefully, and it costs the program order.
+- Putting colours in the vertices so that meshes differing only in colour
+  become one: there are none left to merge, `combineScenery` already shares
+  materials that look the same. What keeps the house at ~330 draw calls is
+  the walls that fade one by one (139 meshes with a material each) and the
+  storeys that hide one by one.
+
 ## Next ideas (not done)
 
+- Physics: what's left of a step is the solver itself (20 passes over ~75
+  equations, half the step) and the exact tests between Lennie's parts and
+  the scenery near them (a quarter). Fewer passes, or not halving the step
+  while he's fast (`FAST_SUBSTEP_SPEED`), would be the next big gain, but
+  both change how Lennie tumbles and how easily he gets stuck in a wall.
+- Putting Lennie's physics to sleep while he lies still. Now that a step is
+  cheaper it matters less, and a lot can wake him (cars, the cat, effects that
+  let go of him later), so it's easy to get wrong.
 - On weak devices only: cheaper shading (Lambert), and a see-through effect
   without `discard` in every material (for instance only on the meshes between
-  the camera and Lennie). Each would change the look a little on the tablet.
-- Memory: about 550 MB of JavaScript heap even before these changes, plus the
-  product pictures. An older iPad with less memory may close the tab. The
-  baked clutter adds about a million corners (packed small, ~20 bytes each).
-- Physics: fewer solver iterations or steps, only with care, as it changes how
-  Lennie tumbles.
+  the camera and Lennie). Each would change the look a little on the tablet,
+  and only pays once the main processor is no longer the limit.
+- Anti-aliasing off on a device that ended up at a low sharpness (it can only
+  be chosen when the page loads): not measured.
+- Memory. On the PC: 100 MB of JavaScript, 35 MB of geometry, and 174
+  pictures drawn on canvases, 30 megapixels together: about 160 MB on the
+  graphics chip, and as much again for the canvases themselves, which are
+  kept after the chip has its copy. Only the TV's is ever drawn on again
+  (`tv.js`), so the others could be let go of after the first frame; that
+  needs a way to draw them again when the browser drops the graphics context
+  and wants them back, which this tablet really does (see above: throwing
+  data away without one left the game blank). An older iPad with less memory
+  may close the tab.

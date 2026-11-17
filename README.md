@@ -209,7 +209,7 @@ Each frame, `main.js` moves the camera first, then lets the house and the shop d
 - `src/supermarket.js`: the supermarket across the road, inside and out (the breakable shop window, aisles, freezers and fridges, the bakery, the sloping veg stand, the cheese cooler, the pindakaas pyramid, the butcher's counter and the other displays), with its own fading walls and roof
 - `src/seethrough.js`: the see-through circle that keeps Lennie in view through whatever is between him and the camera
 - `src/batching.js`: once everything is built, glues the scenery that never moves into a few big meshes, so there's far less to draw
-- `src/broadphase.js`: the physics' bookkeeping done the cheap way: only the scenery near Lennie is tested for bumps, and only the pairs that touch are remembered, which changes nothing in the game and more than halves what a physics step costs
+- `src/broadphase.js`: the physics' bookkeeping done the cheap way: only the scenery near Lennie is tested for bumps, only the pairs that touch are remembered, and only the bodies that can move are solved for, which changes nothing in the game and takes away most of what a physics step costs
 - `src/blobshadow.js`: the soft dark spot under Lennie (the game has no real shadows, so it stays smooth on low-end tablets)
 - `src/flickercheck.js`: when the game runs on your own computer (localhost), lists any spots where two surfaces lie in the same place and would flicker, in the browser console
 - `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking (the house's mess uses the same tumbling, and its plates, mugs and glasses smash into shards there)
