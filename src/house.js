@@ -800,7 +800,7 @@ export function buildHouse(scene, world, physMats) {
   // The toilet's two walls, the wall between the hallway and the kitchen, the
   // hallway's back wall (with the door to the living room), and the storage
   // cupboard under the stairs. The kitchen and the living room are open to
-  // each other: only the counter and the piano stand between them.
+  // each other: only the bar, the counter behind it and the piano stand between them.
   function buildGroundWalls(inner, R, door) {
     const paper = (room) => wallpaper(R[room]);
     wall({ ...inner, run: 'x', at: GF.toiletZ, from: IN.x0, to: GF.toiletX + INT / 2, line: 'toilet-0', mats: { pos: paper('toilet'), neg: paper('hall') } });
@@ -1229,14 +1229,14 @@ export function buildHouse(scene, world, physMats) {
       run('x', 4.225, -1, 0.556, 3.2, 5);
       door('x', 4.225, -1, -0.15, 0.55, 0.758, 0.835, 0.8);
       // along the right wall, and the kitchen side of the counter across the back
-      run('z', 3.225, -1, 1.875, 4.2, 4);
-      run('x', 1.85, 1, 0.97, 3.2, 4);
+      run('z', 3.225, -1, 2.01, 4.2, 4);
+      run('x', 1.985, 1, 0.97, 3.2, 4);
       return parts;
     }
 
     // The piano's 52 white keys are one strip with the gaps between them
     // painted on (pianoKeys()); the 36 black keys sit on it, 3 mm sunk in.
-    const KEYS = { x0: 1.93, x1: 3.47, n: 52, y0: 0.76, y: 0.775, z0: 0.36, z1: 0.5 };
+    const KEYS = { x0: 2.25, x1: 3.79, n: 52, y0: 0.76, y: 0.775, z0: 0.36, z1: 0.5 };
     function blackKeys() {
       const kw = (KEYS.x1 - KEYS.x0) / KEYS.n;
       const parts = [];
@@ -1318,7 +1318,7 @@ export function buildHouse(scene, world, physMats) {
       const book = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.32, 0.003), [paper, paper, paper, paper, paper, std({ map, roughness: 0.9 })]);
       const lean = 0.1;
       // its bottom edge on the desk, just behind the lip; its top 1 cm clear of the piano's front
-      book.position.set(2.7, 0.9215 + 0.16 * Math.cos(lean), 0.5035 + 0.16 * Math.sin(lean));
+      book.position.set(3.02, 0.9215 + 0.16 * Math.cos(lean), 0.5035 + 0.16 * Math.sin(lean));
       book.rotation.x = lean;
       book.receiveShadow = true;
       groups[0].add(book);
@@ -1338,6 +1338,61 @@ export function buildHouse(scene, world, physMats) {
     const PIANO = 0x1d1a1c;
     const STEEL = { mat: std({ color: 0xc9ced3, roughness: 0.35, metalness: 0.3 }) };
     const KITCHEN_FRONT = GF.hallX + INT / 2;
+    // the bar: its top from x0 to the right-hand wall, from z0 (by the piano)
+    // to z1 (the kitchen counter's back); its white body from x = body, level
+    // with the counter's cupboards; the pole near its left end at (pole, poleZ)
+    const BAR = { x0: 0.92, body: 0.95, pole: 0.98, z0: 1.135, z1: 1.43, top: 1.25 };
+    BAR.poleZ = (BAR.z0 + BAR.z1) / 2;
+    // A little wooden cabinet of six drawers (two across, three high) on the
+    // bar, its back to the right-hand wall (5 mm off it), its drawers facing
+    // along the bar, two of them left pulled out a bit. Drawn only; one body
+    // for the whole thing.
+    const DRAWERS = { x0: 3.62, x1: 3.87, z0: 1.15, z1: 1.435, h: 0.42 };
+    function drawerCabinet() {
+      const { x0: X0, x1: X1, z0: Z0, z1: Z1, h: HH } = DRAWERS;
+      const NO = { phys: false };
+      const METAL = { mat: std({ color: 0x34322f, roughness: 0.4, metalness: 0.6 }), phys: false };
+      const [CARCASS, FRONT, BACK, INSIDE] = [0xa8774b, 0xb3824f, 0x6f4c2e, 0xc49a6c];
+      const T = 0.012; // the boards
+      const U = Z1 - Z0;
+      const D = X1 - X0;
+      const Y0 = BAR.top;
+      const parts = [];
+      // u across the front (z), y up from the bar top, w from the front (x0) back to the wall
+      const p = (u0, u1, y0, y1, w0, w1, color, opts = NO) => parts.push([[X0 + w0, Y0 + y0, Z0 + u0], [X0 + w1, Y0 + y1, Z0 + u1], color, opts]);
+      // the carcass: the boards fit between each other, so no two faces lie in one plane
+      p(0, U, HH - T, HH, 0, D, CARCASS); // top
+      p(0, T, 0, HH - T, 0, D, CARCASS); // the sides
+      p(U - T, U, 0, HH - T, 0, D, CARCASS);
+      p(T, U - T, 0, T, 0, D, CARCASS); // bottom
+      p(T, U - T, T, HH - T, D - 0.008, D, BACK); // the back
+      const UM = U / 2;
+      p(UM - T / 2, UM + T / 2, T, HH - T, 0, D - 0.008, CARCASS); // the divider
+      const rowH = (HH - 4 * T) / 3;
+      const cols = [[T, UM - T / 2], [UM + T / 2, U - T]];
+      for (const [a, b] of cols) for (let r = 1; r < 3; r++) p(a, b, T + r * rowH + (r - 1) * T, T + r * (rowH + T), 0, D - 0.008, CARCASS); // the shelves
+      // the drawers: a front 3 mm inside its opening with a cup handle on it;
+      // [column, row] → how far it's pulled out
+      const OUT = { '0,0': 0.09, '1,1': 0.05 };
+      cols.forEach(([a, b], c) => {
+        for (let r = 0; r < 3; r++) {
+          const y0 = T + r * (rowH + T);
+          const y1 = y0 + rowH;
+          const P = OUT[`${c},${r}`] ?? 0;
+          p(a + 0.003, b - 0.003, y0 + 0.003, y1 - 0.003, 0.002 - P, 0.016 - P, FRONT);
+          const [m, ym] = [(a + b) / 2, (y0 + y1) / 2];
+          p(m - 0.035, m + 0.035, ym - 0.01, ym + 0.016, -0.001 - P, 0.002 - P, null, METAL); // the handle's plate
+          p(m - 0.035, m + 0.035, ym - 0.014, ym - 0.005, -0.012 - P, -0.001 - P, null, METAL); // ... and its cup
+          if (!P) continue;
+          // a pulled-out drawer shows its sides and bottom
+          p(a + 0.004, a + 0.012, y0 + 0.002, y1 - 0.025, 0.016 - P, 0.2 - P, INSIDE);
+          p(b - 0.012, b - 0.004, y0 + 0.002, y1 - 0.025, 0.016 - P, 0.2 - P, INSIDE);
+          p(a + 0.012, b - 0.012, y0 + 0.002, y0 + 0.008, 0.016 - P, 0.2 - P, INSIDE);
+        }
+      });
+      body([X0, Y0, Z0], [X1, Y0 + HH, Z1], physMats.hard, { kind: 'furniture' });
+      return parts;
+    }
     piece(0, [
       // living room: the corner couch with its back to the storage cupboard,
       // facing the garden, as long as the low white cabinet behind it
@@ -1360,23 +1415,32 @@ export function buildHouse(scene, world, physMats) {
       [[0.55, 0.42, -4.3], [0.75, 0.65, -3.5], SOFA_ARM, { soft: true }],
       // the dining table (its six chairs and the piano stool are loose, below)
       ...table(1.9, -2.2, 3.0, -0.3, 0.78, 0xc9a06a),
-      // the piano, its back to the kitchen counter
-      [[1.85, 0, 0.55], [3.55, 1.25, 1.12], PIANO],
-      [[1.9, 0.68, 0.33], [3.5, 0.76, 0.55], PIANO],
+      // the piano against the right-hand wall (5 mm off it), its back to the bar
+      [[2.17, 0, 0.55], [3.87, 1.25, 1.12], PIANO],
+      [[2.22, 0.68, 0.33], [3.82, 0.76, 0.55], PIANO],
       // (the keys are below: pianoKeys())
-      [[1.9, 0, 0.38], [1.98, 0.68, 0.46], PIANO],
-      [[3.42, 0, 0.38], [3.5, 0.68, 0.46], PIANO],
+      [[2.22, 0, 0.38], [2.3, 0.68, 0.46], PIANO],
+      [[3.74, 0, 0.38], [3.82, 0.68, 0.46], PIANO],
       // the music desk above the keys, with a little lip the sheet music stands against (its book is below)
-      [[2.25, 0.9, 0.5], [3.15, 0.92, 0.552], PIANO, { phys: false }],
-      [[2.26, 0.92, 0.494], [3.14, 0.935, 0.5005], PIANO, { phys: false }],
+      [[2.57, 0.9, 0.5], [3.47, 0.92, 0.552], PIANO, { phys: false }],
+      [[2.58, 0.92, 0.494], [3.46, 0.935, 0.5005], PIANO, { phys: false }],
+      // The bar between the piano and the kitchen, as high as the piano: the
+      // counter's back raised up in white, as long as the counter, under a
+      // wooden top, and near its left end a wooden pole from the top up to the
+      // ceiling (its foot 2 cm sunk into the top). The bar's top stops 1.5 cm
+      // behind the piano, so the two tops don't touch.
+      [[BAR.body, 0, BAR.z0 + 0.025], [IN.x1, BAR.top - 0.04, BAR.z1], CABINET],
+      [[BAR.x0, BAR.top - 0.04, BAR.z0], [IN.x1, BAR.top, BAR.z1 + 0.02], null, { mat: M.wood }],
+      [[BAR.pole - 0.035, BAR.top - 0.02, BAR.poleZ - 0.035], [BAR.pole + 0.035, H - T, BAR.poleZ + 0.035], WOOD],
+      ...drawerCabinet(),
       // kitchen: a U of counters, along the front under the window, along the right wall, and across the back
-      // (the worktops reach 2.5 cm over the cupboard doors, see kitchenDoors())
+      // against the bar (the worktops reach 2.5 cm over the cupboard doors, see kitchenDoors())
       [[KITCHEN_FRONT, 0, 4.225], [IN.x1, 0.85, 4.875], CABINET],
       [[KITCHEN_FRONT, 0.85, 4.2], [IN.x1, 0.9, 4.875], WORKTOP],
-      [[3.225, 0, 1.85], [IN.x1, 0.85, 4.225], CABINET],
-      [[3.2, 0.85, 1.875], [IN.x1, 0.9, 4.2], WORKTOP],
-      [[0.95, 0, 1.2], [IN.x1, 0.85, 1.85], CABINET],
-      [[0.93, 0.85, 1.18], [IN.x1, 0.9, 1.875], WORKTOP],
+      [[3.225, 0, 1.985], [IN.x1, 0.85, 4.225], CABINET],
+      [[3.2, 0.85, 2.01], [IN.x1, 0.9, 4.2], WORKTOP],
+      [[0.95, 0, BAR.z1], [IN.x1, 0.85, 1.985], CABINET],
+      [[0.93, 0.85, BAR.z1], [IN.x1, 0.9, 2.01], WORKTOP],
       ...kitchenDoors(),
       ...blackKeys(),
       // (the hanging cupboard on the side wall, above the counter, is in clutter.js: Lennie smashes its doors)
@@ -1420,7 +1484,7 @@ export function buildHouse(scene, world, physMats) {
       knockable(chair(1.5, z, 1, 0xd95d39), 5);
       knockable(chair(3.4, z, -1, 0xd95d39), 5);
     }
-    knockable([[[2.3, 0, -0.05], [3.1, 0.5, 0.3], PIANO]], 9);
+    knockable([[[2.62, 0, -0.05], [3.42, 0.5, 0.3], PIANO]], 9);
 
     // The clothes rack in the utility room: a chrome rail on two feet, from x0
     // to x1 along the back wall (centred on z), full of coats and jackets on
@@ -1648,11 +1712,12 @@ export function buildHouse(scene, world, physMats) {
     S('toybox', 'On the toy box!', 250, 'TOYS!', [1.15, H + 0.45, 4.15], [2.25, H + 1.2, 4.9]),
     S('table', 'On the dinner table!', 200, 'DINNER!', [1.85, 0.75, -2.25], [3.05, 1.45, -0.25]),
     S('counter', 'On the kitchen counter', 200, 'CHEF!', [-0.35, 0.88, 4.15], [3.9, 1.55, 4.9]),
-    S('counter', 'On the kitchen counter', 200, 'CHEF!', [3.15, 0.88, 1.8], [3.9, 1.55, 4.2]),
-    S('counter', 'On the kitchen counter', 200, 'CHEF!', [0.9, 0.88, 1.15], [3.9, 1.55, 1.9]),
+    S('counter', 'On the kitchen counter', 200, 'CHEF!', [3.15, 0.88, 2.0], [3.9, 1.55, 4.2]),
+    S('counter', 'On the kitchen counter', 200, 'CHEF!', [0.9, 0.88, 1.44], [3.9, 1.55, 2.05]),
+    S('bar', 'On the bar!', 250, 'CHEERS!', [0.85, 1.2, 1.13], [3.9, 2.0, 1.44]),
     S('couch', 'Couch potato', 150, 'AHH!', [-3.9, 0.3, -2.45], [-0.55, 1.2, -0.75]),
     S('armchair', 'Comfy in the armchair', 150, 'AHH!', [-0.3, 0.3, -4.65], [0.8, 1.2, -3.45]),
-    S('piano', 'On the piano!', 350, 'PLINK!', [1.8, 1.2, 0.5], [3.6, 2.0, 1.17]),
+    S('piano', 'On the piano!', 350, 'PLINK!', [2.12, 1.2, 0.5], [3.9, 2.0, 1.13]),
     S('loo', 'On the loo!', 500, 'OOPS!', [-3.5, 0.3, 5.12], [-2.9, 1.1, 5.95]),
     S('litter', 'In the cat litter!', 400, 'EWW!', [1.0, 0, -6.6], [2.6, 0.75, -5.6]),
     S('junk', 'On the junk pile!', 300, 'CLATTER!', [3.0, 0.8, -9.6], [3.9, 1.9, -8.15]),

@@ -170,8 +170,8 @@ const ROOM_MESS = {
   bath: ['Rubber duck rescue!', 'Splish splash!', 'Quack attack!', 'Toilet roll tornado!', 'Bath time!', 'Squeaky clean... not!'],
 };
 
-// The little toy cabinet beside the piano, its back to the kitchen counter (buildToyCabinet).
-const TOY_CABINET = { x0: 1.12, x1: 1.72, z0: 0.8, z1: 1.17, top: 0.62 };
+// The little toy cabinet beside the piano, its back to the bar (buildToyCabinet).
+const TOY_CABINET = { x0: 1.45, x1: 2.05, z0: 0.75, z1: 1.115, top: 0.62 };
 // What pops up when Lennie crashes into the TV cabinet or the toy cabinet and the toys come out.
 const TOY_MESS = ['Toy avalanche!', 'Toy story!', 'Playtime!', 'Who put all that in there?', 'Tidy up time!'];
 
@@ -179,10 +179,10 @@ const TOY_MESS = ['Toy avalanche!', 'Toy story!', 'Playtime!', 'Who put all that
 const FURNITURE = {
   living: [
     [-3.875, -0.6, -2.4, -0.8], [-3.875, -2.95, -4.75, -2.41], [-1.55, -0.6, -0.75, -0.35], [-3.875, -1.66, -0.79, 1.01], // couch, TV cabinet, low cabinet, stairs and storage
-    [-0.25, 0.75, -4.875, -3.5], [1.28, 3.62, -2.2, -0.3], [1.85, 3.55, -0.05, 1.12], [2.175, 3.875, -4.875, -4.3], // comfy chair, dining table, piano, game closet
+    [-0.25, 0.75, -4.875, -3.5], [1.28, 3.62, -2.2, -0.3], [2.17, 3.875, -0.05, 1.12], [2.175, 3.875, -4.875, -4.3], // comfy chair, dining table, piano, game closet
     [TOY_CABINET.x0, TOY_CABINET.x1, TOY_CABINET.z0, TOY_CABINET.z1], // the toy cabinet
   ],
-  kitchen: [[-0.31, 3.875, 4.2, 4.875], [3.2, 3.875, 1.875, 4.2], [0.93, 3.875, 1.19, 1.875]],
+  kitchen: [[-0.31, 3.875, 4.2, 4.875], [3.2, 3.875, 2.01, 4.2], [0.85, 3.875, 1.19, 2.01]], // the counters, and the bar behind the back one
   hall: [[-3.875, -1.66, 2.96, 4.875], [-2.95, -1.95, 2.7, 2.96]], // the toilet, the coat rack
   utility: [[3.15, 3.875, -5.85, -5.125], [1.3, 2.3, -6.575, -5.9], [2.25, 3.55, -6.575, -6.05], [2.1, 3.15, -5.7, -5.125]], // fridge, litter box, clothes rack, trash bags
   garage: [[0.875, 1.375, -9.55, -8.05], [3.05, 3.875, -9.55, -8.2], [1.4, 3.2, -9.55, -9.15], [1.7, 3.875, -7.225, -6.825]], // camping shelves, table, bike, tool shelves
@@ -1330,11 +1330,13 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     [0, -2.8, -0.85, -1.55, -1.12, 0.52], // couch seat
     [0, -3.62, -2.9, -2.35, -1.15, 0.52], // the couch's chaise end
     [0, 1.9, 3.0, -2.2, -0.3, 0.78], // dining table
-    [0, 1.85, 3.55, 0.55, 1.12, 1.25], // piano
+    [0, 2.17, 3.87, 0.55, 1.12, 1.25], // piano
+    [0, 0.92, 3.875, 1.135, 1.45, 1.25], // the bar behind it
+    [0, 3.62, 3.87, 1.15, 1.435, 1.67], // the cabinet of drawers on it
     [0, TOY_CABINET.x0, TOY_CABINET.x1, TOY_CABINET.z0, TOY_CABINET.z1, TOY_CABINET.top], // the toy cabinet beside it
     [0, -0.31, 3.875, 4.2, 4.875, 0.9], // kitchen counter along the front
-    [0, 3.2, 3.875, 1.875, 4.2, 0.9], // ... along the right wall
-    [0, 0.93, 3.875, 1.18, 1.875, 0.9], // ... and across the back
+    [0, 3.2, 3.875, 2.01, 4.2, 0.9], // ... along the right wall
+    [0, 0.93, 3.875, 1.43, 2.01, 0.9], // ... and across the back
     [0, 3.15, 3.875, -5.85, -5.125, 1.95], // fridge
     [0, 3.05, 3.855, -9.5, -8.2, 0.85], // the garage table
     [1, -2.67, -0.59, 0.6, 2.4, 0.61], // bed
@@ -1439,11 +1441,11 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   put(living, 'chipsNaturel', -1.95, 0.52, -1.3, { yaw: 1.2, ...onFace('chipsNaturel') });
   put(living, 'plateC', -2.42, 0.52, -1.35);
   // the piano: sheet music and a forgotten mug
-  put(living, 'paper', 2.3, 1.25, 0.85, { yaw: 0.1 });
-  put(living, 'mugWhite', 3.25, 1.25, 0.8);
+  put(living, 'paper', 2.62, 1.25, 0.85, { yaw: 0.1 });
+  put(living, 'mugWhite', 3.57, 1.25, 0.8);
   // on top of the toy cabinet beside it
-  put(living, 'puzzleCube', 1.25, TOY_CABINET.top, 0.92, { yaw: 0.4 });
-  put(living, 'gameCaseA', 1.55, TOY_CABINET.top, 0.98, { yaw: 0.2 });
+  put(living, 'puzzleCube', 1.58, TOY_CABINET.top, 0.87, { yaw: 0.4 });
+  put(living, 'gameCaseA', 1.88, TOY_CABINET.top, 0.93, { yaw: 0.2 });
   // the kids' stuff (they're 10 and 13), not too much of it: comics, game cases,
   // trading cards, foam darts and a few Lego bricks, more of it in front of the TV
   const kidStuff = ['comicA', 'comicB', 'gameCaseA', 'gameCaseB', 'cardMonster', 'cardMonster', 'dart', 'dart', 'dart', 'legoRed', 'legoBlue', 'legoYellow', 'puzzleCube'];
@@ -1515,16 +1517,18 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     put(kitchen, 'allesreiniger', 1.18, Y, 4.8);
     for (const [x, z, yaw] of [[0.95, 4.27, 0.3], [0.75, 4.3, 2.0]]) put(kitchen, 'cutlery', x, Y, z, { yaw });
   }
-  // The counter across the back, between the kitchen and the living room, is
-  // full: plants and tulips along the living room side, the breakfast things
-  // and the dishes along the kitchen side. The plants' pots, the vase and the
+  // The bar between the living room and the kitchen (house.js) is full of
+  // plants and tulips, with the fruit bowl; the counter behind it has the
+  // breakfast things and the dishes. The plants' pots, the vase and the
   // fruit bowl smash when they fall (products.js).
   {
+    const BAR = 1.25;
+    for (const [id, x, z] of [['plantBig', 1.3, 1.3], ['tulips', 1.68, 1.28], ['plantOrchid', 2.25, 1.28], ['plantCactus', 3.0, 1.27], ['plantBasil', 3.27, 1.3]]) put(kitchen, id, x, BAR, z);
+    put(kitchen, 'plantPothos', 3.75, BAR + 0.42, 1.29); // on the little cabinet of drawers at the end of the bar (house.js)
+    put(kitchen, 'magazine', 1.97, BAR, 1.3, { yaw: 1.45 });
+    const fruit = put(kitchen, 'fruitBowl', 2.62, BAR, 1.29);
+    for (const [id, dx, dz, dy] of [['appel', -0.08, -0.04, 0.006], ['sinaasappel', 0.08, -0.03, 0.006], ['peer', 0, 0.08, 0.006], ['citroen', 0.0, -0.01, 0.1]]) put(kitchen, id, 2.62 + dx, BAR + dy, 1.29 + dz, { on: fruit });
     const Y = 0.9;
-    for (const [id, x, z] of [['plantBig', 1.1, 1.36], ['tulips', 1.5, 1.32], ['plantOrchid', 2.2, 1.3], ['plantCactus', 2.95, 1.29], ['plantBasil', 3.22, 1.32], ['plantPothos', 3.6, 1.36]]) put(kitchen, id, x, Y, z);
-    put(kitchen, 'magazine', 1.86, Y, 1.38, { yaw: 1.45 });
-    const fruit = put(kitchen, 'fruitBowl', 2.6, Y, 1.4);
-    for (const [id, dx, dz, dy] of [['appel', -0.08, -0.04, 0.006], ['sinaasappel', 0.08, -0.03, 0.006], ['peer', 0, 0.08, 0.006], ['citroen', 0.0, -0.01, 0.1]]) put(kitchen, id, 2.6 + dx, Y + dy, 1.4 + dz, { on: fruit });
     pile(kitchen, 'plateC', 1.2, Y, 1.68, 5);
     put(kitchen, 'glass', 1.45, Y, 1.72);
     put(kitchen, 'witbrood', 1.72, Y, 1.66, { yaw: -Math.PI / 2 });
@@ -2263,19 +2267,19 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
       return below;
     };
     // bottom left: two piles of game cases
-    pileUp(['gameCaseB', 'gameCaseA', 'gameCaseB', 'gameCaseA'], L, PLINTH, 1.06, Math.PI / 2);
-    pileUp(['gameCaseA', 'gameCaseB', 'gameCaseA'], L, PLINTH, 0.88, Math.PI / 2);
+    pileUp(['gameCaseB', 'gameCaseA', 'gameCaseB', 'gameCaseA'], L, PLINTH, 1.01, Math.PI / 2);
+    pileUp(['gameCaseA', 'gameCaseB', 'gameCaseA'], L, PLINTH, 0.83, Math.PI / 2);
     // bottom right: a pile of comics, the puzzle cube in front
-    pileUp(['comicA', 'comicB', 'comicB', 'comicA', 'comicB'], R, PLINTH, 1.02, 0);
-    inside('puzzleCube', R, PLINTH, 0.845, { yaw: 0.3 });
+    pileUp(['comicA', 'comicB', 'comicB', 'comicA', 'comicB'], R, PLINTH, 0.97, 0);
+    inside('puzzleCube', R, PLINTH, 0.795, { yaw: 0.3 });
     // top left: the headset
-    inside('headphones', L, UP, 0.98, { yaw: Math.PI / 2 + 0.05 });
+    inside('headphones', L, UP, 0.93, { yaw: Math.PI / 2 + 0.05 });
     // top right: trading cards, Lego and foam darts
-    pileUp(['cardMonster', 'cardMonster', 'cardMonster', 'cardMonster'], R - 0.06, UP, 1.08, 0.1);
-    const brick = inside('legoRed', R + 0.07, UP, 1.08, { yaw: 0.3 });
-    inside('legoBlue', R + 0.07, UP + 2 * half('legoRed')[1], 1.08, { yaw: 0.9, on: brick });
-    inside('legoYellow', R + 0.06, UP, 0.98, { yaw: 1.4 });
-    for (const z of [0.86, 0.91]) inside('dart', R, UP, z, { yaw: 0.1 + (z - 0.86) * 4 });
+    pileUp(['cardMonster', 'cardMonster', 'cardMonster', 'cardMonster'], R - 0.06, UP, 1.03, 0.1);
+    const brick = inside('legoRed', R + 0.07, UP, 1.03, { yaw: 0.3 });
+    inside('legoBlue', R + 0.07, UP + 2 * half('legoRed')[1], 1.03, { yaw: 0.9, on: brick });
+    inside('legoYellow', R + 0.06, UP, 0.93, { yaw: 1.4 });
+    for (const z of [0.81, 0.86]) inside('dart', R, UP, z, { yaw: 0.1 + (z - 0.81) * 4 });
 
     const out = new THREE.Vector3(0, 0, -1);
     solid.surface.tally = 'toys';

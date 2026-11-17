@@ -74,7 +74,7 @@ const NODES = {
   kA: N(0.3, 0, 0.6, false),
   kB: N(0.45, 0, 2.6, false, ['sit']),
   kC: N(2.2, 0, 3.0, false, ['groom', 'sit']),
-  bowls: N(1.62, 0, 2.38, false, ['eat'], Math.PI),
+  bowls: N(1.62, 0, 2.47, false, ['eat'], Math.PI),
   // the utility room, behind the living room's back wall
   uIn: N(1.475, 0, -5.5, false),
   uMid: N(1.2, 0, -5.82, false),
@@ -301,8 +301,8 @@ export function createCat({ scene, house, ragdoll, effects, sfx, hooks }) {
       shape(new THREE.CylinderGeometry(0.062, 0.062, 0.004, 16), [x, 0.063, z], inside),
     ];
     const kibble = [];
-    for (let i = 0; i < 9; i++) kibble.push(blob(0.012, [1.62 + Math.cos(i * 2.4) * 0.03, 0.067, 2.07 + Math.sin(i * 2.4) * 0.03], [1, 0.6, 1], i % 2 ? 0x7a4a22 : 0x8f5a2b, 0));
-    const bowls = new THREE.Mesh(mergeGeometries([...bowl(1.62, 2.07, 0xb5332c, 0x5e3a1c), ...bowl(1.9, 2.07, 0x3d6fb0, 0x9fd0ee), ...kibble]), material);
+    for (let i = 0; i < 9; i++) kibble.push(blob(0.012, [1.62 + Math.cos(i * 2.4) * 0.03, 0.067, 2.16 + Math.sin(i * 2.4) * 0.03], [1, 0.6, 1], i % 2 ? 0x7a4a22 : 0x8f5a2b, 0));
+    const bowls = new THREE.Mesh(mergeGeometries([...bowl(1.62, 2.16, 0xb5332c, 0x5e3a1c), ...bowl(1.9, 2.16, 0x3d6fb0, 0x9fd0ee), ...kibble]), material);
     bowls.userData.noAim = true;
     scene.add(bowls);
   }

@@ -42,7 +42,7 @@ const inBox = (p, b, m = 0) => p.x > b.min[0] - m && p.x < b.max[0] + m && p.y >
 // Where things are (built in house.js, clutter.js, garden.js, streetscape.js and supermarket.js).
 const PLACES = {
   hob: box([-0.2, 0.88, 4.25], [0.6, 1.45, 4.85]), // the cooker's hob on the kitchen counter (any body part's middle over it)
-  piano: box([1.75, 0, 0.4], [3.65, 1.4, 1.2]), // the piano in the living room
+  piano: box([2.07, 0, 0.4], [3.9, 1.4, 1.12]), // the piano in the living room, against the right-hand wall
   paint: box([1.75, 0, -7.45], [3.5, 1.0, -6.75]), // the paint tins on the garage's tool shelves
   bins: box([1.35, 0, -16.1], [3.85, 1.2, -15.2]), // the three wheelie bins
   hagelslag: box([-18.62, 0.4, 36.1], [-17.38, 1.45, 42.5]), // aisle 1's shelves of hagelslag, vlokken and muisjes (and just above)
