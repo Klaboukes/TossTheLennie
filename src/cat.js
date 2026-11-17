@@ -131,37 +131,96 @@ function shape(geo, [x, y, z], color, rot = null) {
   return paint(geo, color);
 }
 
+const _up = new THREE.Vector3(0, 1, 0);
+const _q = new THREE.Quaternion();
+const _white = new THREE.Color(0xffffff);
+
+/**
+ * A tuft of fur: a thin pointed cone growing from `at` towards `dir`, its tip
+ * a shade lighter than its root. It's lit as the skin it grows out of (normal
+ * `nrm`), not as a cone: that way the tufts blend into one soft coat with a
+ * ragged edge, instead of each catching the light like a little bubble.
+ */
+function tuft(at, dir, len, w, color, nrm) {
+  const tip = new THREE.Color(color).lerp(_white, 0.28).getHex();
+  const geo = paint(new THREE.ConeGeometry(w, len, 4, 1, true).translate(0, len / 2, 0), (p) => (p.y > len * 0.5 ? tip : color));
+  geo.applyQuaternion(_q.setFromUnitVectors(_up, dir.clone().normalize()));
+  geo.translate(at.x, at.y, at.z);
+  const n = geo.attributes.normal;
+  const m = nrm.clone().normalize();
+  for (let i = 0; i < n.count; i++) n.setXYZ(i, m.x, m.y, m.z);
+  return geo;
+}
+
 function buildLooks() {
   let seed = 11;
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const grey = () => GREY[Math.floor(rnd() * GREY.length)];
   const white = () => WHITE[Math.floor(rnd() * WHITE.length)];
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const ruffle = (v, amount, r = rnd) => v.set(v.x + (r() - 0.5) * amount, v.y + (r() - 0.5) * amount, v.z + (r() - 0.5) * amount);
 
-  // The body, round its middle (0, 0, 0), nose towards +z: an egg of fur
-  // with tufts all over it. White underneath and on the chest (the bib).
+  // The body, round its middle (0, 0, 0), nose towards +z: an egg covered in
+  // tufts of fur that lie back towards the tail, with a fuller ruff on the
+  // chest and a shaggy belly. White underneath and on the chest (the bib).
   const coat = (p) => (p.y < -0.045 || (p.z > 0.11 && p.y < 0.07) ? white() : grey());
   const R = [0.12, 0.115, 0.215];
-  const body = [blob(1, [0, 0, 0], R, coat, 2)];
-  for (let i = 0; i < 70; i++) {
-    // a point spread evenly over the egg, pushed out a little: the fluff
-    const u = rnd() * 2 - 1;
-    const a = rnd() * Math.PI * 2;
+  const body = [blob(1, [0, 0, 0], R.map((r) => r * 0.97), coat, 3)];
+  const FUR = 420;
+  for (let i = 0; i < FUR; i++) {
+    // points spread evenly over the egg, in a spiral from top to bottom
+    const u = 1 - (2 * (i + 0.5)) / FUR;
+    const a = i * 2.39996 + rnd() * 0.3;
     const s = Math.sqrt(1 - u * u);
-    const d = new THREE.Vector3(s * Math.cos(a), u, s * Math.sin(a));
-    const at = new THREE.Vector3(d.x * R[0], d.y * R[1], d.z * R[2]).multiplyScalar(0.93);
-    const r = (d.z > 0.5 ? 0.06 : 0.048) * (0.8 + rnd() * 0.4); // a fuller ruff round the chest
-    body.push(blob(r, at.toArray(), [1, 0.85, 1.1], coat(at), 1));
+    const d = V(s * Math.cos(a), u, s * Math.sin(a));
+    const at = V(d.x * R[0], d.y * R[1], d.z * R[2]).multiplyScalar(0.9);
+    const nrm = V(d.x / R[0], d.y / R[1], d.z / R[2]).normalize();
+    let dir, len;
+    if (d.z > 0.55 && d.y < 0.5) {
+      dir = nrm.clone().add(V(0, -0.45, 0)); // the ruff on the chest, hanging forward and down
+      len = 0.065;
+    } else if (d.y < -0.45) {
+      dir = nrm.clone().add(V(0, 0, -0.35)); // the shaggy belly
+      len = 0.055;
+    } else {
+      dir = nrm.clone().multiplyScalar(0.45).add(V(0, 0, -0.7)); // lying back along the body
+      len = 0.05;
+    }
+    body.push(tuft(at, ruffle(dir.normalize(), 0.3), len * (0.8 + rnd() * 0.4), 0.018, coat(at), nrm));
   }
 
-  // The head, round the top of its neck: a round furry head with big
+  // The head, round the top of its neck: a round furry head with big fluffy
   // cheeks, pointy ears, a white muzzle and chin and a white blaze up the
   // nose, yellow-green eyes, a pink nose and white whiskers.
   const face = (p) => ((p.z > 0.085 && p.y < 0.04) || (p.z > 0.12 && Math.abs(p.x) < 0.018 && p.y < 0.09) ? white() : grey());
+  const H = V(0, 0.04, 0.07);
+  const HR = [0.085 * 1.08, 0.085 * 0.95, 0.085 * 0.92];
   const headParts = (eyesShut) => {
-    const parts = [blob(0.085, [0, 0.04, 0.07], [1.08, 0.95, 0.92], face, 2)];
+    let hs = 5; // (its own dice, so the fur is the same with the eyes open or shut)
+    const hrnd = () => ((hs = (hs * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const parts = [blob(0.085, H.toArray(), [1.08, 0.95, 0.92], face, 2)];
+    // short fur over the crown, the back of the head and the nape, lying back
+    for (let i = 0; i < 90; i++) {
+      const u = 1 - (2 * (i + 0.5)) / 90;
+      const a = i * 2.39996;
+      const s = Math.sqrt(1 - u * u);
+      const d = V(s * Math.cos(a), u, s * Math.sin(a));
+      if (d.z > 0.35) continue; // (not over the face)
+      const at = V(d.x * HR[0], d.y * HR[1], d.z * HR[2]).multiplyScalar(0.92).add(H);
+      const nrm = V(d.x / HR[0], d.y / HR[1], d.z / HR[2]).normalize();
+      const dir = ruffle(nrm.clone().multiplyScalar(0.55).add(V(0, 0, -0.65)).normalize(), 0.25, hrnd);
+      parts.push(tuft(at, dir, 0.026 + hrnd() * 0.01, 0.015, face(at), nrm));
+    }
     for (const s of [-1, 1]) {
-      parts.push(blob(0.05, [s * 0.055, 0.015, 0.09], [1, 0.85, 0.9], face, 1)); // cheek fluff
-      parts.push(blob(0.035, [s * 0.075, 0.0, 0.06], [1, 0.9, 1.1], grey(), 1));
+      parts.push(blob(0.045, [s * 0.055, 0.015, 0.085], [1, 0.85, 0.9], face, 1)); // the cheeks
+      // and their fluff, sticking out sideways and down: a fluffy cat's big face
+      for (let i = 0; i < 16; i++) {
+        const y = -0.035 + (i % 4) * 0.025 + hrnd() * 0.01;
+        const z = 0.03 + Math.floor(i / 4) * 0.022 + hrnd() * 0.01;
+        const at = V(s * (0.068 - Math.max(0, z - 0.08) * 0.4), y, z);
+        const dir = V(s, -0.35 - (y < 0 ? 0.4 : 0), -0.25 + (hrnd() - 0.5) * 0.4);
+        parts.push(tuft(at, dir, 0.04 + hrnd() * 0.02, 0.016, face(at), V(s, -0.2, 0.1)));
+      }
       parts.push(shape(new THREE.ConeGeometry(0.036, 0.075, 6), [s * 0.05, 0.125, 0.055], grey(), [-0.15, 0, -s * 0.35])); // ears
       parts.push(shape(new THREE.ConeGeometry(0.022, 0.05, 5), [s * 0.049, 0.118, 0.066], PINK, [-0.15, 0, -s * 0.35]));
       if (eyesShut) {
@@ -181,25 +240,52 @@ function buildLooks() {
   };
 
   // A leg hangs down from its pivot (the shoulder or hip) 0.2 m to the paw,
-  // with a white sock. Hind legs have fluffy thighs.
+  // with a white sock; its fur lies down it. Hind legs have fluffy thighs.
   const leg = (hind) => {
     const sock = (p) => (p.y < (hind ? -0.12 : -0.07) ? white() : grey());
     const parts = [
       shape(new THREE.CylinderGeometry(0.03, 0.026, 0.19, 8), [0, -0.095, 0], sock),
       blob(0.034, [0, -0.19, 0.012], [1, 0.6, 1.25], white(), 1),
     ];
-    for (let i = 0; i < 5; i++) parts.push(blob(0.032, [rnd() * 0.02 - 0.01, -0.03 - i * 0.03, rnd() * 0.02 - 0.01], [1, 1, 1], sock, 1));
-    if (hind) parts.push(blob(0.06, [0, -0.02, -0.01], [0.85, 1.1, 1.1], grey(), 1));
+    for (let i = 0; i < 30; i++) {
+      const row = Math.floor(i / 6);
+      const a = (i % 6) * (Math.PI / 3) + row * 0.5;
+      const out = V(Math.cos(a), 0, Math.sin(a));
+      const at = out.clone().multiplyScalar(0.024).setY(-0.015 - row * 0.032);
+      parts.push(tuft(at, ruffle(out.clone().multiplyScalar(0.55).add(V(0, -1, 0)), 0.3), 0.04 + rnd() * 0.01, 0.015, sock(at), out));
+    }
+    if (hind) {
+      parts.push(blob(0.05, [0, -0.02, -0.01], [0.85, 1.1, 1.1], grey(), 1));
+      for (let i = 0; i < 16; i++) {
+        const a = i * 2.39996;
+        const out = V(Math.cos(a) * 0.85, 0, Math.sin(a) * 1.1);
+        const at = out.clone().multiplyScalar(0.042).setY(-0.04 + (rnd() - 0.5) * 0.05);
+        parts.push(tuft(at, ruffle(out.clone().add(V(0, -0.9, -0.5)), 0.3), 0.05 + rnd() * 0.015, 0.018, grey(), out));
+      }
+    }
     return mergeGeometries(parts);
   };
 
   // The tail in two halves, each 0.17 m along −z from its pivot: a bushy
-  // chain of tufts, grey all the way.
+  // plume, fur sticking out all round it and lying towards the tip.
   const tail = (tip) => {
-    const parts = [];
-    for (let i = 0; i < 7; i++) {
-      const r = (tip ? 0.042 - i * 0.003 : 0.045) * (0.9 + rnd() * 0.2);
-      parts.push(blob(r, [rnd() * 0.012 - 0.006, rnd() * 0.012 - 0.006, -0.012 - i * 0.026], [1, 1, 1.25], grey(), 1));
+    const core = new THREE.CylinderGeometry(tip ? 0.012 : 0.022, tip ? 0.022 : 0.026, 0.17, 6).rotateX(-Math.PI / 2).translate(0, 0, -0.085);
+    const parts = [paint(core, grey())];
+    for (let i = 0; i < 49; i++) {
+      const ring = Math.floor(i / 7);
+      const a = (i % 7) * ((Math.PI * 2) / 7) + ring * 0.45;
+      const out = V(Math.cos(a), Math.sin(a), 0);
+      const at = out.clone().multiplyScalar(tip ? 0.02 - ring * 0.0012 : 0.023).setZ(-0.008 - ring * 0.025);
+      const len = (tip ? 0.05 - ring * 0.003 : 0.052) * (0.85 + rnd() * 0.3);
+      parts.push(tuft(at, ruffle(out.clone().multiplyScalar(0.7).add(V(0, 0, -0.6)), 0.3), len, 0.016, grey(), out));
+    }
+    if (tip) {
+      // and a brush at the very end
+      for (let i = 0; i < 6; i++) {
+        const a = i * ((Math.PI * 2) / 6);
+        const out = V(Math.cos(a), Math.sin(a), 0);
+        parts.push(tuft(V(0, 0, -0.165), ruffle(out.clone().multiplyScalar(0.35).add(V(0, 0, -1)), 0.3), 0.045, 0.014, grey(), V(out.x, out.y, -1)));
+      }
     }
     return mergeGeometries(parts);
   };
