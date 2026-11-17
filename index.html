@@ -176,6 +176,8 @@
 
   <div id="aim-pad" class="glass">
     <span class="aim-pad-label">Arc</span>
+    <!-- How high the arc is now: redrawn by drawArcPicture() in main.js -->
+    <svg id="arc-pic" viewBox="0 0 36 24" aria-hidden="true"><path class="arc-ground" d="M2 21.5H34"/><path id="arc-path" class="arc-path"/><circle id="arc-from" class="arc-from" r="2"/></svg>
     <button id="aim-higher" class="aim-btn" aria-label="Higher arc">▲</button>
     <button id="aim-lower" class="aim-btn" aria-label="Lower arc">▼</button>
   </div>

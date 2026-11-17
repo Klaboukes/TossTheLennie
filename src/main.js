@@ -1647,10 +1647,37 @@ function endSling(throwIt = true) {
 function changeSlingAngle(steps) {
   const before = slingAngle;
   slingAngle = clamp(slingAngle + steps * SLING_ANGLE.step, SLING_ANGLE.min, SLING_ANGLE.max);
-  if (sling) return;
-  // Nothing on screen shows it yet, so say so.
-  if (slingAngle === before) toast(t(steps > 0 ? 'That\'s the highest arc' : 'That\'s the lowest arc'), 1000);
+  drawArcPicture();
+  // Nothing in the scene shows it yet, so say so.
+  if (!sling) sayArc(steps, slingAngle !== before);
+}
+
+function sayArc(steps, changed) {
+  if (!changed) toast(t(steps > 0 ? 'That\'s the highest arc' : 'That\'s the lowest arc'), 1000);
   else toast(t(steps > 0 ? 'Higher arc' : 'Lower arc'), 800);
+}
+
+/**
+ * The little picture on the Arc panel: a dotted flight as steep as the arc is
+ * set now (the slingshot's launch angle, or in aim mode the aimed arc's height,
+ * as the angle of a throw of about 4 m). A steep one is drawn narrower to fit.
+ */
+const arcPic = { path: document.getElementById('arc-path'), from: document.getElementById('arc-from'), angle: NaN };
+function drawArcPicture() {
+  const deg = aim.on ? THREE.MathUtils.radToDeg(Math.atan(aim.loft)) : slingAngle;
+  if (deg === arcPic.angle) return;
+  arcPic.angle = deg;
+  const ground = 21.5;
+  const tan = Math.tan(THREE.MathUtils.degToRad(deg));
+  // A throw `w` wide that leaves at this angle tops out w·tan/4 high.
+  const w = Math.min(28, (4 * 17) / tan);
+  const x0 = 18 - w / 2;
+  const x1 = 18 + w / 2;
+  const top = (w * tan) / 4;
+  // A quadratic curve tops out halfway to its control point.
+  arcPic.path.setAttribute('d', `M${x0.toFixed(1)} ${ground}Q18 ${(ground - 2 * top).toFixed(1)} ${x1.toFixed(1)} ${ground}`);
+  arcPic.from.setAttribute('cx', x0.toFixed(1));
+  arcPic.from.setAttribute('cy', ground);
 }
 
 /**
@@ -1787,6 +1814,7 @@ canvas.addEventListener('wheel', (e) => {
     moveGrab();
   } else {
     aim.loft = clamp(aim.loft - Math.sign(e.deltaY) * AIM_LOFT.step, AIM_LOFT.min, AIM_LOFT.max);
+    drawArcPicture();
   }
 }, { passive: false, capture: true });
 
@@ -2413,6 +2441,7 @@ function toggleAim() {
   btn.aim.setAttribute('aria-pressed', String(aim.on));
   if (!aim.on) hideAim();
   aim.pin = null;
+  drawArcPicture();
   canvas.style.cursor = grab ? 'grabbing' : idleCursor();
   const how = document.body.classList.contains('touch')
     ? 'tap where Lennie should go, then tap there again to throw'
@@ -3236,9 +3265,14 @@ ui.boardEnd.addEventListener('click', () => {
 
 // The Arc buttons: the arc of aimed throws in aim mode, the slingshot's launch angle otherwise.
 function changeArc(steps) {
-  if (aim.on) aim.loft = clamp(aim.loft + steps * AIM_LOFT.step * 2, AIM_LOFT.min, AIM_LOFT.max);
-  else changeSlingAngle(steps);
+  if (!aim.on) return changeSlingAngle(steps);
+  const before = aim.loft;
+  aim.loft = clamp(aim.loft + steps * AIM_LOFT.step * 2, AIM_LOFT.min, AIM_LOFT.max);
+  drawArcPicture();
+  // With no target picked (or the pointer off the scene), no dotted arc shows it.
+  if (!aim.pin && !aim.hover) sayArc(steps, aim.loft !== before);
 }
+drawArcPicture();
 ui.aimPad.querySelector('#aim-higher').addEventListener('click', () => changeArc(1));
 ui.aimPad.querySelector('#aim-lower').addEventListener('click', () => changeArc(-1));
 renderChallenge();
