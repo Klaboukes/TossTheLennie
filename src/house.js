@@ -1875,8 +1875,10 @@ export function buildHouse(scene, world, physMats) {
     ...clutter.spots,
   ];
 
-  // a clear bit of floor on each storey: the living room, the bedroom, the loft between the stairs and its door
-  const SPAWN = [{ x: 0.2, z: -2.6 }, { x: 0.0, z: -0.8 }, { x: -1.7, z: -1.2 }];
+  // a clear bit of floor on each storey: the living room, floor 2's hallway
+  // (between the stairs and its doors), and in the attic the landing at the top
+  // of the stairs, on the way to the middle wall's door
+  const SPAWN = [{ x: 0.2, z: -2.6 }, { x: -1.3, z: 0.45 }, { x: -1.85, z: -0.4 }];
   function spawnPoint(level) {
     if (level >= 3) return { x: -1.0, z: 0.2, height: HOUSE.ridgeY + 0.3 };
     return { ...SPAWN[level], height: level * H + 0.05 };
