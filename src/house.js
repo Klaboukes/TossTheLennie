@@ -1732,6 +1732,10 @@ export function buildHouse(scene, world, physMats) {
     if (level >= 3) return { x: -1.0, z: 0.2, height: HOUSE.ridgeY + 0.3 };
     return { ...SPAWN[level], height: level * H + 0.05 };
   }
+  // Where Lennie sits when the game starts (and after R and each new turn):
+  // in the comfy chair by the back window, his hips a little forward of its
+  // back so his shins hang clear of the seat's front edge (ragdoll.js sit()).
+  const homeSeat = { x: 0.25, z: -3.87, seat: 0.42, yaw: 0 };
 
   // ------------------------------------------------------------ view: cutaway + fading
   // Every line is a thin slab (a wall or a floor); its plane is across its
@@ -1877,6 +1881,7 @@ export function buildHouse(scene, world, physMats) {
     levelOf,
     locate,
     spawnPoint,
+    homeSeat,
     spots,
     updateView,
     ceilingOver,

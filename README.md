@@ -157,7 +157,7 @@ Under the score there's always one challenge to go for, from easy ("Smash a wind
 
 ## Taking turns
 
-The people button starts a game for 2–4 players, with their names (remembered for next time). Pick how many tosses everyone gets: 5, 10, 15 or 20 (5 at first, and after that whatever was picked last time); they go one after the other. Before each turn the house is fixed and Lennie goes back downstairs, with the camera back in the living room, so everyone starts the same way, and a card says whose turn it is, so the tablet can be passed on. A toss counts once Lennie has landed: grabbing him while he's still rolling ends that turn, and R and the drop keys wait until he's down, so a bad throw can't be undone. A board under the score shows everyone's total. After the last toss the winner is announced, with confetti in their colour, and *Play again* or *Back to free play*.
+The people button starts a game for 2–4 players, with their names (remembered for next time). Pick how many tosses everyone gets: 5, 10, 15 or 20 (5 at first, and after that whatever was picked last time); they go one after the other. Before each turn the house is fixed and Lennie goes back to sitting in the comfy chair in the living room, where the game starts, with the camera back looking over the room, so everyone starts the same way, and a card says whose turn it is, so the tablet can be passed on. A toss counts once Lennie has landed: grabbing him while he's still rolling ends that turn, and R and the drop keys wait until he's down, so a bad throw can't be undone. A board under the score shows everyone's total. After the last toss the winner is announced, with confetti in their colour, and *Play again* or *Back to free play*.
 
 ## Replay and reactions
 

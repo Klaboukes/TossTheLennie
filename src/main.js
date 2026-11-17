@@ -149,12 +149,12 @@ scene.background = new THREE.Color(0xe3f2ff);
 // Nothing is lost: the see-through effect already cuts away scenery within
 // 45 cm of the lens (seethrough.js), and the camera stays 80 cm from Lennie.
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.2, 400);
-// The home view: from the living room's front corner, looking at Lennie on the
-// floor with the garden window behind him, so a pull straight down sends him
-// out into the garden. The game starts here, and R and each new turn come back
-// to it, so every player starts the same way.
-const HOME_CAM = new THREE.Vector3(0.3, 1.8, 0.9);
-const HOME_TARGET = new THREE.Vector3(0.2, 0.5, -2.6); // where Lennie starts (house.spawnPoint(0))
+// The home view: from the front of the living room, high up, over the whole
+// room to Lennie sitting in the comfy chair with the garden window behind him,
+// so a pull straight down sends him out into the garden. The game starts here,
+// and R and each new turn come back to it, so every player starts the same way.
+const HOME_CAM = new THREE.Vector3(0.7, 2.4, 0.9);
+const HOME_TARGET = new THREE.Vector3(0.25, 0.69, -3.98); // Lennie's middle as he sits (house.homeSeat)
 camera.position.copy(HOME_CAM);
 
 // ---------------------------------------------------------------- physics
@@ -204,11 +204,7 @@ function nudge() {
   chest.velocity.x += (Math.random() - 0.5) * 2;
   chest.velocity.z += (Math.random() - 0.5) * 2;
 }
-{
-  const p = house.spawnPoint(0);
-  lennie.reset({ x: p.x, z: p.z, height: p.height + 0.3, yaw: 0.4 });
-  nudge();
-}
+lennie.sit(house.homeSeat);
 
 const guard = new StuckGuard(world, lennie);
 guard.collectScenery();
@@ -2228,7 +2224,8 @@ const btn = {
 
 const LEVEL_NAMES = ['floor 1', 'floor 2', 'floor 3', 'the roof', 'the supermarket floor'];
 const SHOP_DROP = 4; // 'level' 4 in the drop menu is the supermarket, across the street
-function dropLennie(level) {
+/** Lennie back on a floor, or (`seated`) back in the comfy chair he starts in. */
+function dropLennie(level, seated = false) {
   if (grab) endGrab();
   endSling(false);
   stopReplay();
@@ -2236,22 +2233,28 @@ function dropLennie(level) {
   const p = level === SHOP_DROP ? shop.spawnPoint() : house.spawnPoint(level);
   effects.clear(); // (before he's moved: it lets go of anything holding him, frozen or stuck)
   cat.release(); // (and the cat lets go of him)
-  lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
+  if (seated) lennie.sit(house.homeSeat);
+  else lennie.reset({ x: p.x, z: p.z, height: p.height, yaw: (Math.random() - 0.5) * 0.8 });
   zap.clear();
   guard.forget();
   aim.guide = aim.through = null;
-  nudge();
+  if (!seated) nudge();
   lennie.setExpression('normal');
   toss.state = 'idle';
   resetChain();
   hideResult();
+  if (seated) {
+    settleFocus = null; // (the caller brings the camera back to the home view)
+    return;
+  }
   focusLennie(0.8);
   settleFocus = { t: 0 };
 }
 
 // After a drop Lennie flops over and slides a bit: once he lies still, the
 // camera re-centres on him (on a narrow phone screen he'd otherwise be off the edge).
-let settleFocus = { t: 0 };
+// Not at the start, where he sits still in the chair in the home view.
+let settleFocus = null;
 function updateSettleFocus(dt) {
   if (!settleFocus) return;
   settleFocus.t += dt;
@@ -2267,7 +2270,7 @@ function resetAll(say = true) {
   house.repairAll();
   shop.repairAll();
   clearShards();
-  dropLennie(0);
+  dropLennie(0, true);
   // back to the home view, wherever the last toss left the camera
   camAnim = { t: 0, dur: 0.9, fromT: controls.target.clone(), toT: HOME_TARGET.clone(), fromC: camera.position.clone(), toC: HOME_CAM.clone() };
   if (say) toast(t('Windows, doors and TV fixed, shelves stocked, the mess and the chairs back where they were, Lennie back downstairs'), 1900);

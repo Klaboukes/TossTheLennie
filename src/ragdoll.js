@@ -103,6 +103,29 @@ export const FEEL = {
   // How hard a launch flings his arms and legs about.
   kick: 1,
 };
+// Lennie lounging in a chair (sit()), facing +Z: how far each part is turned
+// [forward, out to his side] in radians, as seen in the room. Forward is
+// negative pitch, the way the joints' relaxed pose counts it: his back leans
+// back against the chair's back, his thighs lie on the seat (the hips can't
+// bend a full right angle), his shins hang down over the front edge and his
+// forearms rest on the armrests. Every joint stays well inside its limits.
+const SEATED = {
+  pelvis: [-0.45, 0],
+  chest: [-0.6, 0],
+  head: [-0.2, 0],
+  upperArm: [-0.9, 0.12],
+  lowerArm: [-1.57, 0.05],
+  upperLeg: [-1.45, 0.08],
+  lowerLeg: [-0.25, 0.03],
+};
+// [part, the part it hangs from], each after its parent.
+const SEATED_TREE = [
+  ['chest', 'pelvis'], ['head', 'chest'],
+  ...SIDES.flatMap(({ s }) => [
+    ['upperArm' + s, 'chest'], ['lowerArm' + s, 'upperArm' + s],
+    ['upperLeg' + s, 'pelvis'], ['lowerLeg' + s, 'upperLeg' + s],
+  ]),
+];
 const FLUNG = [['upperArmL', 5], ['upperArmR', 5], ['upperLegL', 3.5], ['upperLegR', 3.5], ['head', 2]];
 const UP = new CANNON.Vec3(0, 1, 0);
 const X_AXIS = new CANNON.Vec3(1, 0, 0);
@@ -972,6 +995,45 @@ export class Ragdoll {
       part.body.torque.setZero();
       part.body.wakeUp();
     }
+    this.sync();
+  }
+
+  /**
+   * Sit Lennie back in a chair: his hips over (x, z), facing yaw, the bottom
+   * of his hips and thighs 1 cm above the seat (`seat` is its height).
+   */
+  sit({ x = 0, z = 0, seat = 0, yaw = 0 } = {}) {
+    const turn = (name) => {
+      const [pitch, roll] = SEATED[name.replace(/[LR]$/, '')];
+      const sign = name.endsWith('R') ? -1 : 1;
+      return new CANNON.Quaternion().setFromAxisAngle(Z_AXIS, roll * sign)
+        .mult(new CANNON.Quaternion().setFromAxisAngle(X_AXIS, pitch));
+    };
+    // Each part hangs from its parent's joint, starting from his hips.
+    const at = { pelvis: { p: new CANNON.Vec3(), q: turn('pelvis') } };
+    for (const [child, parent] of SEATED_TREE) {
+      const j = this.joints.find((j) => (j.a === child && j.b === parent) || (j.a === parent && j.b === child));
+      const q = turn(child);
+      const p = at[parent].p.vadd(at[parent].q.vmult(vec(j.a === parent ? j.pa : j.pb))).vsub(q.vmult(vec(j.a === child ? j.pa : j.pb)));
+      at[child] = { p, q };
+    }
+    const facing = new CANNON.Quaternion().setFromAxisAngle(UP, yaw);
+    const place = (y) => {
+      for (const part of Object.values(this.parts)) {
+        const p = facing.vmult(at[part.name].p);
+        part.body.position.set(x + p.x, y + p.y, z + p.z);
+        part.body.quaternion.copy(facing.mult(at[part.name].q));
+        part.body.velocity.setZero();
+        part.body.angularVelocity.setZero();
+        part.body.force.setZero();
+        part.body.torque.setZero();
+        part.body.wakeUp();
+        part.body.updateAABB();
+      }
+    };
+    place(0);
+    const bottom = Math.min(...['pelvis', 'upperLegL', 'upperLegR'].map((n) => this.parts[n].body.aabb.lowerBound.y));
+    place(seat + 0.01 - bottom);
     this.sync();
   }
 
