@@ -240,6 +240,7 @@ const ui = {
   helpClose: $('help-close'),
   dropMenu: $('drop-menu'),
   replayBtn: $('r-replay'),
+  rClose: $('r-close'),
   replayBadge: $('replay-badge'),
   aimPad: $('aim-pad'),
   slingPower: $('sling-power'),
@@ -514,6 +515,7 @@ function showResult(result, where, cheer = null) {
   ui.replayBtn.hidden = !replay.canPlay;
   countUp = { t: 0, dur: 0.9, to: result.total };
   ui.rTotal.textContent = '0';
+  resultClosed = false;
   ui.result.classList.add('show');
   placeResult();
   clearTimeout(resultTimer);
@@ -524,6 +526,16 @@ function hideResult() {
   ui.result.classList.remove('show');
   view.to = 0;
 }
+
+// The x on the card puts it away for this toss: it doesn't come back after a
+// replay either (the next toss shows its own card again).
+let resultClosed = false;
+ui.rClose.addEventListener('click', () => {
+  ui.rClose.blur();
+  resultClosed = true;
+  clearTimeout(resultTimer);
+  hideResult();
+});
 
 // On a phone held upright the score card lies right across the screen, over the
 // middle, which is where Lennie is: the card hid the pose it was scoring. So the
@@ -2469,7 +2481,7 @@ function endReplay() {
   ui.replayBadge.hidden = true;
   if (match && turnPending) {
     showTurnCard();
-  } else if (toss.state === 'scored') {
+  } else if (toss.state === 'scored' && !resultClosed) {
     ui.result.classList.add('show');
     placeResult();
     clearTimeout(resultTimer);

@@ -19,6 +19,7 @@ const NL = {
   'Pick a challenge': 'Kies een uitdaging',
   'Challenge': 'Uitdaging',
   'Skip this challenge': 'Sla deze uitdaging over',
+  'Close': 'Sluiten',
   'Skip': 'Overslaan',
   'done': 'klaar',
   'Landing spots found:': 'Landingsplekken gevonden:',

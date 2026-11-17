@@ -161,7 +161,7 @@ The people button starts a game for 2–4 players, with their names (remembered 
 
 ## Replay and reactions
 
-Every toss is recorded. *Watch the replay* on the score card (or P) plays it back in slow motion with the camera following Lennie, from just before he's let go to where he lands, however long he was held first. A tap or a key stops it. A replay only plays when someone asks for it.
+Every toss is recorded. *Watch the replay* on the score card (or P) plays it back in slow motion with the camera following Lennie, from just before he's let go to where he lands, however long he was held first. A tap or a key stops it. A replay only plays when someone asks for it. The score card goes away by itself after a few seconds; the × in its corner puts it away at once, and then it stays away until the next toss.
 
 A big toss (2,000 or more, about one toss in six) gets a burst of confetti where Lennie lands and a blue *Big toss!* sticker on the score card. A new best gets more confetti with gold in it, a gold *New best!* sticker and a little chime. Both make *Watch the replay* glow a few times.
 
@@ -214,7 +214,7 @@ Each frame, `main.js` moves the camera first, then lets the house and the shop d
 - `src/flickercheck.js`: when the game runs on your own computer (localhost), lists any spots where two surfaces lie in the same place and would flicker, in the browser console
 - `src/products.js`: the groceries: every product's shape and packaging, what goes on which shelf, and knocking them off and restocking (the house's mess uses the same tumbling, and its plates, mugs and glasses smash into shards there)
 - `src/textures.js`: procedural textures (brick, roof tiles, window panels, cartoon glass, wallpaper, grubby white paint with the kids' handprints and crayon, wood, floor tiles, grass)
-- `src/ragdoll.js`: Lennie's bodies, joints, muscle tone (joints that ease into their limits instead of slamming into them, a loose floating pose while he flies, and arms and legs flung about at a launch) and look (1.90 m and 100 kg, with a bit of a belly, in a worn hoodie and joggers; his face after the photo in docs: thinning dark hair receding at the temples, rectangular glasses and a short salt-and-pepper beard)
+- `src/ragdoll.js`: Lennie's bodies, joints, muscle tone (joints that ease into their limits instead of slamming into them, a loose floating pose while he flies, and arms and legs flung about at a launch) and look (1.90 m and 100 kg, with a bit of a belly, in a worn hoodie, joggers and trainers; shaped arms and legs that stay closed at the elbows, knees, shoulders and hips however he's bent, and hands with fingers; his face after the photo in docs: thinning dark hair receding at the temples, rectangular glasses and a short salt-and-pepper beard)
 - `src/scoring.js`: contortion measurement, trick detection and the multiplier, and how much of the score a gentle toss keeps
 - `src/challenges.js`: the list of challenges and the progress kept in the browser
 - `src/i18n.js`: Dutch and English: the Dutch version of every text (the game's code is written in English; a new text needs its Dutch version added here), switching between them, and putting `index.html`'s own texts in the chosen language

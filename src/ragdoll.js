@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Lennie: 50, 1.90 m tall, 100 kg with a bit of a belly, in a worn hoodie and
 // old joggers. His face follows the real Lennie (docs/lennie-face.jpg): short
@@ -141,8 +142,85 @@ function mesh(geometry, mat, position) {
   return m;
 }
 
-function capsule(radius, length, mat) {
-  return mesh(new THREE.CapsuleGeometry(radius, Math.max(0.01, length - 2 * radius), 6, 16), mat);
+/**
+ * An arm or a leg bone, turned on a lathe. `rings` are [height, radius] pairs
+ * from the bottom up; the shape runs smoothly through them and ends in a ball
+ * centred on the first and on the last ring. Put those on the joints and a
+ * bent elbow or knee stays closed, with no end poking out: the two bones turn
+ * about the middle of the same ball. The child bone's ball is a few
+ * millimetres smaller than its parent's, so the two never flicker. An end
+ * that's hidden (in a cuff, under his hoodie) can be flat instead.
+ */
+function limb(rings, { ballBottom = true, ballTop = true, radial = 16 } = {}) {
+  const CAP = 5;
+  const [y0, r0] = rings[0];
+  const [y1, r1] = rings[rings.length - 1];
+  const pts = [];
+  if (ballBottom) {
+    for (let i = 0; i < CAP; i++) {
+      const a = (i / CAP) * (Math.PI / 2);
+      pts.push(new THREE.Vector2(Math.sin(a) * r0, y0 - Math.cos(a) * r0));
+    }
+  } else {
+    pts.push(new THREE.Vector2(0, y0));
+  }
+  pts.push(...new THREE.SplineCurve(rings.map(([y, r]) => new THREE.Vector2(r, y))).getPoints((rings.length - 1) * 4));
+  if (ballTop) {
+    for (let i = 1; i <= CAP; i++) {
+      const a = (i / CAP) * (Math.PI / 2);
+      pts.push(new THREE.Vector2(Math.cos(a) * r1, y1 + Math.sin(a) * r1));
+    }
+  } else {
+    pts.push(new THREE.Vector2(0, y1));
+  }
+  return new THREE.LatheGeometry(pts, radial);
+}
+
+/** Lays a texture `u` times as often round a shape and `v` times along it. */
+function tile(geometry, u, v = 1) {
+  const uv = geometry.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * u, uv.getY(i) * v);
+  return geometry;
+}
+
+const _fuse = new THREE.Matrix4();
+const FUSED = ['position', 'normal', 'uv'];
+
+/**
+ * Fewer things to draw: all the meshes in `root` that share one material
+ * become one mesh. Anything that moves or hides by itself (his pupils,
+ * eyebrows and mouths) is marked `userData.live` and left alone, like
+ * everything that starts out hidden.
+ */
+function fuse(root) {
+  root.updateMatrixWorld(true);
+  const toRoot = root.matrixWorld.clone().invert();
+  const byMaterial = new Map();
+  (function collect(o) {
+    if (o.userData.live || !o.visible) return;
+    if (o.isMesh) {
+      if (!byMaterial.has(o.material)) byMaterial.set(o.material, []);
+      byMaterial.get(o.material).push(o);
+    }
+    for (const child of o.children) collect(child);
+  })(root);
+  for (const [mat, meshes] of byMaterial) {
+    if (meshes.length < 2) continue;
+    const pieces = meshes.map((m) => {
+      const geo = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+      for (const name of Object.keys(geo.attributes)) if (!FUSED.includes(name)) geo.deleteAttribute(name);
+      geo.clearGroups();
+      return geo.applyMatrix4(_fuse.multiplyMatrices(toRoot, m.matrixWorld));
+    });
+    const one = mergeGeometries(pieces);
+    if (!one) continue; // (the console says why)
+    for (const m of meshes) {
+      m.removeFromParent();
+      m.geometry.dispose();
+    }
+    root.add(mesh(mergeVertices(one), mat));
+  }
+  return root;
 }
 
 // Deterministic pseudo-random, so Lennie looks the same every load.
@@ -469,12 +547,21 @@ export class Ragdoll {
     const sign = name.endsWith('R') ? -1 : 1;
     switch (base) {
       case 'pelvis': {
-        const joggers = this.#cloth('joggers');
-        g.add(mesh(new RoundedBoxGeometry(0.39, 0.2, 0.27, 4, 0.08), joggers, [0, -0.005, 0]));
-        // the elastic waistband, mostly hidden under the hoodie and the belly
-        const band = mesh(new THREE.CylinderGeometry(1, 1, 0.045, 28), this.#cloth('joggersRib'), [0, 0.075, 0]);
-        band.scale.set(0.198, 1, 0.14);
-        g.add(band);
+        // Hips: wide, narrowing between his legs, and less deep than wide.
+        // Only the bottom shows, between his thighs: the rest is under his
+        // hoodie.
+        const hips = limb([[-0.12, 0.06], [-0.085, 0.14], [-0.03, 0.19], [0.03, 0.19]], { ballBottom: false, ballTop: false, radial: 28 });
+        g.add(mesh(tile(hips, 2).scale(1, 1, 0.66), this.#cloth('joggers')));
+        // The bottom of his hoodie hangs over his hips down to its ribbed hem,
+        // so he bends at the waist inside it and his legs don't start at his
+        // belly. It's part of his hips, not his chest, so the hem stays snug
+        // round them however he's bent. Its top is a dome that sits inside
+        // his chest and only shows where a bend opens his waist.
+        const skirt = limb([[-0.05, 0.208], [0.02, 0.21], [0.11, 0.21], [0.16, 0.175], [0.19, 0.11]], { ballBottom: false, ballTop: false, radial: 28 });
+        g.add(mesh(tile(skirt, 2).scale(1, 1, 0.69), this.#cloth('hoodie'), [0, 0, 0.01]));
+        const hem = mesh(new THREE.CylinderGeometry(1, 1, 0.05, 32), this.#cloth('hoodieRib'), [0, -0.035, 0.01]);
+        hem.scale.set(0.217, 1, 0.15);
+        g.add(hem);
         break;
       }
       case 'chest':
@@ -484,42 +571,102 @@ export class Ragdoll {
         this.#buildHead(g);
         break;
       case 'upperArm':
-        g.add(capsule(0.072, 0.36, this.#cloth('hoodie')));
+        // Thick at the shoulder, slimmer at the elbow. The shoulder's ball sits
+        // a little under the joint, or his shoulders would stand up to his ears.
+        g.add(mesh(limb([[-0.17, 0.062], [-0.06, 0.069], [0.06, 0.075], [0.14, 0.07]]), this.#cloth('hoodie')));
         break;
-      case 'lowerArm': {
-        g.add(capsule(0.064, 0.3, this.#cloth('hoodie')).translateY(0.01));
-        g.add(mesh(new THREE.CylinderGeometry(0.056, 0.058, 0.045, 18), this.#cloth('hoodieRib'), [0, -0.14, 0]));
-        const skin = material(COLORS.skin);
-        const hand = mesh(new THREE.SphereGeometry(0.07, 20, 14), skin, HAND_OFFSET);
-        hand.scale.set(0.8, 1.15, 0.95);
-        g.add(hand);
-        // the thumb, pointing forward
-        const thumb = mesh(new THREE.CapsuleGeometry(0.02, 0.035, 4, 10), skin, [-0.02 * sign, HAND_OFFSET.y + 0.015, 0.06]);
-        thumb.rotation.x = 0.6;
-        g.add(thumb);
+      case 'lowerArm':
+        // the sleeve bunches up over a tighter cuff
+        g.add(mesh(limb([[-0.125, 0.056], [-0.05, 0.06], [0.05, 0.061], [0.155, 0.058]], { ballBottom: false }), this.#cloth('hoodie')));
+        g.add(mesh(new THREE.CylinderGeometry(0.046, 0.048, 0.05, 18), this.#cloth('hoodieRib'), [0, -0.145, 0]));
+        this.#buildHand(g, sign);
         break;
-      }
       case 'upperLeg':
-        g.add(capsule(0.093, 0.5, this.#cloth('joggers')));
+        g.add(mesh(limb([[-0.24, 0.08], [-0.1, 0.088], [0.08, 0.099], [0.24, 0.1]]), this.#cloth('joggers')));
         break;
       case 'lowerLeg': {
-        g.add(capsule(0.08, 0.42, this.#cloth('joggers')).translateY(0.02));
+        // a bit of calf, and the leg bunched up over the ankle cuff
+        g.add(mesh(limb([[-0.19, 0.06], [-0.1, 0.068], [0.07, 0.08], [0.23, 0.076]], { ballBottom: false }), this.#cloth('joggers')));
         // baggy, worn-out knees
-        const knee = mesh(new THREE.SphereGeometry(0.084, 18, 12), this.#cloth('joggers', { color: 0xe4e4e4 }), [0, 0.205, 0.01]);
-        knee.scale.set(0.96, 0.8, 1.06);
+        const knee = mesh(new THREE.SphereGeometry(0.078, 18, 12), this.#cloth('joggers', { color: 0xe4e4e4 }), [0, 0.2, 0.012]);
+        knee.scale.set(0.95, 0.85, 1.05);
         g.add(knee);
-        g.add(mesh(new THREE.CylinderGeometry(0.061, 0.064, 0.05, 18), this.#cloth('joggersRib'), [0, -0.2, 0]));
-        g.add(mesh(new RoundedBoxGeometry(0.15, 0.08, 0.28, 3, 0.03), material(COLORS.shoe, { roughness: 0.7 }), FOOT_OFFSET));
-        g.add(mesh(new THREE.BoxGeometry(0.152, 0.024, 0.282), material(COLORS.sole), [FOOT_OFFSET.x, FOOT_OFFSET.y - 0.03, FOOT_OFFSET.z]));
+        g.add(mesh(new THREE.CylinderGeometry(0.055, 0.057, 0.05, 18), this.#cloth('joggersRib'), [0, -0.2, 0]));
+        this.#buildShoe(g);
         break;
       }
     }
-    return g;
+    return fuse(g);
+  }
+
+  /**
+   * A chunky cartoon hand hanging out of the sleeve: palm towards his body,
+   * thumb forward, four fingers a little curled. It's all one material, so
+   * fuse() makes it one mesh.
+   */
+  #buildHand(g, sign) {
+    const skin = material(COLORS.skin);
+    const y = HAND_OFFSET.y;
+    g.add(mesh(new THREE.CylinderGeometry(0.034, 0.036, 0.04, 12), skin, [0, y + 0.045, 0])); // wrist
+    const palm = mesh(new THREE.SphereGeometry(1, 16, 12), skin, [0, y + 0.005, 0]);
+    palm.scale.set(0.03, 0.05, 0.047);
+    g.add(palm);
+    const thumb = mesh(new THREE.CapsuleGeometry(0.015, 0.035, 3, 8), skin, [-0.008 * sign, y + 0.01, 0.052]);
+    thumb.rotation.x = -0.8;
+    g.add(thumb);
+    // from the little finger at the back to the index finger at the front
+    const curl = -0.3 * sign;
+    [0.04, 0.05, 0.056, 0.05].forEach((length, i) => {
+      const finger = mesh(new THREE.CapsuleGeometry(0.0135, length - 0.027, 3, 8), skin);
+      finger.position.set((Math.sin(curl) * length) / 2, y - 0.03 - (Math.cos(curl) * length) / 2, -0.033 + i * 0.022);
+      finger.rotation.z = curl;
+      g.add(finger);
+    });
+  }
+
+  /**
+   * A trainer: a low dome over the toes, a higher one round the heel and
+   * ankle and one between them, on a pale sole a touch wider than the shoe,
+   * with three laces.
+   * Nothing reaches below the sole, so it's flat to stand and land on.
+   */
+  #buildShoe(g) {
+    const upper = material(COLORS.shoe, { roughness: 0.7 });
+    const pale = material(COLORS.sole);
+    const seam = FOOT_OFFSET.y - 0.013; // where the domes sink into the sole
+    const dome = (rx, ry, rz, z) => {
+      const m = mesh(new THREE.SphereGeometry(1, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2), upper, [0, seam, z]);
+      m.scale.set(rx, ry, rz);
+      g.add(m);
+    };
+    dome(0.067, 0.05, 0.094, 0.092);
+    dome(0.062, 0.058, 0.08, 0.035); // the instep, filling the dip between the two
+    dome(0.062, 0.075, 0.068, -0.012);
+
+    // the sole's outline seen from above (x across, the second number along the foot)
+    const print = new THREE.Shape();
+    print.moveTo(0, -0.08);
+    print.bezierCurveTo(0.048, -0.08, 0.063, -0.06, 0.063, -0.01);
+    print.bezierCurveTo(0.063, 0.03, 0.068, 0.06, 0.068, 0.1);
+    print.bezierCurveTo(0.068, 0.16, 0.045, 0.187, 0, 0.187);
+    print.bezierCurveTo(-0.045, 0.187, -0.068, 0.16, -0.068, 0.1);
+    print.bezierCurveTo(-0.068, 0.06, -0.063, 0.03, -0.063, -0.01);
+    print.bezierCurveTo(-0.063, -0.06, -0.048, -0.08, 0, -0.08);
+    const sole = new THREE.ExtrudeGeometry(print, { depth: 0.02, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.003, bevelSegments: 1, curveSegments: 8 });
+    g.add(mesh(sole.rotateX(Math.PI / 2), pale, [0, FOOT_OFFSET.y - 0.012, 0]));
+
+    for (const [z, y] of [[0.05, 0.033], [0.072, 0.037], [0.094, 0.038]]) {
+      g.add(mesh(new THREE.BoxGeometry(0.052, 0.006, 0.01), pale, [0, FOOT_OFFSET.y + y, z]));
+    }
   }
 
   #buildChest(g) {
     const hoodie = this.#cloth('hoodie');
     g.add(mesh(new RoundedBoxGeometry(0.46, 0.44, 0.27, 4, 0.1), hoodie));
+    // his shoulders: a rounded yoke from one arm to the other, rising to the neck
+    const yoke = mesh(new THREE.SphereGeometry(1, 24, 12), hoodie, [0, 0.15, -0.005]);
+    yoke.scale.set(0.28, 0.09, 0.12);
+    g.add(yoke);
 
     // the belly, with the hoodie's front pocket stretched over it
     const bellyAt = [0, -0.07, 0.06];
@@ -535,16 +682,13 @@ export class Ragdoll {
     pocket.scale.set(...bellyScale);
     g.add(pocket);
 
-    // ribbed hem, stretched round the belly
-    const hem = mesh(new THREE.CylinderGeometry(1, 1, 0.055, 32, 1, true), this.#cloth('hoodieRib', { side: THREE.DoubleSide }), [0, -0.2, 0.02]);
-    hem.scale.set(0.24, 1, 0.162);
-    g.add(hem);
+    // (the bottom of the hoodie and its hem are on his hips: see 'pelvis')
 
     // the hood, bunched up behind his neck, and the neckline
     const hood = mesh(new THREE.SphereGeometry(0.12, 20, 14), this.#cloth('hoodie', { color: 0xe8e2df }), [0, 0.17, -0.12]);
     hood.scale.set(1.4, 0.6, 0.75);
     g.add(hood);
-    const collar = mesh(new THREE.TorusGeometry(0.085, 0.032, 10, 28), this.#cloth('hoodie'), [0, 0.215, -0.005]);
+    const collar = mesh(new THREE.TorusGeometry(0.085, 0.032, 10, 28), hoodie, [0, 0.215, -0.005]);
     collar.rotation.x = Math.PI / 2;
     g.add(collar);
 
@@ -569,8 +713,10 @@ export class Ragdoll {
   #buildHead(g) {
     const skin = material(COLORS.skin);
 
-    // a neck under the beard, so no gap shows when his head lolls
-    g.add(mesh(new THREE.CylinderGeometry(0.056, 0.062, 0.11, 16), skin, [0, -0.11, -0.01]));
+    // a neck under the beard, so no gap shows when his head lolls, ending in
+    // a ball on the neck joint that stays inside his collar
+    g.add(mesh(new THREE.CylinderGeometry(0.056, 0.062, 0.085, 16), skin, [0, -0.0975, -0.01]));
+    g.add(mesh(new THREE.SphereGeometry(0.062, 16, 12), skin, [0, -0.14, -0.01]));
 
     // The face is laid out on a 0.15 m ball and squeezed into the shape of his
     // head: a bit narrower than tall, top of the head at 1.90 m.
@@ -640,6 +786,7 @@ export class Ragdoll {
     for (const s of [-1, 1]) {
       f.add(mesh(new THREE.SphereGeometry(0.03, 16, 12), eyeMat, [0.055 * s, 0.03, 0.124]));
       const pupil = mesh(new THREE.SphereGeometry(0.015, 12, 10), pupilMat, [0.055 * s, 0.03, 0.151]);
+      pupil.userData.live = true;
       f.add(pupil);
       this.face.pupils.push(pupil);
 
@@ -658,6 +805,7 @@ export class Ragdoll {
       const brow = mesh(new RoundedBoxGeometry(0.056, 0.011, 0.012, 2, 0.004), browMat, [0.058 * s, 0.079, 0.13]);
       brow.rotation.x = -0.4;
       brow.userData.side = s;
+      brow.userData.live = true;
       f.add(brow);
       this.face.brows.push(brow);
 
@@ -718,6 +866,8 @@ export class Ragdoll {
     this.face.ouch = ouch;
     this.face.grin = grin;
     this.face.tongue = tongue;
+    // setExpression() shows and hides these, so fuse() must leave them be
+    for (const o of [smile, ouch, grin, tongue, ...this.face.xEyes]) o.userData.live = true;
 
     // Cartoon stars circling his head when he's dizzy. They live in the scene
     // rather than on the head, so they stay above him whichever way up he is.
