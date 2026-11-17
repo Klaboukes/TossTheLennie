@@ -37,8 +37,9 @@ const DOOR_LOOKS = [
  * One painted door of the TV cabinet: a folk-art horse mid-prance, a painted
  * line inside the edge, flowers in the corners. `flip` -1 has the horse face left.
  */
-function horseDoorTexture(d, flip) {
-  const [W, H] = [256, 152];
+function horseDoorTexture(d, flip, aspect = 256 / 152) {
+  const H = 152;
+  const W = Math.round(H * aspect); // as wide as the door, so the horse isn't stretched
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H;
@@ -68,7 +69,7 @@ function horseDoorTexture(d, flip) {
     dot(x, y, 4.2);
   }
   g.fillStyle = d.saddle;
-  for (let k = 0; k < 7; k++) dot(74 + k * 18, H - 20, 2.5);
+  for (let k = 0; k < 7; k++) dot(W / 2 - 54 + k * 18, H - 20, 2.5);
 
   // the horse, drawn in units about 100 by 90 around its middle
   g.save();
@@ -177,7 +178,7 @@ const TOY_MESS = ['Toy avalanche!', 'Toy story!', 'Playtime!', 'Who put all that
 // Where the furniture stands in each room, so things strewn on the floor stay clear of it.
 const FURNITURE = {
   living: [
-    [-3.875, -0.6, -2.4, -0.8], [-3.875, -2.95, -4.75, -2.75], [-1.55, -0.6, -0.75, -0.35], [-3.875, -1.66, -0.79, 1.01], // couch, TV cabinet, low cabinet, stairs and storage
+    [-3.875, -0.6, -2.4, -0.8], [-3.875, -2.95, -4.75, -2.41], [-1.55, -0.6, -0.75, -0.35], [-3.875, -1.66, -0.79, 1.01], // couch, TV cabinet, low cabinet, stairs and storage
     [-0.25, 0.75, -4.875, -3.5], [1.28, 3.62, -2.2, -0.3], [1.85, 3.55, -0.05, 1.12], [2.175, 3.875, -4.875, -4.3], // comfy chair, dining table, piano, game closet
     [TOY_CABINET.x0, TOY_CABINET.x1, TOY_CABINET.z0, TOY_CABINET.z1], // the toy cabinet
   ],
@@ -869,6 +870,125 @@ function buildCatalogue() {
   });
   C.drawing = { w: 0.21, h: 0.002, d: 0.297, look: () => { const w = mat(0xffffff); return { geo: Box(0.21, 0.002, 0.297), material: [w, w, texMat(drawing), w, w, w] }; } };
 
+  // The kids' stuff in the living room: they're 10 and 13, so no teddies but
+  // a gaming headset, comics, game cases, trading
+  // cards, a foam dart blaster and its darts, a puzzle cube and Lego bricks.
+  // a gaming headset lying flat: the band, two ear cups with green rings on top
+  const headsetDark = mat(0x26262a, { roughness: 0.5 });
+  C.headphones = parts([
+    [new THREE.TorusGeometry(0.085, 0.009, 6, 18, Math.PI).rotateX(-Math.PI / 2).translate(0, 0.015, 0), headsetDark],
+    ...[1, -1].map((s) => [at(Cyl(0.045, 0.045, 0.03, 16), s * 0.095, 0.015, 0), headsetDark]),
+    ...[1, -1].map((s) => [at(Cyl(0.03, 0.03, 0.005, 14), s * 0.095, 0.0315, 0), mat(0x3fae3a, { roughness: 0.4 })]), // 1 mm into the cups
+  ]);
+  // comics: a bright cover, white pages
+  const comicCover = (bg, title, ink, art) => canvasTexture(128, 192, (g) => {
+    g.fillStyle = bg; g.fillRect(0, 0, 128, 192);
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, 128, 36);
+    label(g, title, 64, 19, 112, 28, ink);
+    art(g);
+  });
+  const burst = (g, x, y, r0, r1, n) => { g.beginPath(); for (let i = 0; i < n * 2; i++) { const a = (i / (n * 2)) * TAU; const r = i % 2 ? r1 : r0; g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } g.closePath(); };
+  const heroCover = comicCover('#2a5bd7', 'HELDEN', '#c0392b', (g) => {
+    g.fillStyle = '#f6d04d'; burst(g, 64, 116, 58, 36, 12); g.fill();
+    g.strokeStyle = INK; g.lineWidth = 3; g.stroke();
+    label(g, 'POW!', 64, 116, 70, 34, '#c0392b');
+  });
+  const ninjaCover = comicCover('#c0392b', 'NINJA', '#1b1b1b', (g) => {
+    g.fillStyle = '#ffffff'; g.strokeStyle = INK; g.lineWidth = 3;
+    for (const [x, y, w, h] of [[8, 46, 54, 64], [66, 46, 54, 64], [8, 116, 112, 68]]) { g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h); }
+    g.fillStyle = '#1b1b1b';
+    for (const [x, y] of [[35, 80], [93, 80], [64, 154]]) { circle(g, x, y, 14); g.fill(); }
+    g.fillStyle = '#f2c69c';
+    for (const [x, y] of [[35, 80], [93, 80], [64, 154]]) g.fillRect(x - 11, y - 4, 22, 7);
+    g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(96, 134, 20, 11, 0, 0, TAU); g.fill(); g.stroke();
+    label(g, 'HA!', 96, 134, 30, 14, '#c0392b');
+  });
+  const comic = (cover) => ({ w: 0.17, h: 0.006, d: 0.26, look: () => { const p = mat(0xf5f0e2); return { geo: Box(0.17, 0.006, 0.26), material: [p, p, texMat(cover), p, p, p] }; } });
+  C.comicA = comic(heroCover);
+  C.comicB = comic(ninjaCover);
+  // game cases for the game console: red plastic, a picture on the front under a red band
+  const caseCover = (art) => canvasTexture(64, 104, (g) => {
+    art(g);
+    g.fillStyle = '#e60012'; g.fillRect(0, 0, 64, 14);
+    g.fillStyle = '#ffffff'; g.fillRect(24, 4, 16, 6);
+  });
+  const kartCover = caseCover((g) => {
+    g.fillStyle = '#7fc8f0'; g.fillRect(0, 0, 64, 104);
+    g.fillStyle = '#8a939c'; g.beginPath(); g.moveTo(0, 104); g.lineTo(26, 50); g.lineTo(38, 50); g.lineTo(64, 104); g.fill();
+    g.fillStyle = '#e2231a'; g.fillRect(20, 70, 24, 14);
+    g.fillStyle = '#1b1b1b'; for (const x of [22, 42]) { circle(g, x, 86, 5); g.fill(); }
+    g.fillStyle = '#f6d04d'; circle(g, 32, 64, 7); g.fill();
+  });
+  const blockCover = caseCover((g) => {
+    g.fillStyle = '#9ad0f0'; g.fillRect(0, 0, 64, 104);
+    for (let x = 0; x < 64; x += 8) {
+      const top = 56 + ((x * 7) % 24);
+      g.fillStyle = '#5aa83a'; g.fillRect(x, top, 8, 8);
+      g.fillStyle = '#8a5a3c'; g.fillRect(x, top + 8, 8, 104 - top);
+    }
+    g.fillStyle = '#3f8f3a'; g.fillRect(40, 30, 16, 16);
+    g.fillStyle = '#6b4a2a'; g.fillRect(45, 46, 6, 12);
+  });
+  const gameCase = (cover) => ({ w: 0.105, h: 0.011, d: 0.17, look: () => { const r = plastic(0xd8312a); return { geo: Box(0.105, 0.011, 0.17), material: [r, r, texMat(cover, { roughness: 0.35 }), r, r, r] }; } });
+  C.gameCaseA = gameCase(kartCover);
+  C.gameCaseB = gameCase(blockCover);
+  // a trading card: a yellow border round a little monster
+  const monsterCard = canvasTexture(64, 88, (g) => {
+    g.fillStyle = '#f6d04d'; g.fillRect(0, 0, 64, 88);
+    g.fillStyle = '#9ad0f0'; g.fillRect(5, 12, 54, 38);
+    g.fillStyle = '#f59a23'; circle(g, 32, 34, 13); g.fill();
+    g.fillStyle = '#ffffff'; for (const x of [27, 37]) { circle(g, x, 31, 3.5); g.fill(); }
+    g.fillStyle = '#1b1b1b'; for (const x of [27, 37]) { circle(g, x, 31, 1.6); g.fill(); }
+    g.fillStyle = '#fbf3e4'; g.fillRect(5, 55, 54, 28);
+    g.fillStyle = '#8a939c'; for (let y = 60; y < 80; y += 6) g.fillRect(9, y, 40, 2);
+  });
+  C.cardMonster = { w: 0.063, h: 0.002, d: 0.088, look: () => { const y = mat(0xf6d04d); return { geo: Box(0.063, 0.002, 0.088), material: [y, y, texMat(monsterCard), y, y, y] }; } };
+  // a foam dart blaster (blue with orange bits) and its darts
+  const blasterBlue = plastic(0x2a5bd7);
+  const blasterOrange = plastic(0xf59a23);
+  C.blaster = parts([
+    [Box(0.3, 0.065, 0.04), blasterBlue],
+    [at(Cyl(0.018, 0.018, 0.16, 12), 0.2, 0.01, 0, 0, 0, Math.PI / 2), blasterOrange],
+    [at(Box(0.08, 0.02, 0.044), 0.05, 0.035, 0), blasterOrange],
+    [at(Box(0.035, 0.09, 0.034), -0.08, -0.07, 0, 0, 0, 0.25), blasterBlue],
+  ]);
+  C.dart = parts([
+    [Cyl(0.0065, 0.0065, 0.06, 8).rotateZ(Math.PI / 2), plastic(0x2a5bd7)],
+    [Cyl(0.007, 0.007, 0.012, 8).rotateZ(Math.PI / 2).translate(0.034, 0, 0), blasterOrange],
+  ]);
+  // a puzzle cube, all mixed up
+  const cubeTex = canvasTexture(64, 64, (g) => {
+    g.fillStyle = '#1b1b1b'; g.fillRect(0, 0, 64, 64);
+    const cols = ['#ffffff', '#e2231a', '#2a5bd7', '#f6d04d', '#3fae3a', '#f59a23'];
+    for (let i = 0; i < 9; i++) { g.fillStyle = cols[(i * 4 + 1) % 6]; g.fillRect(3 + (i % 3) * 20, 3 + Math.floor(i / 3) * 20, 18, 18); }
+  });
+  C.puzzleCube = item(Box(0.057, 0.057, 0.057), texMat(cubeTex, { roughness: 0.3 }));
+  // Lego: real-size 2×4 bricks, the ones that hurt when you step on them
+  C.lego = parts([
+    [Box(0.032, 0.0096, 0.016), plastic(0xffffff)],
+    ...[-0.012, -0.004, 0.004, 0.012].flatMap((x) => [-0.004, 0.004].map((z) => [at(Cyl(0.0024, 0.0024, 0.002, 8), x, 0.0056, z), plastic(0xffffff)])),
+  ]);
+  C.legoRed = tint('lego', 0xe2231a);
+  C.legoBlue = tint('lego', 0x2a5bd7);
+  C.legoYellow = tint('lego', 0xf6d04d);
+  C.legoGreen = tint('lego', 0x3fae3a);
+  // The game console in its dock beside the TV, the kind with a red and a
+  // blue controller clipped to either side of the screen, which sticks up
+  // out of the dock. It faces +z. Drawn by us, no logos.
+  const dockM = mat(0x2b2b30, { roughness: 0.45 });
+  const btn = (x, y) => [at(Cyl(0.0032, 0.0032, 0.004, 8), x, y, 0.018, Math.PI / 2), dockM];
+  const joyRed = plastic(0xff3c28);
+  const joyBlue = plastic(0x0ab9e6);
+  C.gameConsole = parts([
+    [at(Box(0.18, 0.104, 0.054), 0, 0.052, 0), dockM], // the dock
+    [at(Box(0.168, 0.034, 0.014), 0, 0.107, 0.004), mat(0x111114, { roughness: 0.2 })], // the console's top edge, sticking up out of it
+    [at(Box(0.036, 0.114, 0.028), -0.1, 0.069, 0.004), joyRed], // the controllers either side, 2 mm into the console
+    [at(Box(0.036, 0.114, 0.028), 0.1, 0.069, 0.004), joyBlue],
+    [at(Cyl(0.0075, 0.0075, 0.006, 10), -0.1, 0.1, 0.019, Math.PI / 2), dockM], // their sticks
+    [at(Cyl(0.0075, 0.0075, 0.006, 10), 0.1, 0.06, 0.019, Math.PI / 2), dockM],
+    ...[[0, 1], [0, -1], [1, 0], [-1, 0]].flatMap(([a, b]) => [btn(0.1 + a * 0.007, 0.1 + b * 0.007), btn(-0.1 + a * 0.007, 0.06 + b * 0.007)]), // buttons
+  ]);
+
   // living room bits
   const dark = plastic(0x2b2b30);
   C.controller = parts([[Box(0.1, 0.025, 0.05), dark], [at(Sph(0.022, 1, 0.6, 1.3), -0.045, -0.003, 0.02), dark], [at(Sph(0.022, 1, 0.6, 1.3), 0.045, -0.003, 0.02), dark], [at(Cyl(0.008, 0.008, 0.01, 8), -0.02, 0.016, -0.005), plastic(0x55555c)]]);
@@ -1205,7 +1325,7 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
 
   // Furniture tops things land on (y = their top, from the floor of their storey).
   const TOPS = [
-    [0, -3.875, -2.95, -4.75, -2.75, 0.5], // TV cabinet
+    [0, -3.875, -2.95, -4.75, -2.41, 0.5], // TV cabinet
     [0, -1.55, -0.6, -0.75, -0.35, 0.55], // low cabinet behind the couch
     [0, -2.8, -0.85, -1.55, -1.12, 0.52], // couch seat
     [0, -3.62, -2.9, -2.35, -1.15, 0.52], // the couch's chaise end
@@ -1307,9 +1427,12 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   put(living, 'mugBlue', -0.78, 0.55, -0.66);
   put(living, 'mugRed', -0.78, 0.55, -0.44);
   put(living, 'cola', -0.67, 0.55, -0.53, { yaw: 1.5, ...tipped('cola') });
-  // the TV cabinet: the game console's controllers
-  put(living, 'controller', -3.1, 0.5, -2.95, { yaw: 1.4 });
-  put(living, 'controller', -3.6, 0.5, -3.05, { yaw: 2.0 });
+  // the TV cabinet: the game console in its dock beside the TV, facing the couch,
+  // and further along, by the couch, two controllers and a game case
+  put(living, 'gameConsole', -3.5, 0.502, -3.02, { yaw: Math.atan2(0.8, 0.6) });
+  put(living, 'controller', -3.15, 0.5, -2.75, { yaw: 1.4 });
+  put(living, 'controller', -3.6, 0.5, -2.62, { yaw: 2.0 });
+  put(living, 'gameCaseB', -3.3, 0.5, -2.52, { yaw: 1.3 });
   // the couch: a blanket, a cushion on the floor, crisps, a plate on the arm of the comfy chair's side
   put(living, 'blanket', -3.25, 0.52, -1.9, { yaw: 0.3 });
   put(living, 'cushion', -2.4, 0, -2.6, { yaw: 0.6 });
@@ -1319,20 +1442,18 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   put(living, 'paper', 2.3, 1.25, 0.85, { yaw: 0.1 });
   put(living, 'mugWhite', 3.25, 1.25, 0.8);
   // on top of the toy cabinet beside it
-  put(living, 'carYellow', 1.3, TOY_CABINET.top, 0.95, { yaw: 0.4 });
-  put(living, 'teddy', 1.58, TOY_CABINET.top, 1.0, { yaw: -Math.PI / 2 - 0.3 });
-  // toys, toys, toys
-  const toys = ['blockA', 'blockB', 'blockC', 'blockD', 'brickRed', 'brickBlue', 'brickYellow', 'brickWhite', 'carRed', 'carBlue', 'crayonRed', 'crayonGreen'];
-  strew(living, toys, 34, { how: lying });
-  strew(living, ['blockA', 'blockB', 'brickRed', 'brickYellow', 'carYellow', 'teddy', 'drawing'], 10, { area: { x0: -2.75, x1: -0.95, z0: -3.9, z1: -1.75 }, how: lying });
-  put(living, 'beachBall', 1.4, 0, -3.9);
-  put(living, 'ball', -1.6, 0, -4.3);
-  put(living, 'teddy', 0.7, 0, -1.0, { yaw: 2.2 });
-  put(living, 'drawing', -1.55, 0, -3.0, { yaw: 0.3 });
-  // a tower of blocks somebody built
-  const tower = ['blockA', 'blockC', 'blockB', 'blockD', 'blockA'];
+  put(living, 'puzzleCube', 1.25, TOY_CABINET.top, 0.92, { yaw: 0.4 });
+  put(living, 'gameCaseA', 1.55, TOY_CABINET.top, 0.98, { yaw: 0.2 });
+  // the kids' stuff (they're 10 and 13), not too much of it: comics, game cases,
+  // trading cards, foam darts and a few Lego bricks, more of it in front of the TV
+  const kidStuff = ['comicA', 'comicB', 'gameCaseA', 'gameCaseB', 'cardMonster', 'cardMonster', 'dart', 'dart', 'dart', 'legoRed', 'legoBlue', 'legoYellow', 'puzzleCube'];
+  strew(living, kidStuff, 14, { how: lying });
+  strew(living, ['gameCaseA', 'gameCaseB', 'cardMonster', 'dart', 'comicA', 'legoGreen'], 6, { area: { x0: -2.75, x1: -0.95, z0: -3.9, z1: -1.75 }, how: lying });
+  put(living, 'blaster', -1.6, 0, -4.25, { yaw: 0.4, ...onFace('blaster') });
+  put(living, 'headphones', -1.3, 0.52, -1.35, { yaw: 0.5 }); // on the couch
+  // a pile of comics somebody was reading
   let below = null;
-  tower.forEach((id, i) => (below = put(living, id, 0.35, i * 0.07, -2.0, { yaw: 0.2 * i, on: below })));
+  ['comicB', 'comicA', 'comicB', 'comicA'].forEach((id, i) => (below = put(living, id, 0.3, i * 0.006, -2.05, { yaw: 0.2 + 0.25 * i, on: below })));
   put(living, 'sockRed', -0.3, 0, 0.3);
 
   // ---------------------------------------------------------------- hallway
@@ -1549,6 +1670,7 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
 
   // ---------------------------------------------------------------- kids room
   const kids = 'kids';
+  const toys = ['blockA', 'blockB', 'blockC', 'blockD', 'brickRed', 'brickBlue', 'brickYellow', 'brickWhite', 'carRed', 'carBlue', 'crayonRed', 'crayonGreen'];
   strew(kids, [...toys, 'teddy', 'beachBall', 'ball', 'carYellow', 'drawing', 'crayonBlue', 'duck'], 46, { how: lying });
   strew(kids, ['shirtKid', 'shirtKidPink', 'jeansKid', 'sockRed', 'sockWhite', 'slipper'], 10);
   // on top of the toy box, and on the bed
@@ -1776,7 +1898,7 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   // along. "Fix everything" (restock) puts the doors back and the toys away.
   function buildTVCabinet() {
     const k = 0;
-    const [X0, X1, Z0, Z1, TOP] = [-3.875, -2.95, -4.75, -2.75, 0.5];
+    const [X0, X1, Z0, Z1, TOP] = [-3.875, -2.95, -4.75, -2.41, 0.5]; // all the way to the couch, 1 cm short of it
     const DOOR_T = 0.02;
     const FRONT = X1 - DOOR_T; // the carcass ends here; the doors are in front of it
     const BASE = 0.06; // the bottom inside, on its plinth
@@ -1796,11 +1918,12 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     for (const i of [1, 2]) b([X0 + 0.02, BASE, Z1 - i * W - 0.01], [FRONT, LID, Z1 - i * W + 0.01], black); // dividers
     const solid = body([X0, 0, Z0], [X1, TOP, Z1], physMats.hard, { kind: 'furniture' });
 
-    // the toys inside: on the bottom of each compartment, a grid of piles,
-    // blocks at the bottom and a car or a few bricks on top, and one big toy
-    const piles = ['blockA', 'blockB', 'blockC', 'blockD'];
-    const tops = ['brickRed', 'brickBlue', 'brickYellow', 'brickWhite', 'carRed', 'carBlue', 'carYellow', 'duck', 'crayonRed', 'crayonBlue', 'crayonGreen'];
-    const big = ['teddy', 'ball', 'teddy'];
+    // the kids' stuff inside: on the bottom of each compartment, a headset or
+    // the foam blaster at the back, and in front of it a grid of piles of game
+    // cases, most with something on top (a puzzle cube, Lego, darts, a card)
+    const piles = ['gameCaseA', 'gameCaseB'];
+    const tops = ['puzzleCube', 'legoRed', 'legoBlue', 'legoYellow', 'legoGreen', 'dart', 'dart', 'cardMonster', 'controller'];
+    const big = ['headphones', 'blaster', 'headphones'];
     const pick = (list) => list[Math.floor(rnd() * list.length)];
 
     const DOOR_H = LID - 0.005 - (BASE + 0.005);
@@ -1810,27 +1933,26 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
       const sec = stocks[k].section({ bounds: ROOMS.living, floorY: 0.012, k, name: 'tvcabinet', fresh: false });
       sections[k].push(sec);
       const [a, c] = [zc - W / 2 + 0.05, zc + W / 2 - 0.05]; // z, clear of the dividers
-      const bigX = X0 + 0.12;
-      stocks[k].place(big[i], bigX, BASE, zc, rnd() * TAU, sec);
-      for (let x = X0 + 0.28; x < FRONT - 0.06; x += 0.14) {
-        for (let z = a + 0.04; z < c - 0.03; z += 0.13) {
+      if (big[i] === 'headphones') stocks[k].place('headphones', X0 + 0.1, BASE, zc, Math.PI / 2 + (rnd() - 0.5) * 0.3, sec);
+      else stocks[k].place(big[i], X0 + 0.12, BASE, zc, Math.PI / 2, sec, 0, onFace(big[i])); // lying on its side, along the back
+      for (let x = X0 + 0.3; x + 0.053 < FRONT - 0.03; x += 0.17) {
+        for (let z = a + 0.09; z + 0.085 < c; z += 0.22) {
           let below = null;
           let y = BASE;
-          const n = Math.floor(rnd() * 4); // 0 to 3 blocks
+          const n = Math.floor(rnd() * 5); // 0 to 4 game cases, turned a little
           for (let j = 0; j < n; j++) {
-            below = stocks[k].place(pick(piles), x + (rnd() - 0.5) * 0.02, y, z + (rnd() - 0.5) * 0.02, rnd() * TAU, sec, 0, { on: below });
-            y += 0.07;
+            const id = pick(piles);
+            below = stocks[k].place(id, x, y, z, (rnd() - 0.5) * 0.3, sec, 0, { on: below });
+            y += 2 * half(id)[1];
           }
-          const id = pick(tops);
-          below = stocks[k].place(id, x, y, z, rnd() * TAU, sec, 0, { on: below });
-          if (id.startsWith('brick') && rnd() < 0.6) stocks[k].place(pick(tops.slice(0, 4)), x, y + 0.038, z, rnd() * TAU, sec, 0, { on: below });
+          if (rnd() < 0.75) stocks[k].place(pick(tops), x, y, z, rnd() * TAU, sec, 0, { on: below });
         }
       }
 
       // the door: painted on the front, its colour all round the edges, a brass knob
       const group = new THREE.Group();
       group.rotation.order = 'YXZ'; // when it falls: tipped over (z) first, then turned (y)
-      const face = std({ map: horseDoorTexture(look, i === 2 ? -1 : 1), roughness: 0.55 });
+      const face = std({ map: horseDoorTexture(look, i === 2 ? -1 : 1, (W - 0.008) / DOOR_H), roughness: 0.55 });
       const edge = std({ color: look.bg, roughness: 0.55 });
       const panel = new THREE.Mesh(new THREE.BoxGeometry(DOOR_T, DOOR_H, W - 0.008), [face, edge, edge, edge, edge, edge]);
       const knob = new THREE.Mesh(new THREE.SphereGeometry(0.013, 12, 8), brass);
@@ -2131,22 +2253,29 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     const L = (X0 + T + XM - T / 2) / 2; // the middle of the left cubbies
     const R = (XM + T / 2 + X1 - T) / 2;
     const UP = MIDY + T;
-    // bottom left: the teddy, and a car in front of it
-    inside('teddy', L, PLINTH, 1.04, { yaw: Math.PI / 2 + 0.2 });
-    inside('carRed', L + 0.02, PLINTH, 0.88, { yaw: 0.15 });
-    // bottom right: a tower of blocks at the back, a car in front
-    let below = null;
-    ['blockA', 'blockC', 'blockB'].forEach((id, i) => (below = inside(id, R - 0.04, PLINTH + i * 0.07, 1.06, { yaw: 0.25 * i, on: below })));
-    inside('carBlue', R + 0.03, PLINTH, 0.9, { yaw: -0.3 });
-    // top left: the duck and a heap of bricks
-    inside('duck', L - 0.05, UP, 1.03, { yaw: -Math.PI / 2 });
-    below = inside('brickRed', L + 0.06, UP, 0.95, { yaw: 0.4 });
-    inside('brickYellow', L + 0.06, UP + 0.038, 0.95, { yaw: 1.1, on: below });
-    inside('brickBlue', L - 0.03, UP, 0.88, { yaw: 2.0 });
-    // top right: the ball, a block and the crayons
-    inside('ball', R + 0.04, UP, 1.05);
-    inside('blockD', R - 0.06, UP, 0.92, { yaw: 0.5 });
-    for (const [id, dx] of [['crayonRed', -0.02], ['crayonGreen', 0.04]]) inside(id, R + dx, UP, 0.86, { yaw: 0.2 + dx * 8, ...tipped(id) });
+    /** A pile of flat things, each on the one below, turned a little. */
+    const pileUp = (ids, x, y, z, yaw) => {
+      let below = null;
+      for (const id of ids) {
+        below = inside(id, x, y, z, { yaw: yaw + (rnd() - 0.5) * 0.1, on: below });
+        y += 2 * half(id)[1];
+      }
+      return below;
+    };
+    // bottom left: two piles of game cases
+    pileUp(['gameCaseB', 'gameCaseA', 'gameCaseB', 'gameCaseA'], L, PLINTH, 1.06, Math.PI / 2);
+    pileUp(['gameCaseA', 'gameCaseB', 'gameCaseA'], L, PLINTH, 0.88, Math.PI / 2);
+    // bottom right: a pile of comics, the puzzle cube in front
+    pileUp(['comicA', 'comicB', 'comicB', 'comicA', 'comicB'], R, PLINTH, 1.02, 0);
+    inside('puzzleCube', R, PLINTH, 0.845, { yaw: 0.3 });
+    // top left: the headset
+    inside('headphones', L, UP, 0.98, { yaw: Math.PI / 2 + 0.05 });
+    // top right: trading cards, Lego and foam darts
+    pileUp(['cardMonster', 'cardMonster', 'cardMonster', 'cardMonster'], R - 0.06, UP, 1.08, 0.1);
+    const brick = inside('legoRed', R + 0.07, UP, 1.08, { yaw: 0.3 });
+    inside('legoBlue', R + 0.07, UP + 2 * half('legoRed')[1], 1.08, { yaw: 0.9, on: brick });
+    inside('legoYellow', R + 0.06, UP, 0.98, { yaw: 1.4 });
+    for (const z of [0.86, 0.91]) inside('dart', R, UP, z, { yaw: 0.1 + (z - 0.86) * 4 });
 
     const out = new THREE.Vector3(0, 0, -1);
     solid.surface.tally = 'toys';
