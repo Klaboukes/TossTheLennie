@@ -322,24 +322,25 @@ export const LAYOUT = {
   back: [[0.625, 1.725], [6.425, 7.525]],
   skylight: [5.1, 6.9], // the roof window of the house on Lennie's right, above its window column
   vents: [[3.35, 2.6], [4.3, 1.4], [2.7, -2.6]], // [u, z], clear of the chimney and the dormer
-  // The back, after the photo of Lennie's: the roof comes down to just above
-  // the ground floor, with a wide dormer over both back rooms of floor 2 (its
-  // sides' outer faces), a window for each room, solar panels in rows above it
-  // (each row: its middle's plan distance d behind the ridge, its panels'
-  // middles u) and a roof window beside them. The house on Lennie's left has
-  // panels too.
-  backDormer: [0.375, 6.475],
-  backWindows: [[0.725, 3.725], [4.225, 6.125]],
+  // The back, after the photo of Lennie's (taken from the garden, so its left
+  // is the far end in u): the roof comes down to just above the ground floor,
+  // with a wide dormer over both back rooms of floor 2 (its sides' outer
+  // faces), a window for each room, solar panels in rows above it (each row:
+  // its middle's plan distance d behind the ridge, its panels' middles u) and
+  // the attic's roof window off to the side, at the far end. The house on
+  // Lennie's right (seen from the street) has panels too, by his.
+  backDormer: [1.775, 7.875],
+  backWindows: [[2.125, 3.725], [4.225, 7.525]],
   panels: [
-    { d: 3.154, u: [1.025, 2.035, 3.045, 4.055, 5.065, 6.075] },
-    { d: 2.194, u: [4.025, 5.035, 6.045, 7.055] },
-    { d: 1.234, u: [3.825, 4.835, 5.845] },
+    { d: 3.154, u: [2.175, 3.185, 4.195, 5.205, 6.215, 7.225] },
+    { d: 2.194, u: [1.195, 2.205, 3.215, 4.225] },
+    { d: 1.234, u: [2.405, 3.415, 4.425] },
   ],
   neighbourPanels: [
-    { d: 3.154, u: [2.035, 3.045, 4.055, 5.065] },
-    { d: 2.194, u: [2.035, 3.045, 4.055] },
+    { d: 3.154, u: [5.2, 6.21, 7.22] },
+    { d: 2.194, u: [5.2, 6.21, 7.22] },
   ],
-  roofWindow: [2.125, 2.825],
+  roofWindow: [6.725, 7.425],
   roofWindowD: 2.2,
 };
 
@@ -347,8 +348,8 @@ const STYLES = {
   // index along the row (0 is Lennie's house, the second from the left), mirrored
   // in pairs like the photo: Lennie's window column sits next to its right-hand
   // neighbour's, and its small windows next to its left-hand neighbour's.
-  [-1]: { mirror: true, panel: 0x2f3238, frame: 0xfbfaf6, door: 0x3a3735, roof: ['chimney', 'vents', 'panels'] },
-  [1]: { mirror: true, panel: 0x2e3a54, frame: 0xfbfaf6, door: 0x6b4a33, noToilet: true, roof: ['chimney', 'skylight', 'vents'] },
+  [-1]: { mirror: true, panel: 0x2f3238, frame: 0xfbfaf6, door: 0x3a3735, roof: ['chimney', 'vents'] },
+  [1]: { mirror: true, panel: 0x2e3a54, frame: 0xfbfaf6, door: 0x6b4a33, noToilet: true, roof: ['chimney', 'skylight', 'vents', 'panels'] },
   [2]: { mirror: false, panel: 0xc8372d, frame: 0xc8372d, door: 0x2f2b29, roof: ['dormer', 'vents'] },
   [3]: { mirror: true, panel: 0xeceae3, frame: 0xfbfaf6, door: 0x2d2b2a, roof: ['dormer'] },
 };

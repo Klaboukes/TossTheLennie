@@ -317,7 +317,7 @@ const FURNITURE = {
   kidsBack: [[-3.875, -3.25, -4.875, -3.25], [-1.25, -0.24, -4.875, -2.8], [-3.875, -2.5, -1.55, -0.88], [-2.3, -1.25, -4.875, -4.0]], // low cabinet, bed, wardrobe, toy box
   bathroom: [[-3.875, -2.95, 1.78, 4.875], [-2.3, -1.62, 4.25, 4.875], [-0.8, -0.24, 2.95, 4.35]], // tub, loo, sink cabinet
   attic: [[-3.875, -2.5, -2.35, -1.6], [-3.875, -2.85, -0.75, 1.65]], // the washing machine and the dryer, the stairwell
-  atticBed: [[2.4, 3.875, 0.25, 2.55], [0.5, 3.3, 2.6, 3.9]], // the bed, the dormer with its low cabinet and its sides
+  atticBed: [[2.4, 3.875, 0.25, 2.55], [0.5, 3.3, 2.6, 3.9]], // the bed, the dormer with its low cabinet
 };
 
 const mats = new Map();
@@ -1927,7 +1927,7 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   // the stairwell and all over the front, where the roof comes down
   const loft = 'attic';
   boxField(loft, -2.2, -0.68, -2.55, -2.55, 0.6);
-  boxField(loft, -2.66, -0.92, 0.62, 1.2);
+  boxField(loft, -2.66, -0.92, 0.95, 0.95); // clear of the way from the stairs to the door in the middle wall
   boxField(loft, -3.6, -0.68, 1.9, 4.22);
   // the washing: powder on the machine, a heap of laundry on the dryer, more in front of them
   put(loft, 'waspoeder', -3.45, WASHER.h, -1.97, { yaw: 0.2 });
