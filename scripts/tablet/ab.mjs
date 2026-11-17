@@ -7,7 +7,7 @@
 //
 // Run `base` twice: the tablet's numbers vary by a frame or two per second
 // from run to run. A variant that gains clearly more than that is real.
-import { connect, sleep, FRAME_RECORDER, TARGETS } from './cdp.mjs';
+import { connect, restartChrome, sleep, FRAME_RECORDER, TARGETS } from './cdp.mjs';
 
 const ROOT = 'let o = lennie.aimRing; while (o.parent) o = o.parent;';
 /** In-page changes to try. Each returns something to print (how many things it changed). */
@@ -46,6 +46,12 @@ VARIANTS.sortMaterial = '(() => { lennie.renderer.setOpaqueSort((a, b) => a.grou
 // Half the solver's work per physics step (changes how Lennie tumbles; only to see what it's worth).
 VARIANTS.iter10 = '(() => { lennie.world.solver.iterations = 10; return 10; })()';
 
+// The game held at one step of its own list of sharpness and shading (QUALITY in main.js: q2 is sharpness 1 with the
+// full shading, q3 the same with the simple shading, q4 that at sharpness 0.75), so watchSpeed() can't change it mid-test.
+for (let q = 0; q < 5; q++) VARIANTS[`q${q}`] = `JSON.stringify(lennie.holdQuality(${q}))`;
+// Sharpness 0.75 with the full shading, which isn't a step of the list (it's where the game ended up before simple shading).
+VARIANTS.full075 = '(() => { lennie.holdQuality(4); lennie.setSimpleShading(false); return "0.75 full"; })()';
+
 const url = process.argv[2];
 const names = process.argv.slice(3);
 if (!url || !names.length || names.some((n) => !(n in VARIANTS))) {
@@ -54,6 +60,7 @@ if (!url || !names.length || names.some((n) => !(n in VARIANTS))) {
 }
 
 for (const name of names) {
+  await restartChrome();
   const t = await connect();
   await t.open(url, 14000);
   await t.key('Escape');

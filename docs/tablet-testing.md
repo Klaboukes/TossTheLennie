@@ -41,8 +41,9 @@ Lennie in aim mode (T, then a click), which repeats well from run to run.
 
 | Script | What it tells you |
 |---|---|
-| `tosses.mjs [url]` | The standard test: 5 throws in the house, 5 in the supermarket, 5 after R. Frames per second and hitches per throw, and any errors. |
-| `ab.mjs <url> base base <variant>…` | A/B experiments: change one thing in the page (hide the clutter, cheaper shading, lower resolution…) and measure 3 house throws, with physics time per frame. |
+| `tosses.mjs [url] [throws] [first]` | The standard test: 5 throws in the house, 5 in the supermarket, 5 after R. Frames per second and hitches per throw, and any errors. The game picks its own sharpness and shading, as for a player; with `first` it forgets what it remembered, as on a first visit. |
+| `ab.mjs <url> base base <variant>…` | A/B experiments: change one thing in the page (hide the clutter, cheaper shading, lower resolution…) and measure 3 house throws, with physics time per frame. `q0`…`q4` hold the game at one step of its own sharpness-and-shading list. |
+| `memory.mjs [url]` | What the game keeps in memory, counted in the page. See [memory.md](memory.md). |
 | `profile.mjs [url]` | A CPU profile of 3 house throws: where the main thread's time goes, by file, by function, and by function with everything it calls. |
 | `draws.mjs [url]` | How many separate things are drawn per frame, by kind, from the start view and turned round. |
 | `still.mjs [url]` | Lennie sitting still in the start view: frames per second, and what limits them (other sharpnesses, nothing drawn, everything drawn into 8 pixels). |
@@ -58,7 +59,14 @@ Lennie in aim mode (T, then a click), which repeats well from run to run.
   scripts first did: open, then reload) crashed the tab the same way ("Aw,
   Snap!"). The scripts now go by way of an empty page. A script that hangs
   without printing anything usually means the tab has crashed, or the tablet
-  has dropped off USB (`adb devices` shows nothing): look at the tablet.
+  has dropped off USB (`adb devices` shows nothing): look at the tablet
+  (`adb exec-out screencap -p > shot.png` shows its screen).
+- **A fresh Chrome for every load.** Each load in the same tab leaves memory
+  behind. After three to five the tablet was swapping, which showed as a
+  frame rate a third lower than it should be, and then the tab crashed.
+  `ab.mjs`, `tosses.mjs`, `still.mjs` and `memory.mjs` now close Chrome and
+  start it again first (`restartChrome()` in `cdp.mjs`); `same.mjs`,
+  `profile.mjs` and `draws.mjs` don't yet.
 - **Aim mode costs something by itself.** The throws are aimed (T), and with
   aim mode on the game works out the aim every frame while Lennie lies waiting.
   In flight it doesn't.
@@ -71,9 +79,10 @@ Lennie in aim mode (T, then a click), which repeats well from run to run.
   at 90 Hz, so the empty page did too). The scripts print errors; read them.
   70 frames a second with an error from three.js meant the tablet had dropped
   the graphics context and the game drew nothing after it (fixed, see below).
-- **The first seconds are slow anyway**: `watchSpeed()` lowers the sharpness in
-  steps (1.5 → 0.75 on this tablet, each step a short stall), and on localhost
-  the flicker check runs for about 15 s. Measure after that.
+- **The first seconds are slow anyway**: `watchSpeed()` lowers the sharpness
+  and the shading in steps (each a short stall; the game remembers where it
+  ended up and starts near there next time), and on localhost the flicker
+  check runs for about 15 s. Measure after that.
 - Heat wasn't a factor: after an hour of tests the chip was at 41 °C, full speed.
 
 ## What we found
@@ -225,8 +234,60 @@ Tried and not worth it:
   the walls that fade one by one (139 meshes with a material each) and the
   storeys that hide one by one.
 
+## Third round: simple shading
+
+Once the main processor's share was down, the graphics chip's showed again
+at sharpness 1. `shading.js` gives the scenery a simple shading for devices
+that can't keep up: the same materials, colours, pictures, lights and fog, but
+only how much light falls on a surface, as a MeshLambertMaterial works it out;
+no shine. The materials stay MeshStandardMaterials (so fading walls, glowing
+screens and the baked products go on working): only their shader program is
+swapped, in the place where `seethrough.js` already adds its lines. Metal is
+darkened by its `metalness`, a little less than the full shading does, to make
+up for the lost glint. In the living room the difference is hard to find in
+two screenshots side by side; polished floors and steel lose their glint.
+Lennie and the window glass keep theirs.
+
+`watchSpeed()` in `main.js` now goes down one list, `QUALITY`: sharpness 1.5,
+1.25, 1, then simple shading at 1, then simple at 0.75. The shine goes before
+the last bit of sharpness because blur shows more. The step is remembered; a
+device that ended on simple shading starts with it (switching mid-visit means
+building the other shader programs, a stall of a second or so), and only gets
+the full shading back after running at 50 frames a second or better with the
+simple one.
+
+Three house throws on the tablet, held at one step (`ab.mjs q2 q3 q4
+full075`, Chrome restarted before each):
+
+| | Frames/s |
+|---|---|
+| Sharpness 1, full shading | 18.7, 20.5 |
+| Sharpness 1, simple shading | 24.3, 28.1, 29.0 |
+| Sharpness 0.75, full shading (where the tablet ended up before) | 25.2, 25.3 |
+| Sharpness 0.75, simple shading (where it ends up now) | 27.0, 30.9, 31.9 |
+
+The standard test with the game choosing for itself (`tosses.mjs`), against
+the second round's numbers above:
+
+| | Second round | First visit | Later visit |
+|---|---|---|---|
+| 5 house throws after loading | 19.8 | 31.4 | 31.9 |
+| 5 supermarket throws | 22.9 | 26.1 | 23.9 |
+| 5 house throws after R | 23.9 | 29.3 | 34.0 |
+
+So the house is at 30 on the tablet now; the supermarket isn't (24–26). At
+0.75 with simple shading the tablet is back at the main processor's limit:
+even at sharpness 0.4 it did 30.7.
+
 ## Next ideas (not done)
 
+- The supermarket, and anything more in the house, is the main processor
+  again: three.js's work per draw call (400–550 calls in flight) and the
+  physics. Fewer calls would mean fewer separate fading walls or hiding
+  storeys in view; `draws.mjs` and `profile.mjs` show where they are.
+- With simple shading, kinds of products that differ only in how rough or
+  metallic they are could share a baked page (`DRAWN` in `products.js` keeps
+  them apart): fewer draw calls, on weak devices only. Not looked into.
 - Physics: what's left of a step is the solver itself (20 passes over ~75
   equations, half the step) and the exact tests between Lennie's parts and
   the scenery near them (a quarter). Fewer passes, or not halving the step
@@ -235,18 +296,12 @@ Tried and not worth it:
 - Putting Lennie's physics to sleep while he lies still. Now that a step is
   cheaper it matters less, and a lot can wake him (cars, the cat, effects that
   let go of him later), so it's easy to get wrong.
-- On weak devices only: cheaper shading (Lambert), and a see-through effect
-  without `discard` in every material (for instance only on the meshes between
-  the camera and Lennie). Each would change the look a little on the tablet,
-  and only pays once the main processor is no longer the limit.
+- On weak devices only: a see-through effect without `discard` in every
+  material (for instance only on the meshes between the camera and Lennie).
+  Without any cut the tablet did 26.5 against 25.3 at sharpness 0.75 with the
+  full shading: within the noise there. Not tried at sharpness 1.
 - Anti-aliasing off on a device that ended up at a low sharpness (it can only
   be chosen when the page loads): not measured.
-- Memory. On the PC: 100 MB of JavaScript, 35 MB of geometry, and 174
-  pictures drawn on canvases, 30 megapixels together: about 160 MB on the
-  graphics chip, and as much again for the canvases themselves, which are
-  kept after the chip has its copy. Only the TV's is ever drawn on again
-  (`tv.js`), so the others could be let go of after the first frame; that
-  needs a way to draw them again when the browser drops the graphics context
-  and wants them back, which this tablet really does (see above: throwing
-  data away without one left the game blank). An older iPad with less memory
-  may close the tab.
+- Memory: one game takes about 1.45 GB of the tablet's 3.9 GB, and a few
+  loads in one tab crash it. What's known, how to measure it and what to try
+  is in [memory.md](memory.md).

@@ -2,15 +2,20 @@
 // supermarket, 5 more in the house after tidying up (R). Prints frames per
 // second and hitches for each, and any errors.
 //
-//   node scripts/tablet/tosses.mjs [url] [throws per place]
+//   node scripts/tablet/tosses.mjs [url] [throws per place] [first]
 //
 // url defaults to the main checkout's game; for a worktree use
 // http://localhost:5173/.claude/worktrees/<name>/index.html
-import { connect, sleep, GAME, TARGETS, FRAME_RECORDER, frameStats } from './cdp.mjs';
+import { connect, restartChrome, sleep, GAME, TARGETS, FRAME_RECORDER, frameStats } from './cdp.mjs';
 
 const url = process.argv[2] ?? GAME;
 const throws = Number(process.argv[3] ?? 5);
+await restartChrome();
 const t = await connect();
+// With `first` as the third argument the game forgets what it remembered about
+// this device's speed, so it starts as on a first visit: full sharpness and
+// shading, stepping down while the test runs.
+if (process.argv[4] === 'first') await t.eval("localStorage.removeItem('toss-the-lennie:quality'), true");
 await t.open(url, 1500);
 await t.eval(FRAME_RECORDER);
 await sleep(12000);
@@ -45,7 +50,7 @@ await place('house', () => t.key('Escape'));
 await place('supermarket', () => t.key('Digit5'));
 await place('house after R', () => t.key('KeyR'));
 const sharp = await t.eval(`(() => { const c = document.getElementById('scene'); return +(c.width / c.clientWidth).toFixed(2); })()`);
-console.log('sharpness at the end (pixel ratio; watchSpeed lowers it on a slow device):', sharp);
+console.log('sharpness at the end (pixel ratio; watchSpeed lowers it on a slow device):', sharp, '- shading:', await t.eval("window.lennie.simpleShading?.() ? 'simple' : 'full'"));
 console.log(t.errors.length ? t.errors.join('\n') : 'no errors');
 t.close();
 process.exit(0);

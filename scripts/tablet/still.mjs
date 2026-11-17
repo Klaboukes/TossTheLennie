@@ -5,9 +5,10 @@
 // the graphics chip isn't what's slow.
 //
 //   node scripts/tablet/still.mjs [url]
-import { connect, sleep, GAME, FRAME_RECORDER } from './cdp.mjs';
+import { connect, restartChrome, sleep, GAME, FRAME_RECORDER } from './cdp.mjs';
 
 const url = process.argv[2] ?? GAME;
+await restartChrome();
 const t = await connect();
 await t.open(url, 22000); // (past the flicker check, which runs in the first ~15 s on localhost)
 await t.key('Escape');

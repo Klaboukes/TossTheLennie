@@ -5,7 +5,40 @@
 // Shared by the other scripts here: connect to the game's tab, load the page
 // fresh, press keys, click, take screenshots, and run code in the page.
 
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const ADB = [process.env.ADB, `${process.env.LOCALAPPDATA}/Android/Sdk/platform-tools/adb.exe`].find((p) => p && existsSync(p)) ?? 'adb';
+
+/**
+ * Closes Chrome on the tablet and starts it again with one light tab, so the
+ * next load of the game gets a fresh process. Every load in the same tab
+ * leaves memory behind: after a handful the tablet was swapping (which showed
+ * as a much lower frame rate in the measurement) and then closed the tab
+ * ("Aw, Snap!"). Does nothing, and returns false, when no tablet is plugged
+ * in (a headless Chrome on the PC).
+ */
+export async function restartChrome() {
+  const adb = (...args) => execFileSync(ADB, args, { encoding: 'utf8', timeout: 20000, stdio: ['ignore', 'pipe', 'ignore'] });
+  try {
+    if (!/\tdevice/.test(adb('devices'))) return false;
+  } catch {
+    return false;
+  }
+  adb('shell', 'am', 'force-stop', 'com.android.chrome');
+  await sleep(2000);
+  // (a folder's listing from the game's server: nearly nothing, and on the address connect() looks for)
+  adb('shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'http://localhost:5173/docs/', 'com.android.chrome');
+  await sleep(5000);
+  // Chrome brings its old tabs back too (the game, at least): close them.
+  const pages = (await (await fetch('http://127.0.0.1:9222/json')).json()).filter((p) => p.type === 'page');
+  const keep = pages.find((p) => p.url.endsWith('/docs/')) ?? pages[0];
+  for (const p of pages) if (p !== keep) await fetch(`http://127.0.0.1:9222/json/close/${p.id}`);
+  await sleep(1000);
+  return true;
+}
 
 /** Where the tablet's Chrome finds the game: the PC's server through `adb reverse`. */
 export const GAME = 'http://localhost:5173/index.html';
@@ -66,7 +99,7 @@ export async function connect({ match = 'localhost:5173' } = {}) {
       // the next one loads: two at once ran the tablet out of memory, and the
       // tab crashed ("Aw, Snap!", after which nothing here gets an answer).
       await send('Page.navigate', { url: 'about:blank' });
-      await sleep(1500);
+      await sleep(4000); // (1.5 s wasn't always enough: after a few dozen loads in a row the tab crashed all the same)
       await send('Page.navigate', { url });
       await sleep(wait + 1500);
     },

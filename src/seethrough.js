@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { simplify, shadingKey } from './shading.js';
 
 // Keeps Lennie in view. Everything between the camera and him, inside a
 // circle around him on screen, is cut away: shelves, freezers, furniture,
@@ -82,7 +83,9 @@ const FRAGMENT_BODY = `
 `;
 
 // One shared function, so three.js compiles one program per material type.
+// (On a slow device the scenery's shading is swapped for a simpler one here too: see shading.js.)
 function patchShader(shader) {
+  simplify(shader);
   Object.assign(shader.uniforms, uniforms);
   shader.vertexShader = VERTEX_HEAD + shader.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>\n${VERTEX_BODY}`);
   shader.fragmentShader = FRAGMENT_HEAD + shader.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>\n${FRAGMENT_BODY}`);
@@ -110,6 +113,7 @@ export function createSeeThrough(scene, renderer, skip) {
     }
     patched.add(mat);
     mat.onBeforeCompile = patchShader;
+    mat.customProgramCacheKey = shadingKey;
     mat.needsUpdate = true;
   }
 

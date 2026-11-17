@@ -16,6 +16,7 @@ import { createCars } from './cars.js';
 import { createCat } from './cat.js';
 import { Challenges, CHALLENGES, CHALLENGE_BONUS } from './challenges.js';
 import { createSeeThrough } from './seethrough.js';
+import { setSimpleShading, simpleShading } from './shading.js';
 import { combineScenery, prewarmFades } from './batching.js';
 import { bakeStocks } from './products.js';
 import { sceneryParts, reportFlicker } from './flickercheck.js';
@@ -110,29 +111,46 @@ const canvas = $('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 // Sharpness: phones and tablets have 2-3 screen pixels per CSS pixel. 1.5
 // looks nearly as sharp and is far less work. If the game still runs slowly,
-// watchSpeed() steps it down further.
-const SHARPNESS = [1.5, 1.25, 1, 0.75];
+// watchSpeed() goes down this list a step at a time: less sharp first, then
+// the scenery without its shine (shading.js), then less sharp again. (The
+// shine goes before the last bit of sharpness: at 0.75 everything is blurry,
+// which shows much more.)
+const QUALITY = [
+  { sharpness: 1.5, simple: false },
+  { sharpness: 1.25, simple: false },
+  { sharpness: 1, simple: false },
+  { sharpness: 1, simple: true },
+  { sharpness: 0.75, simple: true },
+];
+const FIRST_SIMPLE = QUALITY.findIndex((q) => q.simple);
 // A device that had to step down last time starts one step above where it
 // ended up, rather than at the top again: at full sharpness a budget tablet
 // managed 11 frames a second, and spent the first twenty seconds or so of
 // every visit stepping down from it. (One step above, so a device that was only slow for a moment
-// last time, with something else running, gets back up over a few visits.)
-const SHARPNESS_KEY = 'toss-the-lennie:sharpness';
-function rememberSharpness(value) {
-  try { localStorage.setItem(SHARPNESS_KEY, String(value)); } catch { /* storage unavailable */ }
+// last time, with something else running, gets back up over a few visits.
+// Not from simple shading to full, though: switching shading while the game
+// runs stalls it for a moment, and a device that needs the simple one would
+// get that stall on every visit. It only gets the shine back after running
+// really fast without it.)
+const QUALITY_KEY = 'toss-the-lennie:quality';
+function rememberQuality(level) {
+  try { localStorage.setItem(QUALITY_KEY, String(level)); } catch { /* storage unavailable */ }
 }
-let startSharpness = SHARPNESS[0];
+let quality = 0;
 try {
-  const i = SHARPNESS.indexOf(Number(localStorage.getItem(SHARPNESS_KEY)));
-  if (i > 0) startSharpness = SHARPNESS[i - 1];
+  const was = Number(localStorage.getItem(QUALITY_KEY));
+  if (Number.isInteger(was) && was > 0 && was < QUALITY.length) quality = was === FIRST_SIMPLE ? was : was - 1;
 } catch { /* storage unavailable */ }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, startSharpness));
+const sharpnessOf = (q) => Math.min(window.devicePixelRatio, q.sharpness);
+setSimpleShading(QUALITY[quality].simple);
+renderer.setPixelRatio(sharpnessOf(QUALITY[quality]));
 renderer.setSize(innerWidth, innerHeight);
 const SLOW_FRAME = 1 / 28; // seconds: slower than about 28 frames a second on average is too slow
 const CRAWL_FRAME = 1 / 16; // slower than this, it goes down two steps at once
-const speed = { wait: 3, frames: 0, time: 0, good: 0 }; // wait: seconds before measuring (the first frames are slow anyway)
+const FAST_FRAME = 1 / 50; // this fast with simple shading, and the next visit gets the full shading again
+const speed = { wait: 3, frames: 0, time: 0, good: 0, fast: 0 }; // wait: seconds before measuring (the first frames are slow anyway)
 
-/** On a device that can't keep up, draws the picture a bit less sharp (it never goes back up during a visit). */
+/** On a device that can't keep up, draws the picture a bit less sharp or less shiny (it never goes back up during a visit). */
 function watchSpeed(seconds) {
   if (document.hidden || seconds > 0.25) return; // a tab switch or a hiccup, not the game being slow
   if (speed.wait > 0) {
@@ -146,18 +164,37 @@ function watchSpeed(seconds) {
   const frame = speed.time / speed.frames;
   speed.frames = speed.time = 0;
   if (frame <= SLOW_FRAME) {
-    // Keeping up for a good while at this sharpness: that's where the next visit may start from.
-    if (++speed.good === 10) rememberSharpness(SHARPNESS.find((s) => s <= renderer.getPixelRatio() + 0.01) ?? SHARPNESS.at(-1));
+    // Keeping up for a good while like this: that's where the next visit may start from.
+    if (frame <= FAST_FRAME) speed.fast++;
+    if (++speed.good === 10) rememberQuality(QUALITY[quality].simple && speed.fast === 10 ? FIRST_SIMPLE - 1 : quality);
     return;
   }
-  speed.good = 0;
-  const lower = SHARPNESS.filter((s) => s < renderer.getPixelRatio() - 0.01);
-  if (!lower.length) return;
-  const next = lower[frame > CRAWL_FRAME ? Math.min(1, lower.length - 1) : 0];
-  renderer.setPixelRatio(next);
+  speed.good = speed.fast = 0;
+  if (quality === QUALITY.length - 1) return;
+  const was = QUALITY[quality];
+  for (let steps = frame > CRAWL_FRAME ? 2 : 1; steps > 0 && quality < QUALITY.length - 1; steps--) {
+    // (on a screen with one pixel per CSS pixel the first steps change nothing: skip those)
+    const from = QUALITY[quality];
+    do quality++; while (quality < QUALITY.length - 1 && QUALITY[quality].simple === from.simple && sharpnessOf(QUALITY[quality]) === sharpnessOf(from));
+  }
+  const now = QUALITY[quality];
+  if (sharpnessOf(now) < sharpnessOf(was)) {
+    renderer.setPixelRatio(sharpnessOf(now));
+    renderer.setSize(innerWidth, innerHeight);
+  }
+  setSimpleShading(now.simple, scene);
+  rememberQuality(quality);
+  speed.wait = now.simple !== was.simple ? 4 : 1; // (the new shading's programs are built in the first frames after the switch)
+}
+
+/** For measuring (scripts/tablet): puts the game at one step of QUALITY and keeps it there for the rest of the visit. */
+function holdQuality(level) {
+  quality = clamp(level, 0, QUALITY.length - 1);
+  renderer.setPixelRatio(sharpnessOf(QUALITY[quality]));
   renderer.setSize(innerWidth, innerHeight);
-  rememberSharpness(next);
-  speed.wait = 1;
+  setSimpleShading(QUALITY[quality].simple, scene);
+  speed.wait = Infinity;
+  return QUALITY[quality];
 }
 // Solid scenery is drawn in the order of its shader programs (then its
 // materials, as three.js does by itself): a few dozen programs are shared by
@@ -3577,6 +3614,8 @@ requestAnimationFrame(frame);
 window.lennie = {
   lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, effects, trolley, cars, cat, replay, renderer,
   FEEL, launch, dropLennie, // (throw him at a THREE.Vector3 velocity, put him back on a floor)
+  simpleShading, setSimpleShading: (on) => setSimpleShading(on, scene), // (the scenery without its shine, as on a slow device)
+  holdQuality, quality: () => quality, // (the step of sharpness and shading the game is at; hold it at one for measuring)
   slingLift, aimLift, launchLift, centerOfMass, // (the helping hand up the stairs: plan a throw, then throw him as planned)
   advance(seconds) {
     for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60, performance.now());
