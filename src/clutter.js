@@ -1875,8 +1875,8 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   strew(bathroom, ['towelWhite', 'towelBlue', 'heapGrey', 'sockWhite', 'underpants', 'shirtKid', 'shampoo'], 10, { how: lying });
 
   // ---------------------------------------------------------------- the attic: the loft and the bedroom
-  // Boxes stacked everywhere the floor plan leaves free, as high as the
-  // sloping roof lets them, each with its stuff inside (it comes flying out
+  // Stacks of boxes here and there where the floor plan leaves room, up to
+  // three high and no higher than the sloping roof lets them, each with its stuff inside (it comes flying out
   // when Lennie knocks the box over), and junk on the floor between them.
   // Kept clear: the top of the stairs, the way from there to the middle
   // wall's door, and on the other side the way from that door to the bed.
@@ -1895,11 +1895,11 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   const roofAbove = (z) => ATTIC_ROOF(z) - 2 * H; // the roof's height above the attic floor
   /** A stack of boxes at (x, z), each filled with its stuff, no higher than the roof over its outer edge. */
   function boxStack(room, x, z) {
-    const maxH = roofAbove(Math.abs(z) + 0.28) - 0.06;
+    const maxH = roofAbove(Math.abs(z) + 0.28) - 0.06; // and at most three high
     const yaw = (rnd() < 0.5 ? 0 : Math.PI / 2) + (rnd() - 0.5) * 0.2;
     let below = null;
     let h = 0;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       const id = pickOf(BOXES);
       const [bx, by, bz] = half(id);
       if (h + 2 * by > maxH) break;
@@ -1921,8 +1921,8 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
     }
     if (below) strewn.push({ k: 2, x, z, size: 0.3 }); // the junk on the floor stays clear of it
   }
-  /** Stacks of boxes on a grid of centres, most spots taken. */
-  function boxField(room, x0, x1, z0, z1, keep = 0.8) {
+  /** Stacks of boxes on a grid of centres, some spots taken (all of them was too much). */
+  function boxField(room, x0, x1, z0, z1, keep = 0.4) {
     const STEP = 0.58; // the biggest box, a little turned, is under 0.54 m across
     for (let x = x0; x <= x1 + 1e-6; x += STEP) {
       for (let z = z0; z <= z1 + 1e-6; z += STEP) if (rnd() < keep) boxStack(room, x + (rnd() - 0.5) * 0.04, z + (rnd() - 0.5) * 0.04);
@@ -1936,7 +1936,7 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   // the loft: behind the washing machine and the dryer, along the back,
   // beside the stairwell and all over the front, where the roof comes down
   const loft = 'attic';
-  boxField(loft, -3.55, -2.97, -4.32, -4.32, 0.9);
+  boxField(loft, -3.55, -2.97, -4.32, -4.32, 0.5);
   boxField(loft, -2.2, -0.68, -4.25, -3.09);
   boxField(loft, -2.66, -0.92, 0.62, 1.2);
   boxField(loft, -3.6, -0.68, 1.9, 4.22);
@@ -1950,10 +1950,10 @@ export function buildClutter({ box, body, groups, std, physMats, H, garage }) {
   // the bedroom: boxes all over the back, and along the side wall up to the
   // bed, and a few in the corners beside the dormer
   const attic = 'atticBed';
-  boxField(attic, 0.07, 3.55, -4.25, -2.51, 0.75);
-  boxField(attic, 1.52, 3.26, -1.9, -1.32, 0.75);
-  boxField(attic, 0.1, 0.1, 2.9, 4.06, 0.9);
-  boxField(attic, 3.6, 3.6, 2.95, 3.53, 0.9);
+  boxField(attic, 0.07, 3.55, -4.25, -2.51, 0.35);
+  boxField(attic, 1.52, 3.26, -1.9, -1.32, 0.35);
+  boxField(attic, 0.1, 0.1, 2.9, 4.06, 0.5);
+  boxField(attic, 3.6, 3.6, 2.95, 3.53, 0.5);
   // on the bed, and on the low cabinet under the window
   put(attic, 'teddy', 3.2, 0.69, 0.75, { yaw: Math.PI });
   put(attic, 'blanket', 3.05, 0.61, 1.95, { yaw: 0.3 });
