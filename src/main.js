@@ -16,7 +16,8 @@ import { createCars } from './cars.js';
 import { createCat } from './cat.js';
 import { Challenges, CHALLENGES, CHALLENGE_BONUS } from './challenges.js';
 import { createSeeThrough } from './seethrough.js';
-import { combineScenery } from './batching.js';
+import { combineScenery, prewarmFades } from './batching.js';
+import { bakeStocks } from './products.js';
 import { sceneryParts, reportFlicker } from './flickercheck.js';
 import { createBlobShadow } from './blobshadow.js';
 import { tunePhysics } from './broadphase.js';
@@ -2332,6 +2333,8 @@ const notScenery = (o) => {
 // little at a time once the game runs. The live game skips it.
 const DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 const builtParts = DEV ? sceneryParts(scene, notScenery) : null;
+// The products and clutter in their places go into a few baked meshes (products.js).
+bakeStocks();
 // Everything is built: glue the scenery that never moves into a few big
 // meshes, so weak tablets and phones have far less to draw (batching.js).
 combineScenery(scene, notScenery);
@@ -3443,6 +3446,13 @@ function frame(now) {
   if (loading) {
     loading.remove();
     loading = null;
+    // (now, while the game is still starting, rather than the first time a wall fades)
+    prewarmFades(renderer, scene, camera, [...house.fadeMaterials(), ...shop.fadeMaterials()]);
+    // Products only drawn once knocked (products.js bakes them in place): their
+    // pictures go to the graphics chip now, not all at once when a shelf comes down.
+    scene.traverse((o) => {
+      if (o.isInstancedMesh && o.userData.products) for (const m of [].concat(o.material)) if (m.map) renderer.initTexture(m.map);
+    });
   }
 }
 let loading = $('loading');
@@ -3498,7 +3508,7 @@ requestAnimationFrame(frame);
 // Handy for debugging from the console. advance() runs the game loop by hand,
 // e.g. when the tab is in the background and requestAnimationFrame is paused.
 window.lennie = {
-  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, effects, trolley, cars, cat, replay,
+  lennie, world, camera, controls, toss, stats, house, guard, aim, aimRing, zap, effects, trolley, cars, cat, replay, renderer,
   FEEL, launch, dropLennie, // (throw him at a THREE.Vector3 velocity, put him back on a floor)
   slingLift, aimLift, launchLift, centerOfMass, // (the helping hand up the stairs: plan a throw, then throw him as planned)
   advance(seconds) {

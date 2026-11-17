@@ -26,6 +26,7 @@ export class StuckGuard {
     this.rescues = 0;
     this.totalRescues = 0; // for debugging
     this.scenery = [];
+    this.near = []; // (reused by nearScenery())
   }
 
   /** Call once the house and yard are built. */
@@ -40,8 +41,40 @@ export class StuckGuard {
     this.rescues = 0;
   }
 
-  isEmbedded(p) {
+  /**
+   * The scenery whose box reaches Lennie's parts: the only pieces any of them
+   * can be inside. Checking every part against all the ~500 pieces of
+   * scenery after each physics step cost a low-end tablet 4-5 ms a frame; one
+   * pass to pick out the few near him first makes it close to nothing.
+   */
+  nearScenery() {
+    let x0 = Infinity, y0 = Infinity, z0 = Infinity;
+    let x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+    for (const { position: p } of this.bodies) {
+      if (p.x < x0) x0 = p.x;
+      if (p.y < y0) y0 = p.y;
+      if (p.z < z0) z0 = p.z;
+      if (p.x > x1) x1 = p.x;
+      if (p.y > y1) y1 = p.y;
+      if (p.z > z1) z1 = p.z;
+    }
+    const near = this.near;
+    near.length = 0;
     for (const b of this.scenery) {
+      if (!b.world) continue;
+      if (b.shapes[0].type !== PLANE) {
+        const lo = b.aabb.lowerBound;
+        const hi = b.aabb.upperBound;
+        if (x1 < lo.x || x0 > hi.x || y1 < lo.y || y0 > hi.y || z1 < lo.z || z0 > hi.z) continue;
+      }
+      near.push(b);
+    }
+    return near;
+  }
+
+  /** Is point p deep inside a piece of scenery? (from `scenery`: all of it, or just nearScenery()) */
+  isEmbedded(p, scenery = this.scenery) {
+    for (const b of scenery) {
       if (!b.world) continue; // a smashed window or door
       const shape = b.shapes[0];
       if (shape.type !== PLANE) {
@@ -85,7 +118,11 @@ export class StuckGuard {
    * 'lost' (no good pose to go back to; the caller should respawn him).
    */
   check() {
-    const bad = this.isTornApart() || this.bodies.some((b) => this.isEmbedded(b.position));
+    let bad = this.isTornApart();
+    if (!bad) {
+      const near = this.nearScenery();
+      bad = this.bodies.some((b) => this.isEmbedded(b.position, near));
+    }
     if (!bad) {
       this.bodies.forEach((b, i) => {
         const s = this.snapshot[i];

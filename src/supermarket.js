@@ -3,6 +3,7 @@ import * as CANNON from 'cannon-es';
 import { floorGeometry, meterBoxUVs } from './textures.js';
 import { createStock, ASSORTMENT, PRODUCTS, halfSize } from './products.js';
 import { CLEAR_NEAR, CLEAR_FAR } from './house.js';
+import { setFade } from './batching.js';
 
 // The supermarket across the road, after the real one: a long orange box
 // under a zigzag of grey gables, with a brick-and-glass entrance and a big
@@ -201,7 +202,9 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
     if (!clone) {
       clone = mat.clone();
       clone.userData.baseOpacity = mat.transparent ? mat.opacity : 1;
-      clone.transparent = true;
+      // see-through only while it fades (see setFade in batching.js), unless it's glass anyway
+      clone.userData.fades = true;
+      clone.userData.seeThrough = mat.transparent;
       entry.cache.set(mat, clone);
       entry.mats.add(clone);
       matLine.set(clone, entry);
@@ -1342,6 +1345,7 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
       for (const m of entry.mats) {
         m.opacity = entry.opacity * m.userData.baseOpacity;
         m.depthWrite = entry.opacity > 0.95 && m.userData.baseOpacity === 1;
+        setFade(m, entry.opacity < 1);
       }
     }
   }
@@ -1408,7 +1412,8 @@ export function buildSupermarket(scene, world, physMats, { std, tex }) {
   // the sliding doors, between the checkouts, the fruit crates and the aisles.
   const spawnPoint = () => ({ x: -4.5, z: 34.4, height: 0.05 });
 
-  const api = { isInside, isOnRoof, spawnPoint, updateView, isFaded, spots, windows, breakPiece, repairAll, update };
+  const fadeMaterials = () => [...lines.values()].flatMap((e) => [...e.mats]);
+  const api = { isInside, isOnRoof, spawnPoint, updateView, fadeMaterials, isFaded, spots, windows, breakPiece, repairAll, update };
   for (const piece of windows) piece.owner = api;
   return api;
 }

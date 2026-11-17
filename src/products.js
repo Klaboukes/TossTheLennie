@@ -894,24 +894,35 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
     }
   }
 
-  // Products move around, but only inside their room (or the shop) and not far
-  // above where they stand. A sphere around that area does as a kind's bounds,
-  // so it's only drawn when that area is in view.
-  function areaOf(k) {
-    const box = new THREE.Box3();
-    for (const item of k.items) {
-      const b = boundsOf(item);
-      box.expandByPoint(_v.set(b.x0, item.home.y - 1, b.z0));
-      box.expandByPoint(_v.set(b.x1, item.home.y + 3, b.z1));
+  // A kind is only drawn when the sphere around its products is in view. That
+  // sphere hugs where they are now (worked out again whenever one of them
+  // moves), not the whole room or shop they might fly about in: on a low-end
+  // tablet the few hundred kinds in the house were each drawn every frame,
+  // wherever the camera looked, and that cost more than anything else.
+  const moved = new Set(); // kinds whose sphere needs working out again
+  const _box = new THREE.Box3();
+  function fitBounds(k) {
+    _box.makeEmpty();
+    for (const item of k.items) if (instanceShown(item)) _box.expandByPoint(item.pos);
+    const s = k.mesh.boundingSphere;
+    if (_box.isEmpty()) {
+      s.center.set(0, -1000, 0); // nothing to show: never in view
+      s.radius = 0;
+      return;
     }
-    return box.getBoundingSphere(new THREE.Sphere());
+    _box.getBoundingSphere(s);
+    s.radius += Math.hypot(...k.half);
+  }
+  function refreshBounds() {
+    for (const k of moved) fitBounds(k);
+    moved.clear();
   }
 
   function build() {
     for (const k of kinds.values()) {
       const look = lookOf(k.p);
       const mesh = new THREE.InstancedMesh(look.geo, look.material, k.items.length);
-      mesh.boundingSphere = areaOf(k);
+      mesh.boundingSphere = new THREE.Sphere();
       if (k.tinted) {
         for (const item of k.items) mesh.setColorAt(item.idx, _color.set(item.tint ?? 0xffffff));
         mesh.instanceColor.needsUpdate = true;
@@ -923,10 +934,19 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
     restock();
   }
 
+  /**
+   * Whether its kind's InstancedMesh shows it: not while it's hidden or
+   * smashed, nor while it stands where it belongs and bake() has put it in a
+   * baked mesh (it only comes out of there once it's knocked).
+   */
+  const instanceShown = (item) => item.state !== 'hidden' && item.state !== 'broken' && !(item.baked && item.state === 'home');
+
   function write(item) {
-    _m.compose(item.pos, item.quat, item.state === 'hidden' || item.state === 'broken' ? _none : _one);
+    if (item.baked && item.state !== 'home') for (const hide of item.baked) hide();
+    _m.compose(item.pos, item.quat, instanceShown(item) ? _one : _none);
     item.k.mesh.setMatrixAt(item.idx, _m);
     item.k.mesh.instanceMatrix.needsUpdate = true;
+    moved.add(item.k);
   }
 
   function restock() {
@@ -940,10 +960,49 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
       item.rest = item.homeRest;
       if (item.rest) lyingFlat.add(item);
       else lyingFlat.delete(item);
-      _m.compose(item.pos, item.quat, item.shardOf ? _none : _one);
+      _m.compose(item.pos, item.quat, instanceShown(item) ? _one : _none);
       item.k.mesh.setMatrixAt(item.idx, _m);
     }
-    for (const k of kinds.values()) k.mesh.instanceMatrix.needsUpdate = true;
+    for (const k of kinds.values()) {
+      k.mesh.instanceMatrix.needsUpdate = true;
+      fitBounds(k);
+    }
+    moved.clear();
+    for (const b of bakes) b.restore();
+  }
+
+  // ---- baking: everything in its place drawn in a few big meshes
+  // On a low-end tablet each kind's InstancedMesh was a draw call of its own,
+  // and the ground floor alone has some 190 kinds of clutter. Almost all of it
+  // just lies where it belongs, so bake() paints the kinds' pictures onto a
+  // few shared ones (atlas pages) and copies every product in its place into
+  // one mesh per page: a few draw calls for all of it, looking the same. A
+  // product that gets knocked is cut out of its baked mesh and drawn by its
+  // kind's InstancedMesh again; restock() puts it back. A kind made of several
+  // materials (a pan and its metal handle) is baked a material at a time;
+  // kinds whose look can't share a picture (glass) stay as they were.
+  const bakes = [];
+  function bake() {
+    if (bakes.length || !items.length) return;
+    const jobs = [];
+    for (const k of kinds.values()) {
+      const parts = bakeParts(k.mesh.geometry, k.mesh.material);
+      if (!parts) continue;
+      for (const part of parts) jobs.push({ k, ...part, whole: parts.length === 1 });
+    }
+    for (const page of packPages(jobs)) {
+      for (const job of page.jobs) {
+        if (!job.whole) continue; // (several materials: its InstancedMesh keeps them)
+        // its InstancedMesh draws it from the page too: the same shape, pointed at its place there
+        job.k.mesh.geometry = job.geo;
+        job.k.mesh.material = page.material;
+      }
+      const b = bakeMesh(page.jobs, page.material);
+      if (!b) continue;
+      scene.add(b.mesh);
+      bakes.push(b);
+    }
+    restock();
   }
 
   /**
@@ -1146,6 +1205,7 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
 
   /** Moves everything that's falling, bouncing or settling. */
   function update(dt) {
+    refreshBounds(); // (for the ones knocked or smashed since the last frame, too)
     if (!flying.size || dt <= 0) return 0;
     let landed = 0;
     for (const item of flying) {
@@ -1232,6 +1292,7 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
       }
       write(item);
     }
+    refreshBounds(); // where they are now, for this frame's picture
     return landed;
   }
 
@@ -1251,8 +1312,8 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
     item.restQ = new THREE.Quaternion().setFromUnitVectors(_axis, target).multiply(item.quat);
   }
 
-  return {
-    place, fillRow, build, restock, knock, update,
+  const api = {
+    place, fillRow, build, restock, knock, update, bake,
     section: (opts = {}) => ({ items: [], ...opts }),
     /** How many things smashed since the last call, and where the last one did. */
     takeSmashes() {
@@ -1261,5 +1322,337 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
       return { n, point: smashes.point };
     },
     get falling() { return flying.size; },
+  };
+  allStocks.push(api);
+  return api;
+}
+
+// ---------------------------------------------------------------- baking (see bake() in createStock)
+const allStocks = [];
+
+/**
+ * Bakes the products of every stock (the shop's, each floor's clutter). main.js
+ * calls it once everything is built, after the flicker check has noted down
+ * the parts as built.
+ */
+export function bakeStocks() {
+  for (const s of allStocks) s.bake();
+}
+
+const PAGE = 2048; // px: an atlas page is at most this wide and high
+const PAD = 4; // px of a picture's edge repeated round it, so neighbours don't bleed in
+const SWATCH = 16; // px: a plain colour's patch on a page (big enough that seen from afar it doesn't take on its neighbours' colours)
+// How a material is drawn, apart from its colour and picture: kinds that differ
+// in any of these go on different pages.
+const DRAWN = ['roughness', 'metalness', 'side', 'flatShading', 'polygonOffset', 'polygonOffsetFactor', 'polygonOffsetUnits',
+  'depthWrite', 'depthTest', 'colorWrite', 'fog', 'toneMapped', 'wireframe', 'envMapIntensity', 'visible'];
+const OTHER_MAPS = ['normalMap', 'roughnessMap', 'metalnessMap', 'alphaMap', 'aoMap', 'emissiveMap', 'bumpMap', 'lightMap', 'displacementMap', 'envMap'];
+
+/**
+ * How a kind's look goes onto shared pages: a part per material, each with
+ * the triangles drawn with it ({ geo, img, color, material, key }). Null when
+ * it can't: a material that isn't a plain standard one (glass, a glow), or a
+ * picture that repeats or that the corners point outside of.
+ */
+function bakeParts(geo, material) {
+  const mats = [].concat(material);
+  if (!geo.attributes.position || !geo.attributes.normal || Object.keys(geo.morphAttributes).length) return null;
+  // which triangles each material draws (as ranges of the index, or of the corners without one)
+  const total = geo.index ? geo.index.count : geo.attributes.position.count;
+  const groups = geo.groups.length ? geo.groups : [{ start: 0, count: total, materialIndex: 0 }];
+  const ranges = new Map();
+  for (const g of groups) {
+    const m = Array.isArray(material) ? mats[g.materialIndex] : material;
+    if (!m) continue;
+    if (!ranges.has(m)) ranges.set(m, []);
+    ranges.get(m).push([g.start, Math.min(g.start + g.count, total)]);
+  }
+  const parts = [];
+  for (const [m, list] of ranges) {
+    if (!m.visible) continue;
+    if (!m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) return null;
+    if (m.transparent || m.alphaTest || m.vertexColors || m.emissive.getHex() !== 0 || OTHER_MAPS.some((k) => m[k])) return null;
+    if (m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile || m.opacity !== 1) return null;
+    const sub = subGeometry(geo, list);
+    const t = m.map;
+    let img = null;
+    if (t) {
+      img = t.image;
+      if (!img?.width || img.width + 2 * PAD > PAGE || img.height + 2 * PAD > PAGE) return null;
+      if (t.repeat.x !== 1 || t.repeat.y !== 1 || t.offset.x || t.offset.y || t.rotation || !t.flipY) return null;
+      const uv = sub.attributes.uv;
+      if (!uv) return null;
+      for (let i = 0; i < uv.count; i++) {
+        const u = uv.getX(i);
+        const v = uv.getY(i);
+        if (u < -0.001 || u > 1.001 || v < -0.001 || v > 1.001) return null;
+      }
+    }
+    parts.push({ geo: sub, img, color: m.color.getHex(), material: m, key: DRAWN.map((k) => String(m[k])).join('|') });
+  }
+  return parts.length ? parts : null;
+}
+
+/** Just the triangles in `ranges` of `geo` (and only the corners they use), indexed. */
+function subGeometry(geo, ranges) {
+  const index = geo.index;
+  const newOf = new Map();
+  const tris = [];
+  for (const [a, b] of ranges) {
+    for (let i = a; i < b; i++) {
+      const v = index ? index.getX(i) : i;
+      let n = newOf.get(v);
+      if (n === undefined) newOf.set(v, (n = newOf.size));
+      tris.push(n);
+    }
+  }
+  const out = new THREE.BufferGeometry();
+  for (const name of ['position', 'normal', 'uv']) {
+    const src = geo.attributes[name];
+    if (!src) continue;
+    const size = src.itemSize;
+    const arr = new Float32Array(newOf.size * size);
+    for (const [v, n] of newOf) for (let c = 0; c < size; c++) arr[n * size + c] = src.getComponent(v, c);
+    out.setAttribute(name, new THREE.BufferAttribute(arr, size));
+  }
+  out.setIndex(tris);
+  out.computeBoundingSphere();
+  return out;
+}
+
+/**
+ * Puts the kinds' pictures on atlas pages (one set of pages per way of being
+ * drawn), and gives each job its geometry pointed at its place there.
+ * Returns the pages: { material, jobs }.
+ */
+function packPages(jobs) {
+  const byKey = new Map();
+  for (const job of jobs) {
+    if (!byKey.has(job.key)) byKey.set(job.key, []);
+    byKey.get(job.key).push(job);
+  }
+  const pages = [];
+  for (const group of byKey.values()) {
+    // tallest first, in rows across the page
+    group.sort((a, b) => (b.img?.height ?? SWATCH) - (a.img?.height ?? SWATCH));
+    let page = null;
+    let x = 0;
+    let y = 0;
+    let rowH = 0;
+    const slotOf = new Map(); // picture + colour → its place, so kinds sharing a look share it
+    const open = () => {
+      page = { jobs: [], slots: [], first: null, h: 0 };
+      pages.push(page);
+      slotOf.clear();
+      x = y = rowH = 0;
+    };
+    for (const job of group) {
+      const w = (job.img?.width ?? SWATCH) + 2 * PAD;
+      const h = (job.img?.height ?? SWATCH) + 2 * PAD;
+      const id = `${job.img ? job.material.map.uuid : 'plain'}|${job.color}`;
+      if (!page) open();
+      let slot = slotOf.get(id);
+      if (!slot) {
+        if (x + w > PAGE) {
+          x = 0;
+          y += rowH;
+          rowH = 0;
+        }
+        if (y + h > PAGE) open();
+        slot = { x: x + PAD, y: y + PAD, w: w - 2 * PAD, h: h - 2 * PAD, img: job.img, color: job.color };
+        slotOf.set(id, slot);
+        page.slots.push(slot);
+        x += w;
+        rowH = Math.max(rowH, h);
+        page.h = Math.max(page.h, y + h);
+      }
+      page.first ??= job.material;
+      page.jobs.push({ ...job, slot });
+    }
+  }
+  for (const page of pages) {
+    const c = document.createElement('canvas');
+    c.width = PAGE;
+    c.height = Math.max(16, page.h);
+    const g = c.getContext('2d');
+    for (const s of page.slots) paintSlot(g, s);
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 4;
+    const material = page.first.clone();
+    material.map = map;
+    material.color.set(0xffffff);
+    page.material = material;
+    for (const job of page.jobs) job.geo = pointAt(job.geo, job.slot, c.width, c.height);
+  }
+  return pages;
+}
+
+/** Paints a kind's picture (times its colour), or its plain colour, into its slot with a repeated edge round it. */
+function paintSlot(g, s) {
+  const { x, y, w, h, img } = s;
+  const colour = new THREE.Color(s.color).getStyle();
+  if (img) {
+    g.drawImage(img, 0, 0, img.width, img.height, x, y, w, h);
+    // the edge rows and columns stretched out into the padding (corners too)
+    g.drawImage(img, 0, 0, img.width, 1, x, y - PAD, w, PAD);
+    g.drawImage(img, 0, img.height - 1, img.width, 1, x, y + h, w, PAD);
+    g.drawImage(img, 0, 0, 1, img.height, x - PAD, y, PAD, h);
+    g.drawImage(img, img.width - 1, 0, 1, img.height, x + w, y, PAD, h);
+    for (const [sx, sy, dx, dy] of [[0, 0, x - PAD, y - PAD], [img.width - 1, 0, x + w, y - PAD], [0, img.height - 1, x - PAD, y + h], [img.width - 1, img.height - 1, x + w, y + h]]) {
+      g.drawImage(img, sx, sy, 1, 1, dx, dy, PAD, PAD);
+    }
+    if (s.color !== 0xffffff) {
+      g.globalCompositeOperation = 'multiply';
+      g.fillStyle = colour;
+      g.fillRect(x - PAD, y - PAD, w + 2 * PAD, h + 2 * PAD);
+      g.globalCompositeOperation = 'source-over';
+    }
+  } else {
+    g.fillStyle = colour;
+    g.fillRect(x - PAD, y - PAD, w + 2 * PAD, h + 2 * PAD);
+  }
+}
+
+/** A copy of `geo` whose picture positions point at `slot` on a page W × H (a plain colour: its middle). */
+function pointAt(geo, slot, W, H) {
+  const out = geo.clone();
+  const n = out.attributes.position.count;
+  const old = out.attributes.uv;
+  const uv = new Float32Array(n * 2);
+  for (let i = 0; i < n; i++) {
+    // (a canvas texture is flipped: v = 1 is the canvas's top row)
+    const u = slot.img ? old.getX(i) : 0.5;
+    const v = slot.img ? old.getY(i) : 0.5;
+    uv[i * 2] = (slot.x + u * slot.w) / W;
+    uv[i * 2 + 1] = 1 - (slot.y + (1 - v) * slot.h) / H;
+  }
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  out.clearGroups();
+  return out;
+}
+
+
+const _bm = new THREE.Matrix4();
+const _bv = new THREE.Vector3();
+const _bc = new THREE.Color();
+const _rs = new THREE.Sphere();
+const _rayMesh = new THREE.Mesh();
+const _rayHits = [];
+// (once a baked mesh's normals, picture positions and colours are on the graphics chip, they're never needed again here)
+function dropArray() {
+  this.array = null;
+}
+
+/**
+ * One mesh with a copy of every product of `jobs` (a part of a kind each) in
+ * its place: positions, normals, picture positions and, if any is tinted, its
+ * tint as a vertex colour, packed small (a few hundred thousand corners).
+ * Each product is given `baked`, a list of functions that cut it out when
+ * it's knocked; restore() puts them all back.
+ */
+function bakeMesh(jobs, pageMat) {
+  const members = [];
+  let vertices = 0;
+  let indices = 0;
+  let tinted = false;
+  for (const job of jobs) {
+    const geo = job.geo;
+    const n = geo.attributes.position.count;
+    for (const item of job.k.items) {
+      if (item.shardOf) continue; // (a shard is only ever seen flying about)
+      members.push({ item, geo, start: vertices, count: n });
+      vertices += n;
+      indices += geo.index.count;
+      if (item.tint !== null && item.tint !== undefined) tinted = true;
+    }
+  }
+  if (!members.length) return null;
+  const position = new THREE.BufferAttribute(new Float32Array(vertices * 3), 3);
+  const normal = new THREE.BufferAttribute(new Int8Array(vertices * 3), 3, true);
+  const uv = new THREE.BufferAttribute(new Uint16Array(vertices * 2), 2, true);
+  const color = tinted ? new THREE.BufferAttribute(new Uint8Array(vertices * 3), 3, true) : null;
+  const index = new THREE.BufferAttribute(vertices > 65535 ? new Uint32Array(indices) : new Uint16Array(indices), 1);
+  const pos = position.array;
+
+  /** Writes the corners of a product in its place. */
+  function place(m) {
+    const p = m.geo.attributes.position;
+    _bm.compose(m.item.home, m.item.homeQ, _one);
+    for (let i = 0; i < m.count; i++) _bv.fromBufferAttribute(p, i).applyMatrix4(_bm).toArray(pos, (m.start + i) * 3);
+  }
+
+  let at = 0;
+  for (const m of members) {
+    const { geo, start, count, item } = m;
+    const gn = geo.attributes.normal;
+    const guv = geo.attributes.uv;
+    if (color) _bc.set(item.tint ?? 0xffffff);
+    for (let i = 0; i < count; i++) {
+      _bv.fromBufferAttribute(gn, i).applyQuaternion(item.homeQ);
+      normal.setXYZ(start + i, _bv.x, _bv.y, _bv.z);
+      uv.setXY(start + i, guv.getX(i), guv.getY(i));
+      if (color) color.setXYZ(start + i, _bc.r, _bc.g, _bc.b);
+    }
+    for (let i = 0; i < geo.index.count; i++) index.array[at++] = start + geo.index.getX(i);
+    place(m);
+    (item.baked ??= []).push(() => {
+      if (m.hidden) return;
+      m.hidden = true;
+      // all its corners on one point: nothing left to draw
+      for (let i = 0; i < count; i++) item.home.toArray(pos, (start + i) * 3);
+      position.addUpdateRange(start * 3, count * 3);
+      position.needsUpdate = true;
+    });
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', position);
+  geometry.setAttribute('normal', normal.onUpload(dropArray));
+  geometry.setAttribute('uv', uv.onUpload(dropArray));
+  if (color) geometry.setAttribute('color', color.onUpload(dropArray));
+  geometry.setIndex(index.onUpload(dropArray));
+  geometry.computeBoundingSphere();
+  const material = pageMat.clone();
+  material.vertexColors = tinted;
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.matrixAutoUpdate = false;
+  mesh.userData.products = true; // (batching.js leaves it alone)
+  // Aiming (main.js) asks what's under the pointer every frame. Rather than
+  // every triangle of the whole mesh, look only at the products whose sphere
+  // the ray passes through, each in its own shape, as an InstancedMesh does.
+  mesh.raycast = function (raycaster, intersects) {
+    _rs.copy(geometry.boundingSphere).applyMatrix4(this.matrixWorld);
+    if (!raycaster.ray.intersectsSphere(_rs)) return;
+    _rayMesh.material = this.material;
+    for (const m of members) {
+      if (m.hidden) continue;
+      _bm.compose(m.item.home, m.item.homeQ, _one);
+      _rayMesh.matrixWorld.multiplyMatrices(this.matrixWorld, _bm);
+      _rs.copy(m.geo.boundingSphere).applyMatrix4(_rayMesh.matrixWorld);
+      if (!raycaster.ray.intersectsSphere(_rs)) continue;
+      _rayMesh.geometry = m.geo;
+      _rayHits.length = 0;
+      _rayMesh.raycast(raycaster, _rayHits);
+      for (const hit of _rayHits) {
+        hit.object = this;
+        hit.face?.normal.applyQuaternion(m.item.homeQ); // (so it turns with the product, then the mesh)
+        intersects.push(hit);
+      }
+    }
+  };
+  return {
+    mesh,
+    restore() {
+      let any = false;
+      for (const m of members) {
+        if (!m.hidden) continue;
+        m.hidden = false;
+        place(m);
+        any = true;
+      }
+      if (!any) return;
+      position.clearUpdateRanges();
+      position.needsUpdate = true;
+    },
   };
 }

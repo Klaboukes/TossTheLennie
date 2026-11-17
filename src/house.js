@@ -7,6 +7,7 @@ import { buildTV } from './tv.js';
 import { hangDrawings, hangPainting, hangWhiteboard } from './drawings.js';
 import { createLoose } from './loose.js';
 import { parkBikes } from './bikes.js';
+import { setFade } from './batching.js';
 
 // A Dutch terraced house: two brick storeys and an attic under a steep roof,
 // with a dormer. Footprint x ∈ [-4, 4], z ∈ [-5, 5]; the front door faces +z.
@@ -312,13 +313,16 @@ export function buildHouse(scene, world, physMats) {
   const turnedFloor = (k, room) => k === 0 && room.floor === 'wood';
 
   // Each "line" (one wall of one storey, one slab...) fades as a unit when it
-  // blocks the view, so its meshes get their own material clones.
+  // blocks the view, so its meshes get their own material clones. They're only
+  // see-through while they fade (setFade): see-through surfaces cost a low-end
+  // tablet far more to draw, and a wall that isn't fading looks the same solid.
   function lineMat(line, mat) {
     const entry = lines.get(line);
     let clone = entry.cache.get(mat);
     if (!clone) {
       clone = mat.clone();
-      clone.transparent = true;
+      clone.userData.fades = true; // (batching.js keeps it apart, so it can fade on its own)
+      clone.userData.seeThrough = mat.transparent;
       entry.cache.set(mat, clone);
       entry.mats.add(clone);
       matLine.set(clone, entry);
@@ -2144,6 +2148,7 @@ export function buildHouse(scene, world, physMats) {
       for (const m of entry.mats) {
         m.opacity = entry.opacity;
         m.depthWrite = entry.opacity > 0.95;
+        setFade(m, entry.opacity < 1);
       }
     }
   }
@@ -2225,6 +2230,7 @@ export function buildHouse(scene, world, physMats) {
     homeSeat,
     spots,
     updateView,
+    fadeMaterials: () => [...lines.values()].flatMap((e) => [...e.mats]),
     ceilingOver,
     isFaded,
     breakPiece,

@@ -36,6 +36,30 @@ function lookKey(mat) {
 
 const plainCompile = THREE.Material.prototype.onBeforeCompile;
 
+/**
+ * Makes a fading material (one marked `userData.fades`, a wall or roof of the
+ * house or the shop) see-through only while it's faded. A see-through surface
+ * is drawn after all solid ones and blended with what's behind it, which costs
+ * a weak graphics chip far more, so a wall that isn't fading is drawn solid.
+ * (Glass in a fading line, `userData.seeThrough`, always stays see-through.)
+ */
+export function setFade(mat, fading) {
+  const want = fading || !!mat.userData.seeThrough;
+  if (mat.transparent === want) return;
+  mat.transparent = want;
+  mat.needsUpdate = true; // (three.js draws it with another program; prewarmFades() compiled it already)
+}
+
+/**
+ * Compiles the programs a fading material needs while it's see-through, so the
+ * first time a wall fades doesn't stall the game for a moment.
+ */
+export function prewarmFades(renderer, scene, camera, mats) {
+  for (const m of mats) setFade(m, true);
+  renderer.compile(scene, camera);
+  for (const m of mats) setFade(m, false);
+}
+
 /** Splits a mesh with one material per face group into [geometry, material] pairs, all without an index. */
 function pieces(mesh) {
   const geo = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry;
@@ -107,11 +131,11 @@ export function combineScenery(scene, keep) {
     && [].concat(o.material).every((m) => m && m.onBeforeCompile === plainCompile) && !kept(o);
 
   // Materials that look the same become one material, so their meshes can be
-  // combined too. Transparent ones stay apart: the house and the shop fade
-  // their walls by changing those materials' opacity.
+  // combined too. Transparent and fading ones stay apart: the house and the
+  // shop fade their walls by changing those materials' opacity.
   const sameLook = new Map();
   const shared = (mat) => {
-    if (mat.transparent) return mat;
+    if (mat.transparent || mat.userData.fades) return mat;
     const key = lookKey(mat);
     if (!sameLook.has(key)) sameLook.set(key, mat);
     return sameLook.get(key);

@@ -74,7 +74,9 @@ export function sceneryParts(scene, skip = () => false) {
         o.getMatrixAt(i, im);
         matrix.multiply(im);
       }
-      parts.push({ mesh: o, instance: o.isInstancedMesh ? i : -1, matrix });
+      // (its geometry and material as built: products.js bakes the products
+      // afterwards and gives their kinds a shared picture)
+      parts.push({ mesh: o, instance: o.isInstancedMesh ? i : -1, matrix, geometry: o.geometry, material: o.material });
     }
   });
   return parts;
@@ -82,15 +84,14 @@ export function sceneryParts(scene, skip = () => false) {
 
 /** Calls fn(a, b, c, material, firstVertex) for each triangle of `part`, in world space. */
 function eachTriangle(part, fn) {
-  const { mesh, matrix } = part;
-  const geo = mesh.geometry;
+  const { geometry: geo, material, matrix } = part;
   const pos = geo.attributes.position;
   const index = geo.index;
   const vert = (i) => (index ? index.getX(i) : i);
   const count = index ? index.count : pos.count;
-  const groups = Array.isArray(mesh.material)
-    ? geo.groups.map((g) => [g.start, Math.min(g.start + g.count, count), mesh.material[g.materialIndex]])
-    : [[0, count, mesh.material]];
+  const groups = Array.isArray(material)
+    ? geo.groups.map((g) => [g.start, Math.min(g.start + g.count, count), material[g.materialIndex]])
+    : [[0, count, material]];
   for (const [start, end, mat] of groups) {
     if (!mat) continue;
     for (let t = start; t + 2 < end; t += 3) {
@@ -165,8 +166,8 @@ function solidTest(parts, built) {
   const grid = new Map();
   const big = [];
   for (const part of parts) {
-    if (![].concat(part.mesh.material).every((m) => m && built(m).solid)) continue;
-    const geo = part.mesh.geometry;
+    if (![].concat(part.material).every((m) => m && built(m).solid)) continue;
+    const geo = part.geometry;
     if (!geo.boundingBox) geo.computeBoundingBox();
     const solid = { part, bounds: geo.boundingBox.clone().applyMatrix4(part.matrix), mirrored: part.matrix.determinant() < 0 };
     const lo = solid.bounds.min.clone().divideScalar(CELL).floor();
@@ -261,7 +262,7 @@ export async function findFlicker(parts) {
   for (const part of parts) {
     await breathe();
     const { mesh, instance, matrix } = part;
-    const colors = mesh.geometry.attributes.color;
+    const colors = part.geometry.attributes.color;
     const mirrored = matrix.determinant() < 0;
     let color = '';
     if (instance >= 0 && mesh.instanceColor) {
@@ -370,7 +371,7 @@ const f2 = (v) => v.toFixed(2);
 function describe(src) {
   const { mesh, instance, matrix } = src.part;
   const m = src.material;
-  const geo = mesh.geometry;
+  const geo = src.part.geometry;
   let what = geo.type.replace(/Geometry$/, '').toLowerCase();
   if (geo.type === 'BoxGeometry') {
     const s = new THREE.Vector3().setFromMatrixScale(matrix);
