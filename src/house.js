@@ -99,10 +99,10 @@ STAIR.a.zLow = STAIR.zTurn + STAIR.a.straight * STAIR.a.run;
 const WELL = { x0: STAIR.a.x0, x1: STAIR.a.x1, z0: STAIR.a.zHigh, z1: F2.frontZ - INT / 2 };
 const HOLES = { 1: WELL, 2: WELL };
 
-// The baths: on floor 2 along the bathroom's left wall, in the attic in the
+// The baths: on floor 2 all along the bathroom's left wall, in the attic in the
 // dormer under its window. The beanbag in the front kids room, and the attic
 // desk, in front of the stairwell.
-const BATH2 = { x0: IN.x0, x1: -3.0, z0: 2.95, z1: IN.z1 };
+const BATH2 = { x0: IN.x0, x1: -3.0, z0: F2.frontZ + INT / 2, z1: IN.z1 }; // all along the wall, from the bathroom's back wall to its front
 const BATH3 = { x0: 1.0, x1: 2.85, z0: 2.75, z1: 3.75 };
 const BEANBAG = { x: 1.2, z: 3.75 };
 const DESK2 = { z0: 1.75, z1: 3.55 };
@@ -1787,6 +1787,28 @@ export function buildHouse(scene, world, physMats) {
     mirror.position.set(L1 - 0.007, H + 1.6, 3.65);
     for (const m of [basin, tap, tapFoot, mirror]) {
       m.receiveShadow = true;
+      groups[1].add(m);
+    }
+    // The shower over the bath, at the end by the door: a glass screen on the
+    // tub's rim (it shatters like a window), held by a chrome strip on the wall
+    // and edged with one at its free end (the glass's ends tucked into both),
+    // and a shower head on a rail on the left-hand wall.
+    const chrome = col(0xc9ced3, { roughness: 0.25, metalness: 0.7 });
+    const SCREEN = { x: BATH2.x1 - 0.04, z0: BATH2.z0 + 0.01, z1: BATH2.z0 + 0.82, y0: H + 0.55, y1: H + 1.95 };
+    box([SCREEN.x - 0.018, SCREEN.y0, BATH2.z0], [SCREEN.x + 0.018, SCREEN.y1 + 0.02, SCREEN.z0 + 0.02], chrome, { story: 1 });
+    box([SCREEN.x - 0.016, SCREEN.y0, SCREEN.z1 - 0.005], [SCREEN.x + 0.016, SCREEN.y1 + 0.01, SCREEN.z1 + 0.015], chrome, { story: 1 });
+    const pane = { a: SCREEN.z0, b: SCREEN.z1, bottom: SCREEN.y0, top: SCREEN.y1, bars: { v: [], h: [] } };
+    addWindow('z', SCREEN.x, pane, pane, 0.06, 0, 1, 1, null); // (see-through anyway, so it never fades)
+    const zs = BATH2.z0 + 0.4;
+    for (const [geo, x, y, rz] of [
+      [new THREE.BoxGeometry(0.06, 0.08, 0.2), IN.x0 + 0.03, H + 0.9, 0], // the mixer tap
+      [new THREE.CylinderGeometry(0.012, 0.012, 1.1, 10), IN.x0 + 0.03, H + 1.49, 0], // the rail
+      [new THREE.BoxGeometry(0.1, 0.02, 0.02), IN.x0 + 0.07, H + 2.04, 0], // the arm
+      [new THREE.CylinderGeometry(0.07, 0.05, 0.03, 18), IN.x0 + 0.14, H + 2.02, -0.5], // the head, tipped towards the bath
+    ]) {
+      const m = new THREE.Mesh(geo, chrome);
+      m.position.set(x, y, zs);
+      m.rotation.z = rz;
       groups[1].add(m);
     }
     rug(1, 0.55, -3.6, 1.6, -1.6, 0xe8d6f5); // beside the big bed
