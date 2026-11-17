@@ -777,7 +777,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalogue = PRODUCTS }) {
   const kinds = new Map(); // product id → { look, items, mesh }
   const items = [];
-  const lyingFlat = new Set(); // the flat ones lying still (see freeLayer)
+  const lyingFlat = new Set(); // the ones lying still with their top at a height of its own: flat ones and landed ones (see freeLayer)
   const flying = new Set();
   let seed = 7;
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
@@ -1063,25 +1063,27 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
     return Math.abs(e[1]) * hx + Math.abs(e[5]) * hy + Math.abs(e[9]) * hz;
   }
 
-  // ---- flat things lying across each other
-  // Two flat things (shirts, socks, papers) overlapping with their tops at
-  // exactly the same height flicker where they overlap. So each one, when it's
-  // put down and again when it lands, gets lifted by whole millimetres to a
-  // height that no flat thing it overlaps has.
+  // ---- things lying across each other
+  // Two things overlapping with their tops at exactly the same height flicker
+  // where they overlap: flat ones (shirts, socks, papers) lying across each
+  // other, and just as much two board game boxes of the same height that
+  // landed in each other. So each flat one, when it's put down, and anything
+  // at all when it lands, gets lifted by whole millimetres to a height that
+  // nothing it overlaps has.
   const FLAT = 0.012; // lying with less than this above its middle
   const STEP = 0.001;
 
   /**
    * For a product lying flat at pos, turned by q: the height of its top and
    * its outline on the floor (its middle x, z and two half-axes ax, az and bx,
-   * bz). Null if it isn't lying flat.
+   * bz). Null if it isn't lying flat, unless `any` (then whatever its height).
    */
-  function flatRest(k, pos, q) {
+  function flatRest(k, pos, q, any = false) {
     const e = _rm.makeRotationFromQuaternion(q).elements;
     let up = 0;
     for (let i = 1; i < 3; i++) if (Math.abs(e[i * 4 + 1]) > Math.abs(e[up * 4 + 1])) up = i;
     const tall = Math.abs(e[1]) * k.half[0] + Math.abs(e[5]) * k.half[1] + Math.abs(e[9]) * k.half[2];
-    if (tall >= FLAT) return null;
+    if (tall >= FLAT && !any) return null;
     const [i, j] = [0, 1, 2].filter((n) => n !== up);
     return {
       top: pos.y + tall, x: pos.x, z: pos.z,
@@ -1206,8 +1208,9 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
         if (item.t > 0.6 && item.vel.lengthSq() < 0.0004) {
           item.quat.copy(item.restQ);
           item.pos.y = ground + lowest(item);
-          // flat things find a height of their own among the ones they landed across
-          item.rest = flatRest(item.k, item.pos, item.quat);
+          // it finds a height of its own among the ones it landed across, so
+          // two tops don't flicker in one plane (flat things, but also boxes)
+          item.rest = flatRest(item.k, item.pos, item.quat, true);
           if (item.rest) {
             item.layer = freeLayer(item, item.rest);
             item.rest.top += item.layer;
