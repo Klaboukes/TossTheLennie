@@ -70,22 +70,71 @@ export async function restartChrome() {
   adb('shell', 'am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'http://localhost:5173/docs/', 'com.android.chrome');
   await sleep(5000);
   // Chrome brings its old tabs back too (the game, at least): close them.
-  const pages = (await (await fetch('http://127.0.0.1:9222/json')).json()).filter((p) => p.type === 'page');
+  // (Chrome isn't always listening yet: "fetch failed" now and then, so try a few times)
+  let list = null;
+  for (let i = 0; i < 8 && !list; i++) {
+    try { list = await (await fetch('http://127.0.0.1:9222/json')).json(); } catch { await sleep(1500); }
+  }
+  if (!list) throw new Error("Chrome on the tablet doesn't answer on port 9222 (adb forward done? Chrome's first-run screens clicked through?)");
+  const pages = list.filter((p) => p.type === 'page');
   const keep = pages.find((p) => p.url.endsWith('/docs/')) ?? pages[0];
   for (const p of pages) if (p !== keep) await fetch(`http://127.0.0.1:9222/json/close/${p.id}`);
   await sleep(1000);
   return true;
 }
 
+/**
+ * What Android itself counts for Chrome on the tablet, in MB: each process's
+ * memory (PSS) and, of that, graphics memory (`GL mtrack`), plus what the
+ * tablet has left. `graphics` is Chrome's graphics process (where the game's
+ * pictures, meshes and canvases on the chip are counted), `tab` the game's
+ * tab, `chrome` the browser itself. Null without a tablet. See docs/memory.md.
+ */
+export function androidMemory() {
+  const adb = (...args) => execFileSync(ADB, args, { encoding: 'utf8', timeout: 30000, maxBuffer: 1e8, stdio: ['ignore', 'pipe', 'ignore'] });
+  let out;
+  try {
+    if (!/\tdevice/.test(adb('devices'))) return null;
+    out = adb('shell', 'dumpsys', 'meminfo', '--package', 'com.android.chrome');
+  } catch {
+    return null;
+  }
+  const NAMES = { privileged: 'graphics', sandboxed: 'tab', '': 'chrome' };
+  const res = { graphics: 0, graphicsGL: 0, tab: 0, chrome: 0 };
+  let cur = null;
+  for (const line of out.split('\n')) {
+    const m = line.match(/MEMINFO in pid \d+ \[com\.android\.chrome:?([a-z]*)/);
+    if (m) cur = NAMES[m[1]] ?? null;
+    if (!cur) continue;
+    const gl = line.match(/^\s+GL mtrack\s+(\d+)/);
+    if (gl && cur === 'graphics') res.graphicsGL += Math.round(gl[1] / 1024);
+    const total = line.match(/TOTAL PSS:\s+(\d+)/);
+    if (total) res[cur] += Math.round(total[1] / 1024); // (several tabs' processes are added up: keep one tab open)
+  }
+  res.together = res.graphics + res.tab + res.chrome;
+  const info = adb('shell', 'cat', '/proc/meminfo');
+  res.available = Math.round(+info.match(/MemAvailable:\s+(\d+)/)[1] / 1024);
+  res.swapFree = Math.round(+info.match(/SwapFree:\s+(\d+)/)[1] / 1024);
+  return res;
+}
+
 /** Where the tablet's Chrome finds the game: the PC's server through `adb reverse`. */
 export const GAME = 'http://localhost:5173/index.html';
+
+/**
+ * The same address as a player gets the game: `localhost.` with a dot is still
+ * this PC, but the game doesn't take it for a developer's computer, so it
+ * skips the flicker check. That check alone leaves some 300 MB behind in the
+ * tab for a while (see docs/memory.md), which no player ever has.
+ */
+export const asPlayer = (url) => url.replace('//localhost:', '//localhost.:');
 
 /**
  * Connects to the tab showing the game (the first tab on localhost:5173). Keep
  * only one game tab open on the tablet: two copies of the game ran it out of
  * memory and Android closed Chrome.
  */
-export async function connect({ match = 'localhost:5173' } = {}) {
+export async function connect({ match = ':5173' } = {}) {
   await waitForTurn();
   const list = await (await fetch('http://127.0.0.1:9222/json')).json();
   const page = list.find((p) => p.type === 'page' && p.url.includes(match)) ?? list.find((p) => p.type === 'page');

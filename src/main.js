@@ -19,6 +19,7 @@ import { createSeeThrough } from './seethrough.js';
 import { setSimpleShading, simpleShading } from './shading.js';
 import { combineScenery, prewarmFades } from './batching.js';
 import { bakeStocks } from './products.js';
+import { pictureCount, sizeOf } from './pictures.js';
 import { sceneryParts, reportFlicker } from './flickercheck.js';
 import { createBlobShadow } from './blobshadow.js';
 import { tunePhysics } from './broadphase.js';
@@ -3623,6 +3624,7 @@ window.lennie = {
   FEEL, launch, dropLennie, // (throw him at a THREE.Vector3 velocity, put him back on a floor)
   simpleShading, setSimpleShading: (on) => setSimpleShading(on, scene), // (the scenery without its shine, as on a slow device)
   holdQuality, quality: () => quality, // (the step of sharpness and shading the game is at; hold it at one for measuring)
+  pictures: pictureCount, sizeOf, // (how many pictures still hold a canvas, and a texture's size without drawing it again: see pictures.js)
   slingLift, aimLift, launchLift, centerOfMass, // (the helping hand up the stairs: plan a throw, then throw him as planned)
   advance(seconds) {
     for (let t = 0; t < seconds; t += 1 / 60) tick(1 / 60, performance.now());

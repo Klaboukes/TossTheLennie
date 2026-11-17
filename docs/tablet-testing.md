@@ -43,7 +43,10 @@ Lennie in aim mode (T, then a click), which repeats well from run to run.
 |---|---|
 | `tosses.mjs [url] [throws] [first] [nofar]` | The standard test: 5 throws in the house, 5 in the supermarket, 5 after R. Frames per second and hitches per throw, and any errors. The game picks its own sharpness and shading, as for a player; with `first` it forgets what it remembered, as on a first visit. With `nofar` the house and the shop are drawn in full from across the road too (see *Fourth round*). |
 | `ab.mjs <url> base base <variant>…` | A/B experiments: change one thing in the page (hide the clutter, cheaper shading, lower resolution…) and measure 3 house throws, with physics time per frame. `q0`…`q4` hold the game at one step of its own sharpness-and-shading list; `nofar` switches the far copies off. |
-| `memory.mjs [url]` | What the game keeps in memory, counted in the page. See [memory.md](memory.md). |
+| `memory.mjs [url] [dev]` | What the game keeps in memory: counted in the page, and Android's own count for Chrome's processes after loading, after five throws and after a forced clean-up. Loaded as a player gets it; with `dev` as on localhost, flicker check and all. See [memory.md](memory.md). |
+| `breakdown.mjs [process] [prefix] [depth]` | Chrome's own breakdown of its memory, for the game that's open: what the tab's and the graphics process's totals are made of. |
+| `reloads.mjs [url] [reloads]` | Loads the game and reloads it in the same tab a few times, as a kid does, with Android's count after each: does memory pile up, does the tab crash? |
+| `lostcontext.mjs [url]` | Takes the graphics context away and gives it back, twice: does the game come back by itself, and how long does it stand still? |
 | `profile.mjs [url]` | A CPU profile of 3 house throws: where the main thread's time goes, by file, by function, and by function with everything it calls. |
 | `draws.mjs [url]` | How many separate things are drawn per frame, by kind, from the start view and turned round. |
 | `still.mjs [url]` | Lennie sitting still in the start view: frames per second, and what limits them (other sharpnesses, nothing drawn, everything drawn into 8 pixels). |
@@ -79,7 +82,11 @@ Lennie in aim mode (T, then a click), which repeats well from run to run.
   aim mode on the game works out the aim every frame while Lennie lies waiting.
   In flight it doesn't.
 - **On localhost the game is heavier than for players**: the flicker check runs
-  for about 15 s after loading and keeps a copy of the scenery in memory.
+  for about 15 s after loading and leaves some 300 MB of garbage in the tab,
+  which the tablet's browser doesn't clear for a long while (it's most of
+  what "each load leaves behind" above). `http://localhost.:5173/…`, with a
+  dot after localhost, is the same server without the flicker check: what a
+  player gets. The memory scripts load it that way (see [memory.md](memory.md)).
 - **Compare back to back.** The same code varies by 1–3 frames a second between
   runs. Run `base` twice, and the version to compare against right before or after.
 - **A suspiciously perfect result means a crash.** 90 frames a second with
@@ -378,6 +385,5 @@ same thing per shelf, would be the next step there.
   full shading: within the noise there. Not tried at sharpness 1.
 - Anti-aliasing off on a device that ended up at a low sharpness (it can only
   be chosen when the page loads): not measured.
-- Memory: one game takes about 1.45 GB of the tablet's 3.9 GB, and a few
-  loads in one tab crash it. What's known, how to measure it and what to try
-  is in [memory.md](memory.md).
+- Memory: what one game takes on the tablet, what was done about it, how to
+  measure it and what's left to try is in [memory.md](memory.md).

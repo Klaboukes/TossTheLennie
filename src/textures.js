@@ -1,13 +1,12 @@
 import * as THREE from 'three';
+import { drawn, picture } from './pictures.js';
 
 // Procedural canvas textures. Geometry in this project uses UVs measured in
 // metres, so each texture's `repeat` is 1 / (metres covered by one tile).
 
+// (`draw` runs again when the picture is needed again, see pictures.js: start its random numbers inside it)
 function canvasTexture(size, metres, draw) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  draw(c.getContext('2d'), size);
-  const t = new THREE.CanvasTexture(c);
+  const t = drawn(size, size, (g) => draw(g, size));
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(1 / metres, 1 / metres);
@@ -32,8 +31,8 @@ function shade(hex, amount) {
 
 /** Running-bond brickwork, drawn in its own colours (not tinted). */
 function brick(base, mortar, seed) {
-  const r = rng(seed);
   return canvasTexture(512, 1.2, (g, s) => {
+    const r = rng(seed);
     const rows = 12; // 10 cm courses
     const cols = 4; // 30 cm bricks: chunky, comic-sized
     const h = s / rows;
@@ -104,7 +103,7 @@ function grime(kind) {
     g.fillRect(X - rad, Y - rad, rad * 2, rad * 2);
   });
   for (let i = 0; i < 26; i++) smudge(r() * w, r() * h, 20 + r() * 70, 0.03 + r() * 0.05);
-  if (kind === 'ceiling') return finish(c, wM);
+  if (kind === 'ceiling') return finish(c, wM, kind);
   // scuffs and dust along the floor, and a dusty shadow up under the ceiling
   let grad = g.createLinearGradient(0, yAt(0.25), 0, h);
   grad.addColorStop(0, 'rgba(90,80,65,0)');
@@ -183,10 +182,10 @@ function grime(kind) {
     // a long wobbly line, as if someone walked along with a crayon
     stroke(Array.from({ length: 40 }, (_, i) => [2.1 * px + i * 6, yAt(0.82) + Math.sin(i * 0.5) * 4 + jit()]), crayon[2], 1.8);
   }
-  return finish(c, wM);
+  return finish(c, wM, kind);
 }
-function finish(c, wM) {
-  const t = new THREE.CanvasTexture(c);
+function finish(c, wM, kind) {
+  const t = picture(c, () => grime(kind));
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(1 / wM, 1 / 3);
@@ -195,8 +194,8 @@ function finish(c, wM) {
 }
 
 function wood() {
-  const r = rng(7);
   return canvasTexture(512, 2, (g, s) => {
+    const r = rng(7);
     const rows = 10;
     const h = s / rows;
     const tones = ['#c8955f', '#bf8a54', '#d1a06a', '#b98450', '#c99a63'];
@@ -239,8 +238,8 @@ function tiles() {
 }
 
 function carpet() {
-  const r = rng(11);
   return canvasTexture(256, 1, (g, s) => {
+    const r = rng(11);
     g.fillStyle = '#ececec';
     g.fillRect(0, 0, s, s);
     for (let i = 0; i < 5000; i++) {
@@ -252,8 +251,8 @@ function carpet() {
 }
 
 function grass() {
-  const r = rng(3);
   return canvasTexture(512, 4, (g, s) => {
+    const r = rng(3);
     g.fillStyle = '#6fae4f';
     g.fillRect(0, 0, s, s);
     for (let i = 0; i < 9000; i++) {
@@ -272,8 +271,8 @@ function grass() {
 
 /** Dark Dutch roof pantiles: rows of wavy tiles with a highlight on each crest. */
 function pantiles() {
-  const r = rng(5);
   return canvasTexture(256, 1.2, (g, s) => {
+    const r = rng(5);
     const rows = 5;
     const cols = 4;
     const h = s / rows;
@@ -322,8 +321,8 @@ function grooves() {
  * sheets at the tile edge (a sheet is 1.22 m wide).
  */
 function plywood() {
-  const r = rng(31);
   return canvasTexture(256, 1.22, (g, s) => {
+    const r = rng(31);
     g.fillStyle = '#c9a46a';
     g.fillRect(0, 0, s, s);
     // grain: long thin streaks running across the sheet, drawn wrapping so tiles join
@@ -369,8 +368,8 @@ function plywood() {
 }
 
 function stone() {
-  const r = rng(9);
   return canvasTexture(256, 1, (g, s) => {
+    const r = rng(9);
     g.fillStyle = '#8f8a80';
     g.fillRect(0, 0, s, s);
     const n = 2;

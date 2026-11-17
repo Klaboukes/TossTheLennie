@@ -9,6 +9,7 @@ import { createLoose } from './loose.js';
 import { parkBikes } from './bikes.js';
 import { setFade } from './batching.js';
 import { farCopy } from './farview.js';
+import { drawn, picture } from './pictures.js';
 
 // A Dutch terraced house: two brick storeys and an attic under a steep roof,
 // with a dormer. Footprint x ∈ [-4, 4], z ∈ [-5, 5]; the front door faces +z.
@@ -246,7 +247,7 @@ function grilleTexture(length) {
     g.fillStyle = 'rgba(255,240,215,0.25)';
     g.fillRect(x + 2, 0, 2, 64);
   }
-  const t = new THREE.CanvasTexture(c);
+  const t = picture(c, () => grilleTexture(length));
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(length / 0.1, 1);
@@ -1566,14 +1567,12 @@ export function buildHouse(scene, world, physMats) {
       return parts;
     }
     function pianoKeys() {
-      const c = document.createElement('canvas');
-      [c.width, c.height] = [1024, 32];
-      const g = c.getContext('2d');
-      g.fillStyle = '#fbfaf5';
-      g.fillRect(0, 0, c.width, c.height);
-      g.fillStyle = '#8d8a84';
-      for (let i = 1; i < KEYS.n; i++) g.fillRect(Math.round((i / KEYS.n) * c.width) - 1, 0, 2, c.height);
-      const map = new THREE.CanvasTexture(c);
+      const map = drawn(1024, 32, (g, w, h) => {
+        g.fillStyle = '#fbfaf5';
+        g.fillRect(0, 0, w, h);
+        g.fillStyle = '#8d8a84';
+        for (let i = 1; i < KEYS.n; i++) g.fillRect(Math.round((i / KEYS.n) * w) - 1, 0, 2, h);
+      });
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 4;
       const keys = new THREE.Mesh(new THREE.BoxGeometry(KEYS.x1 - KEYS.x0, KEYS.y - KEYS.y0, KEYS.z1 - KEYS.z0), std({ map, roughness: 0.35 }));
@@ -1583,50 +1582,47 @@ export function buildHouse(scene, world, physMats) {
     }
     // An open book of piano music on the music desk, leaning back against the piano.
     function sheetMusic() {
-      const [W, Hh] = [512, 352];
-      const c = document.createElement('canvas');
-      [c.width, c.height] = [W, Hh];
-      const g = c.getContext('2d');
-      g.fillStyle = '#f7f1e1';
-      g.fillRect(0, 0, W, Hh);
-      g.fillStyle = '#d9d0b8';
-      g.fillRect(W / 2 - 2, 0, 4, Hh); // the fold
-      g.strokeStyle = '#2b2b2b';
-      g.fillStyle = '#2b2b2b';
-      let s = 5;
-      const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-      for (const px of [0, W / 2]) {
-        g.fillRect(px + 70, 22, 116, 7); // the title, as a squiggle-free bar
-        for (let row = 0; row < 6; row++) {
-          const top = 50 + row * 49;
-          g.lineWidth = 1.2;
-          for (let l = 0; l < 5; l++) {
-            g.beginPath();
-            g.moveTo(px + 16, top + l * 6);
-            g.lineTo(px + W / 2 - 16, top + l * 6);
-            g.stroke();
-          }
-          g.lineWidth = 1.5;
-          for (const bx of [px + 16, px + 82, px + 148, px + 214, px + W / 2 - 16]) {
-            g.beginPath();
-            g.moveTo(bx, top);
-            g.lineTo(bx, top + 24);
-            g.stroke();
-          }
-          for (let n = 0; n < 12; n++) {
-            const x = px + 30 + n * 18 + (n >> 2) * 2;
-            const y = top - 3 + Math.floor(rnd() * 10) * 3;
-            g.beginPath();
-            g.ellipse(x, y, 4, 3, -0.4, 0, Math.PI * 2);
-            g.fill();
-            g.beginPath();
-            g.moveTo(x + 3.5, y);
-            g.lineTo(x + 3.5, y - 17);
-            g.stroke();
+      const map = drawn(512, 352, (g, W, Hh) => {
+        g.fillStyle = '#f7f1e1';
+        g.fillRect(0, 0, W, Hh);
+        g.fillStyle = '#d9d0b8';
+        g.fillRect(W / 2 - 2, 0, 4, Hh); // the fold
+        g.strokeStyle = '#2b2b2b';
+        g.fillStyle = '#2b2b2b';
+        let s = 5;
+        const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+        for (const px of [0, W / 2]) {
+          g.fillRect(px + 70, 22, 116, 7); // the title, as a squiggle-free bar
+          for (let row = 0; row < 6; row++) {
+            const top = 50 + row * 49;
+            g.lineWidth = 1.2;
+            for (let l = 0; l < 5; l++) {
+              g.beginPath();
+              g.moveTo(px + 16, top + l * 6);
+              g.lineTo(px + W / 2 - 16, top + l * 6);
+              g.stroke();
+            }
+            g.lineWidth = 1.5;
+            for (const bx of [px + 16, px + 82, px + 148, px + 214, px + W / 2 - 16]) {
+              g.beginPath();
+              g.moveTo(bx, top);
+              g.lineTo(bx, top + 24);
+              g.stroke();
+            }
+            for (let n = 0; n < 12; n++) {
+              const x = px + 30 + n * 18 + (n >> 2) * 2;
+              const y = top - 3 + Math.floor(rnd() * 10) * 3;
+              g.beginPath();
+              g.ellipse(x, y, 4, 3, -0.4, 0, Math.PI * 2);
+              g.fill();
+              g.beginPath();
+              g.moveTo(x + 3.5, y);
+              g.lineTo(x + 3.5, y - 17);
+              g.stroke();
+            }
           }
         }
-      }
-      const map = new THREE.CanvasTexture(c);
+      });
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 4;
       const paper = std({ color: 0xf7f1e1, roughness: 0.9 });

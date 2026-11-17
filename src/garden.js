@@ -199,9 +199,10 @@ export function buildGarden(scene, world, physMats, { std, tex, edge }) {
   {
     const face = back + 0.07; // just in front of the planks (back + 0.03) and posts (back + 0.06)
     // weathered: wood grain, grey-brown water stains, and dark damp where they stand in the grass
-    let rs = 7;
-    const r = () => ((rs = (rs * 1664525 + 1013904223) >>> 0) / 4294967296);
     const worn = canvasTexture(128, 128, (g, w, h) => {
+      // (started here, so the picture comes out the same when it's drawn again: see pictures.js)
+      let rs = 7;
+      const r = () => ((rs = (rs * 1664525 + 1013904223) >>> 0) / 4294967296);
       g.fillStyle = '#ffffff';
       g.fillRect(0, 0, w, h);
       for (let i = 0; i < 40; i++) {

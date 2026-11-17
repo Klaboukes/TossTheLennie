@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createStock, PRODUCTS, halfSize } from './products.js';
 import { canvasTexture } from './supermarket.js';
+import { picture } from './pictures.js';
 
 // The mess in Lennie's house: dirty dishes in the kitchen, toys all over the
 // living room and the kids room, clothes everywhere in the bedrooms, and the
@@ -134,7 +135,7 @@ function horseDoorTexture(d, flip, aspect = 256 / 152) {
   dot(39, -42, 2.2);
   g.restore();
 
-  const t = new THREE.CanvasTexture(c);
+  const t = picture(c, () => horseDoorTexture(d, flip, aspect));
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
@@ -228,7 +229,7 @@ function fridgeDoorTexture(aspect) {
     for (let i = 0; i < 6; i++) line('#3b4a8c', 1.4, [-w / 2 + 5, -h / 2 + 9 + i * 9, -w / 2 + 5 + w * (0.4 + ((i * 37) % 5) / 10), -h / 2 + 8 + i * 9]);
   });
   magnet(W * 0.3, 150, '#f2c230');
-  const t = new THREE.CanvasTexture(c);
+  const t = picture(c, () => fridgeDoorTexture(aspect));
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;

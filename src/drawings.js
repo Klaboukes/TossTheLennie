@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { drawn, picture } from './pictures.js';
 
 // The kids' drawings and paintings on the living room's white walls (pictures
 // 0–7), and the framed snapshots of friends in the toilet (8–11: cartoon
@@ -327,7 +328,7 @@ function atlas() {
     g.restore();
   });
 
-  const t = new THREE.CanvasTexture(c);
+  const t = picture(c, atlas);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;
@@ -519,7 +520,7 @@ function townPicture() {
   v.addColorStop(1, 'rgba(40,35,25,0.25)');
   g.fillStyle = v;
   g.fillRect(0, 0, PW, PH);
-  const t = new THREE.CanvasTexture(c);
+  const t = picture(c, townPicture);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
@@ -699,10 +700,7 @@ export function hangWhiteboard({ addMesh, std }, { x, y, z, w, h, face, line }) 
     [w / 2 - B, -h / 2 + B, w / 2, h / 2 - B],
   ]) add(new THREE.BoxGeometry(x1 - x0, y1 - y0, D + 0.005).translate((x0 + x1) / 2, (y0 + y1) / 2, D / 2 - 0.0025), alu);
   // the board, set back in the frame and reaching in under its edges
-  const c = document.createElement('canvas');
-  [c.width, c.height] = [1024, 656];
-  drawWhiteboard(c);
-  const map = new THREE.CanvasTexture(c);
+  const map = drawn(1024, 656, (g) => drawWhiteboard(g.canvas));
   map.colorSpace = THREE.SRGBColorSpace;
   map.anisotropy = 4;
   const board = add(new THREE.PlaneGeometry(w - 2 * B + 0.02, h - 2 * B + 0.02).translate(0, 0, D - 0.008), std({ map, roughness: 0.25 }));

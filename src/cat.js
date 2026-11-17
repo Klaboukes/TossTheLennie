@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { picture } from './pictures.js';
 
 // The family's cat: a fluffy grey-black and white one (a tuxedo, with a white
 // bib, belly, socks and muzzle) that wanders about the living room, the
@@ -303,7 +304,7 @@ function shadowTexture() {
   grad.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, 32, 32);
-  const tex = new THREE.CanvasTexture(c);
+  const tex = picture(c, shadowTexture);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }

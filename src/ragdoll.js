@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { drawn } from './pictures.js';
 
 // Lennie: 50, 1.90 m tall, 100 kg with a bit of a belly, in a worn hoodie and
 // old joggers. His face follows the real Lennie (docs/lennie-face.jpg): short
@@ -264,11 +265,9 @@ function rng(seed) {
   };
 }
 
+// (`draw` runs again when the picture is needed again, see pictures.js: start its random numbers inside it)
 function canvasTexture(size, draw) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  draw(c.getContext('2d'), size);
-  const t = new THREE.CanvasTexture(c);
+  const t = drawn(size, size, (g) => draw(g, size));
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return t;
@@ -276,8 +275,8 @@ function canvasTexture(size, draw) {
 
 /** Marl fabric: flecks of lighter and darker thread, bobbles, and faded patches. */
 function fabricTexture(base, seed, { worn = 6, repeat = 2 } = {}) {
-  const r = rng(seed);
   const t = canvasTexture(256, (g, s) => {
+    const r = rng(seed);
     g.fillStyle = base;
     g.fillRect(0, 0, s, s);
     // faded, washed-out patches
@@ -322,8 +321,8 @@ function ribTexture(base) {
 
 /** Short hair or a scruffy beard: dark strands with flecks of grey. */
 function hairTexture(base, seed, grey) {
-  const r = rng(seed);
   return canvasTexture(128, (g, s) => {
+    const r = rng(seed);
     g.fillStyle = base;
     g.fillRect(0, 0, s, s);
     for (let i = 0; i < 2600; i++) {
@@ -339,8 +338,8 @@ function hairTexture(base, seed, grey) {
  * between them. The material cuts the gaps out (alphaTest).
  */
 function thinHairTexture(base, seed) {
-  const r = rng(seed);
   return canvasTexture(128, (g, s) => {
+    const r = rng(seed);
     g.clearRect(0, 0, s, s);
     for (let i = 0; i < 3400; i++) {
       const v = r();
@@ -356,8 +355,8 @@ function thinHairTexture(base, seed) {
 
 function logoTexture() {
   // a cracked, washed-out print of his "L" logo
-  const r = rng(7);
   return canvasTexture(128, (g) => {
+    const r = rng(7);
     g.fillStyle = '#efe3d0';
     g.beginPath(); g.arc(64, 64, 62, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#5a6fae';

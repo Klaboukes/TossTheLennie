@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import { picture } from './pictures.js';
 
 // The game draws no real shadows: they made every frame several times more
 // work, far too much for low-end tablets and phones. Instead Lennie gets a
@@ -21,7 +22,7 @@ function spotTexture() {
   grad.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);
-  const tex = new THREE.CanvasTexture(c);
+  const tex = picture(c, spotTexture);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }

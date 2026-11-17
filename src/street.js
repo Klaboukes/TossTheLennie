@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { drawn } from './pictures.js';
 
 // The rest of the terrace: a block of five houses, built like the photo it's
 // based on (a 1970s Dutch row), with Lennie's house second from the left. The
@@ -104,30 +105,27 @@ export function makeDetails(kit) {
   let panelMats = null;
   function panelLook() {
     if (panelMats) return panelMats;
-    const c = document.createElement('canvas');
-    c.width = 128;
-    c.height = 216;
-    const g = c.getContext('2d');
-    g.fillStyle = '#c9ccd0'; // the aluminium frame
-    g.fillRect(0, 0, 128, 216);
-    g.fillStyle = '#0d1119'; // between the cells
-    g.fillRect(4, 4, 120, 208);
-    const [cols, rows] = [6, 10];
-    const [cw, ch] = [120 / cols, 208 / rows];
-    for (let i = 0; i < cols; i++) {
-      for (let j = 0; j < rows; j++) {
-        const x = 4 + i * cw + 0.8;
-        const y = 4 + j * ch + 0.8;
-        const grad = g.createLinearGradient(x, y, x + cw, y + ch);
-        grad.addColorStop(0, '#1d2840');
-        grad.addColorStop(1, '#121a2c');
-        g.fillStyle = grad;
-        g.fillRect(x, y, cw - 1.6, ch - 1.6);
-        g.fillStyle = 'rgba(150,165,190,0.25)'; // the thin busbars along each cell
-        for (const f of [0.33, 0.66]) g.fillRect(x + (cw - 1.6) * f, y, 0.8, ch - 1.6);
+    const map = drawn(128, 216, (g) => {
+      g.fillStyle = '#c9ccd0'; // the aluminium frame
+      g.fillRect(0, 0, 128, 216);
+      g.fillStyle = '#0d1119'; // between the cells
+      g.fillRect(4, 4, 120, 208);
+      const [cols, rows] = [6, 10];
+      const [cw, ch] = [120 / cols, 208 / rows];
+      for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+          const x = 4 + i * cw + 0.8;
+          const y = 4 + j * ch + 0.8;
+          const grad = g.createLinearGradient(x, y, x + cw, y + ch);
+          grad.addColorStop(0, '#1d2840');
+          grad.addColorStop(1, '#121a2c');
+          g.fillStyle = grad;
+          g.fillRect(x, y, cw - 1.6, ch - 1.6);
+          g.fillStyle = 'rgba(150,165,190,0.25)'; // the thin busbars along each cell
+          for (const f of [0.33, 0.66]) g.fillRect(x + (cw - 1.6) * f, y, 0.8, ch - 1.6);
+        }
       }
-    }
-    const map = new THREE.CanvasTexture(c);
+    });
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = 8;
     const frame = std({ color: 0xbfc3c8, roughness: 0.4, metalness: 0.5 });
@@ -225,28 +223,25 @@ export function makeDetails(kit) {
   const blockMats = {};
   function blockMat(side) {
     if (blockMats[side]) return blockMats[side];
-    const c = document.createElement('canvas');
-    c.width = 128;
-    c.height = 256;
-    const g = c.getContext('2d');
-    g.fillStyle = '#b3ada1';
-    g.fillRect(0, 0, 128, 256);
-    const hole = side > 0 ? '#15130f' : '#eef3f2';
-    for (const y0 of [0, 128]) {
-      g.strokeStyle = '#8a8478'; // the mortar joint around the block
-      g.lineWidth = 5;
-      g.strokeRect(2.5, y0 + 2.5, 123, 123);
-      g.fillStyle = hole;
-      const [m, arm, t] = [16, 36, 14]; // margin, length and thickness of the corner Ls
-      for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
-        const x = sx ? 128 - m - arm : m;
-        const y = y0 + (sy ? 128 - m - arm : m);
-        g.fillRect(x, sy ? y + arm - t : y, arm, t); // the L's flat stroke
-        g.fillRect(sx ? x + arm - t : x, y, t, arm); // its upright stroke
+    const map = drawn(128, 256, (g) => {
+      g.fillStyle = '#b3ada1';
+      g.fillRect(0, 0, 128, 256);
+      const hole = side > 0 ? '#15130f' : '#eef3f2';
+      for (const y0 of [0, 128]) {
+        g.strokeStyle = '#8a8478'; // the mortar joint around the block
+        g.lineWidth = 5;
+        g.strokeRect(2.5, y0 + 2.5, 123, 123);
+        g.fillStyle = hole;
+        const [m, arm, t] = [16, 36, 14]; // margin, length and thickness of the corner Ls
+        for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+          const x = sx ? 128 - m - arm : m;
+          const y = y0 + (sy ? 128 - m - arm : m);
+          g.fillRect(x, sy ? y + arm - t : y, arm, t); // the L's flat stroke
+          g.fillRect(sx ? x + arm - t : x, y, t, arm); // its upright stroke
+        }
+        g.fillRect(64 - 13, y0 + 64 - 19, 26, 38); // the hole in the middle, a bit taller than wide
       }
-      g.fillRect(64 - 13, y0 + 64 - 19, 26, 38); // the hole in the middle, a bit taller than wide
-    }
-    const map = new THREE.CanvasTexture(c);
+    });
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = 8;
     const look = side > 0 ? { roughness: 0.9 } : { emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.25, roughness: 0.9 };
@@ -267,21 +262,18 @@ export function makeDetails(kit) {
    * door, at x, about shoulder height, as on the real house. Fades with `line`.
    */
   function houseNumber(n, x, line = null) {
-    const c = document.createElement('canvas');
-    c.width = 128;
-    c.height = 104;
-    const g = c.getContext('2d');
-    g.fillStyle = '#f2f1ec';
-    g.fillRect(0, 0, 128, 104);
-    g.strokeStyle = '#9c9a94';
-    g.lineWidth = 4;
-    g.strokeRect(2, 2, 124, 100);
-    g.fillStyle = '#1d2433';
-    g.font = 'bold 72px "Trebuchet MS", sans-serif';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(String(n), 64, 56);
-    const map = new THREE.CanvasTexture(c);
+    const map = drawn(128, 104, (g) => {
+      g.fillStyle = '#f2f1ec';
+      g.fillRect(0, 0, 128, 104);
+      g.strokeStyle = '#9c9a94';
+      g.lineWidth = 4;
+      g.strokeRect(2, 2, 124, 100);
+      g.fillStyle = '#1d2433';
+      g.font = 'bold 72px "Trebuchet MS", sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(String(n), 64, 56);
+    });
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = 8;
     const mat = std({ map, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });

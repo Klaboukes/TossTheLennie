@@ -5,6 +5,7 @@ import { createStock, ASSORTMENT, PRODUCTS, halfSize } from './products.js';
 import { CLEAR_NEAR, CLEAR_FAR } from './house.js';
 import { setFade } from './batching.js';
 import { farCopy } from './farview.js';
+import { drawn } from './pictures.js';
 
 // The supermarket across the road, after the real one: a long orange box
 // under a zigzag of grey gables, with a brick-and-glass entrance and a big
@@ -47,12 +48,9 @@ const MESS = {
   sint: ['In de zak, Lennie!', 'Sint saw that!', 'Strooi, strooi, strooi!', 'Is it 5 December already?', 'Pepernoten party!'],
 };
 
+// (`draw` runs again when the picture is needed again, see pictures.js)
 export function canvasTexture(w, h, draw) {
-  const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  draw(c.getContext('2d'), w, h);
-  const t = new THREE.CanvasTexture(c);
+  const t = drawn(w, h, draw);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;

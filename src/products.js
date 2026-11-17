@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { drawn, letGo, sizeOf } from './pictures.js';
 
 // The supermarket's groceries: every product is a little model with its own
 // cartoon packaging (bread in bags, milk cartons, cheese wheels, bottles of
@@ -189,12 +191,11 @@ export function halfSize(p) {
 }
 
 // ---------------------------------------------------------------- drawing the packaging
+// A label isn't drawn until it's needed (pictures.js): when its product's
+// picture is painted onto a baked page, or when it's first seen. It's let go
+// of right after, so the labels are never all in memory at once.
 function canvas(w, h, draw) {
-  const c = document.createElement('canvas');
-  c.width = Math.max(16, Math.round(w));
-  c.height = Math.max(16, Math.round(h));
-  draw(c.getContext('2d'), c.width, c.height);
-  const t = new THREE.CanvasTexture(c);
+  const t = drawn(Math.max(16, Math.round(w)), Math.max(16, Math.round(h)), draw, { lazy: true });
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return t;
@@ -666,7 +667,7 @@ function paintPlan(geo, material, unique) {
     if (m.side !== first.side || m.flatShading !== first.flatShading || Math.abs(m.metalness - first.metalness) > 0.2) return null;
     if (m.emissive.getHex() !== 0 || ['normalMap', 'roughnessMap', 'metalnessMap', 'alphaMap', 'aoMap', 'emissiveMap', 'bumpMap', 'lightMap'].some((k) => m[k])) return null;
     const t = m.map;
-    if (t && (!t.image?.width || t.repeat.x !== 1 || t.repeat.y !== 1 || t.offset.x || t.offset.y || t.rotation)) return null;
+    if (t && (!sizeOf(t)?.width || t.repeat.x !== 1 || t.repeat.y !== 1 || t.offset.x || t.offset.y || t.rotation)) return null;
   }
   const index = geo.index?.array;
   const owner = new Map(); // corner → material
@@ -694,46 +695,46 @@ function oneMaterial(look) {
     return regrouped;
   }
   const PAD = 4; // pixels between strips, so they don't bleed into each other
-  const slots = new Map(unique.map((m) => [m, { m, img: m.map?.image ?? null, h: m.map?.image?.height ?? 8 }]));
-  const W = Math.max(16, ...[...slots.values()].map((s) => s.img?.width ?? 0));
+  const slots = new Map(unique.map((m) => [m, { m, tex: m.map ?? null, h: m.map ? sizeOf(m.map).height : 8 }]));
+  const W = Math.max(16, ...[...slots.values()].map((s) => (s.tex ? sizeOf(s.tex).width : 0)));
   let H = 0;
   for (const s of slots.values()) {
     s.y = H + PAD;
     H += s.h + 2 * PAD;
   }
-  const c = document.createElement('canvas');
-  c.width = W;
-  c.height = H;
-  const g = c.getContext('2d');
-  for (const s of slots.values()) {
-    const colour = s.m.color.getStyle();
-    if (s.img) {
-      // the picture, with its top and bottom rows stretched into the padding
-      g.drawImage(s.img, 0, 0, s.img.width, 1, 0, s.y - PAD, W, PAD);
-      g.drawImage(s.img, 0, s.img.height - 1, s.img.width, 1, 0, s.y + s.h, W, PAD);
-      g.drawImage(s.img, 0, s.y, W, s.h);
-      if (s.m.color.getHex() !== 0xffffff) {
-        g.globalCompositeOperation = 'multiply';
+  // (painted when it's needed, like the labels it's made of: see canvas())
+  const map = drawn(W, H, (g) => {
+    for (const s of slots.values()) {
+      const colour = s.m.color.getStyle();
+      if (s.tex) {
+        // the picture, with its top and bottom rows stretched into the padding
+        const img = s.tex.image;
+        g.drawImage(img, 0, 0, img.width, 1, 0, s.y - PAD, W, PAD);
+        g.drawImage(img, 0, img.height - 1, img.width, 1, 0, s.y + s.h, W, PAD);
+        g.drawImage(img, 0, s.y, W, s.h);
+        if (s.m.color.getHex() !== 0xffffff) {
+          g.globalCompositeOperation = 'multiply';
+          g.fillStyle = colour;
+          g.fillRect(0, s.y - PAD, W, s.h + 2 * PAD);
+          g.globalCompositeOperation = 'source-over';
+        }
+      } else {
         g.fillStyle = colour;
         g.fillRect(0, s.y - PAD, W, s.h + 2 * PAD);
-        g.globalCompositeOperation = 'source-over';
       }
-    } else {
-      g.fillStyle = colour;
-      g.fillRect(0, s.y - PAD, W, s.h + 2 * PAD);
     }
-  }
+    for (const s of slots.values()) if (s.tex) letGo(s.tex);
+  }, { lazy: true });
   // point every corner at its material's strip
   const uv = geo.attributes.uv;
   for (const [v, m] of owner) {
     const s = slots.get(m);
-    const u = s.img ? uv.getX(v) : 0.5;
-    const t = s.img ? uv.getY(v) : 0.5;
+    const u = s.tex ? uv.getX(v) : 0.5;
+    const t = s.tex ? uv.getY(v) : 0.5;
     uv.setXY(v, u, 1 - (s.y + s.h) / H + (t * s.h) / H);
   }
   uv.needsUpdate = true;
   geo.clearGroups();
-  const map = new THREE.CanvasTexture(c);
   map.colorSpace = THREE.SRGBColorSpace;
   map.anisotropy = 4;
   const first = unique[0];
@@ -988,19 +989,27 @@ export function createStock(scene, { bounds, floorY = 0.012, tables = [], catalo
     for (const k of kinds.values()) {
       const parts = bakeParts(k.mesh.geometry, k.mesh.material);
       if (!parts) continue;
-      for (const part of parts) jobs.push({ k, ...part, whole: parts.length === 1 });
+      for (const part of parts) jobs.push({ k, ...part });
     }
+    const onPages = new Map(); // kind → its parts as they are on the pages: [{ geo, material }]
     for (const page of packPages(jobs)) {
       for (const job of page.jobs) {
-        if (!job.whole) continue; // (several materials: its InstancedMesh keeps them)
-        // its InstancedMesh draws it from the page too: the same shape, pointed at its place there
-        job.k.mesh.geometry = job.geo;
-        job.k.mesh.material = page.material;
+        if (!onPages.has(job.k)) onPages.set(job.k, []);
+        onPages.get(job.k).push({ geo: job.geo, material: page.material });
       }
       const b = bakeMesh(page.jobs, page.material);
       if (!b) continue;
       scene.add(b.mesh);
       bakes.push(b);
+    }
+    // A kind's InstancedMesh (which draws the knocked ones) draws from the
+    // pages too: the same shapes, pointed at their places there. So a kind's
+    // own picture never goes to the graphics chip as well, and knocking things
+    // over doesn't add pictures to it. A kind of several materials (a can's
+    // label and its metal) keeps a draw call for each, from each one's page.
+    for (const [k, parts] of onPages) {
+      k.mesh.geometry = parts.length === 1 ? parts[0].geo : mergeGeometries(parts.map((p) => p.geo), true);
+      k.mesh.material = parts.length === 1 ? parts[0].material : parts.map((p) => p.material);
     }
     restock();
   }
@@ -1375,10 +1384,10 @@ function bakeParts(geo, material) {
     if (m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile || m.opacity !== 1) return null;
     const sub = subGeometry(geo, list);
     const t = m.map;
-    let img = null;
+    let size = null; // (its picture's, without asking for the picture: that would draw it, see pictures.js)
     if (t) {
-      img = t.image;
-      if (!img?.width || img.width + 2 * PAD > PAGE || img.height + 2 * PAD > PAGE) return null;
+      size = sizeOf(t);
+      if (!size?.width || size.width + 2 * PAD > PAGE || size.height + 2 * PAD > PAGE) return null;
       if (t.repeat.x !== 1 || t.repeat.y !== 1 || t.offset.x || t.offset.y || t.rotation || !t.flipY) return null;
       const uv = sub.attributes.uv;
       if (!uv) return null;
@@ -1388,7 +1397,7 @@ function bakeParts(geo, material) {
         if (u < -0.001 || u > 1.001 || v < -0.001 || v > 1.001) return null;
       }
     }
-    parts.push({ geo: sub, img, color: m.color.getHex(), material: m, key: DRAWN.map((k) => String(m[k])).join('|') });
+    parts.push({ geo: sub, tex: t ?? null, size, color: m.color.getHex(), material: m, key: DRAWN.map((k) => String(m[k])).join('|') });
   }
   return parts.length ? parts : null;
 }
@@ -1434,22 +1443,22 @@ function packPages(jobs) {
   const pages = [];
   for (const group of byKey.values()) {
     // tallest first, in rows across the page
-    group.sort((a, b) => (b.img?.height ?? SWATCH) - (a.img?.height ?? SWATCH));
+    group.sort((a, b) => (b.size?.height ?? SWATCH) - (a.size?.height ?? SWATCH));
     let page = null;
     let x = 0;
     let y = 0;
     let rowH = 0;
     const slotOf = new Map(); // picture + colour → its place, so kinds sharing a look share it
     const open = () => {
-      page = { jobs: [], slots: [], first: null, h: 0 };
+      page = { jobs: [], slots: [], first: null, w: 0, h: 0 };
       pages.push(page);
       slotOf.clear();
       x = y = rowH = 0;
     };
     for (const job of group) {
-      const w = (job.img?.width ?? SWATCH) + 2 * PAD;
-      const h = (job.img?.height ?? SWATCH) + 2 * PAD;
-      const id = `${job.img ? job.material.map.uuid : 'plain'}|${job.color}`;
+      const w = (job.size?.width ?? SWATCH) + 2 * PAD;
+      const h = (job.size?.height ?? SWATCH) + 2 * PAD;
+      const id = `${job.tex ? job.tex.uuid : 'plain'}|${job.color}`;
       if (!page) open();
       let slot = slotOf.get(id);
       if (!slot) {
@@ -1459,11 +1468,12 @@ function packPages(jobs) {
           rowH = 0;
         }
         if (y + h > PAGE) open();
-        slot = { x: x + PAD, y: y + PAD, w: w - 2 * PAD, h: h - 2 * PAD, img: job.img, color: job.color };
+        slot = { x: x + PAD, y: y + PAD, w: w - 2 * PAD, h: h - 2 * PAD, tex: job.tex, color: job.color };
         slotOf.set(id, slot);
         page.slots.push(slot);
         x += w;
         rowH = Math.max(rowH, h);
+        page.w = Math.max(page.w, x);
         page.h = Math.max(page.h, y + h);
       }
       page.first ??= job.material;
@@ -1471,26 +1481,34 @@ function packPages(jobs) {
     }
   }
   for (const page of pages) {
-    const c = document.createElement('canvas');
-    c.width = PAGE;
-    c.height = Math.max(16, page.h);
-    const g = c.getContext('2d');
-    for (const s of page.slots) paintSlot(g, s);
-    const map = new THREE.CanvasTexture(c);
+    // Only as wide and high as what's on it: a page of a few plain colours is
+    // a small square, not a strip 2048 px wide.
+    const W = Math.max(16, page.w);
+    const H = Math.max(16, page.h);
+    // Painted when it goes to the graphics chip (all pages do with the first
+    // frame, see frame() in main.js), from the kinds' pictures, which are drawn
+    // for it and let go of again: a page at a time, so the pages and labels are
+    // never all in memory together. Painted the same way whenever it's needed
+    // again (pictures.js).
+    const map = drawn(W, H, (g) => {
+      for (const s of page.slots) paintSlot(g, s);
+      for (const s of page.slots) if (s.tex) letGo(s.tex);
+    }, { lazy: true });
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = 4;
     const material = page.first.clone();
     material.map = map;
     material.color.set(0xffffff);
     page.material = material;
-    for (const job of page.jobs) job.geo = pointAt(job.geo, job.slot, c.width, c.height);
+    for (const job of page.jobs) job.geo = pointAt(job.geo, job.slot, W, H);
   }
   return pages;
 }
 
 /** Paints a kind's picture (times its colour), or its plain colour, into its slot with a repeated edge round it. */
 function paintSlot(g, s) {
-  const { x, y, w, h, img } = s;
+  const { x, y, w, h } = s;
+  const img = s.tex?.image; // (drawn for this if it was let go of: see pictures.js)
   const colour = new THREE.Color(s.color).getStyle();
   if (img) {
     g.drawImage(img, 0, 0, img.width, img.height, x, y, w, h);
@@ -1522,8 +1540,8 @@ function pointAt(geo, slot, W, H) {
   const uv = new Float32Array(n * 2);
   for (let i = 0; i < n; i++) {
     // (a canvas texture is flipped: v = 1 is the canvas's top row)
-    const u = slot.img ? old.getX(i) : 0.5;
-    const v = slot.img ? old.getY(i) : 0.5;
+    const u = slot.tex ? old.getX(i) : 0.5;
+    const v = slot.tex ? old.getY(i) : 0.5;
     uv[i * 2] = (slot.x + u * slot.w) / W;
     uv[i * 2 + 1] = 1 - (slot.y + (1 - v) * slot.h) / H;
   }
