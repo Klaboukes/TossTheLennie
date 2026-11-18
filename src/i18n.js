@@ -673,6 +673,9 @@ const NL = {
   'Sint saw that!': 'Sint zag dat!',
   'Strooi, strooi, strooi!': 'Strooi, strooi, strooi!',
   'Is it 5 December already?': 'Is het al 5 december?',
+  'L is for Lennie!': 'L van Lennie!',
+  'Chocolate alphabet soup!': 'Chocolade-letterbrij!',
+  'Spell it out, Lennie!': 'Spel het maar, Lennie!',
   'Pepernoten party!': 'Pepernotenfeest!',
   // ------------------------------------------------ what pops up with the special effects (effects.js)
   'Lennie on the rocks!': 'Lennie met ijs!',

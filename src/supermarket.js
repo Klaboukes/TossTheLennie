@@ -46,6 +46,7 @@ const MESS = {
   pindakaas: ['Smooth move!', 'Nuts!', 'Crunchy or smooth?', 'Sticky situation!', 'Going nuts, Lennie!'],
   snacks: ['Snack attack!', 'Bitterballen bonanza!', 'Frikandel frenzy!', 'Mustard not included!', 'Frozen solid... and flying!'],
   sausage: ['What the sausage?!', 'Wurst landing ever!', 'Best of the wurst!', 'Rookworst rain!', 'Meat you on the floor!'],
+  letters: ['L is for Lennie!', 'Chocolate alphabet soup!', 'Spell it out, Lennie!', 'Sint saw that!', 'Is it 5 December already?'],
   flowers: ['Flower power!', 'Say it with flowers!', 'Tulip trouble!', 'Oops-a-daisy!', 'Painting the town red!'],
   sint: ['In de zak, Lennie!', 'Sint saw that!', 'Strooi, strooi, strooi!', 'Is it 5 December already?', 'Pepernoten party!'],
 };
@@ -1207,14 +1208,25 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     spotsExtra.push(['snacks', 'In the snack freezer!', 550, 'KROKET!', [FZ.x0, 0.3, FZ.z0], [FZ.x1, 1.3, FZ.z1]]);
   }
 
-  // ---------------------------------------------------------------- the Sinterklaas stand: pepernoten and chocolate letters
-  {
-    const red = std({ color: 0xc8102e, roughness: 0.8 });
+  // ---------------------------------------------------------------- the Sinterklaas stands: pepernoten and chocolate letters
+  // One on the open floor before the aisles, two against the aisles' green end
+  // caps on that side (just in front of them, not touching), one of those all chocolate letters.
+  const red = std({ color: 0xc8102e, roughness: 0.8 });
+  const sintHeaders = new Map();
+  function sintStand(back, u0, u1, assortment, line, mess) {
     const sint = shelfUnit({
-      axis: 'x', back: 35.3, dir: -1, u0: -1.1, u1: 0.1, depth: 0.45, h: 1.3, ys: [0.1, 0.5, 0.9],
-      assortment: ASSORTMENT.SINT, mats: { frame: red, shelf: cabinetWhite, back: red }, mess: MESS.sint,
+      axis: 'x', back, dir: -1, u0, u1, depth: 0.45, h: 1.3, ys: [0.1, 0.5, 0.9],
+      assortment, mats: { frame: red, shelf: cabinetWhite, back: red }, mess,
     });
-    const header = canvasTexture(512, 192, (g, w, h) => {
+    if (!sintHeaders.has(line)) sintHeaders.set(line, std({ map: sintHeader(line) }));
+    boxAt(...sint.box(u0, 1.3, 0, u1, 1.75, 0.04), sint.withFront(red, sintHeaders.get(line)), { cast: true });
+  }
+  sintStand(35.3, -1.1, 0.1, ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
+  sintStand(AISLE.z0 - 0.06, aisleXs[1] - 0.6, aisleXs[1] + 0.6, ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
+  sintStand(AISLE.z0 - 0.06, aisleXs[5] - 0.6, aisleXs[5] + 0.6, ASSORTMENT.LETTERS, 'chocoladeletters!', MESS.letters);
+  /** The red sign on top of a Sinterklaas stand: a mitre, SINT, and what's in it. */
+  function sintHeader(line) {
+    return canvasTexture(512, 192, (g, w, h) => {
       g.fillStyle = '#c8102e'; g.fillRect(0, 0, w, h);
       // a mitre
       g.lineWidth = 5; g.strokeStyle = INK_SIGN;
@@ -1224,9 +1236,11 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
       g.fillRect(87, 55, 16, 80); g.fillRect(68, 80, 54, 15);
       g.font = '900 52px "Arial Black", "Trebuchet MS", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = '#ffffff'; g.fillText('SINT', 330, 65);
-      g.fillStyle = '#f6d04d'; g.font = '900 40px "Arial Black", "Trebuchet MS", sans-serif'; g.fillText('pepernoten!', 330, 135);
+      // (a long line in smaller letters, so it fits beside the mitre)
+      g.font = '900 40px "Arial Black", "Trebuchet MS", sans-serif';
+      g.font = `900 ${Math.min(40, Math.floor((40 * 320) / g.measureText(line).width))}px "Arial Black", "Trebuchet MS", sans-serif`;
+      g.fillStyle = '#f6d04d'; g.fillText(line, 330, 135);
     });
-    boxAt(...sint.box(-1.1, 1.3, 0, 0.1, 1.75, 0.04), sint.withFront(red, std({ map: header })), { cast: true });
   }
 
   // ---------------------------------------------------------------- tulips by the entrance, and the bottle return machine

@@ -92,6 +92,8 @@ export const PRODUCTS = {
   kruidnoten: { shape: 'box', w: 0.14, h: 0.2, d: 0.06, face: { bg: '#7b3f00', band: '#f6d04d', fg: '#7b3f00', text: 'KRUIDNOTEN', art: ['pepernoten'] } },
   letterL: { shape: 'box', w: 0.13, h: 0.17, d: 0.03, face: { bg: '#d8312a', fg: '#ffffff', text: 'MELK', art: ['letter', 'L'] } },
   letterS: { shape: 'box', w: 0.13, h: 0.17, d: 0.03, face: { bg: '#1d4f9a', fg: '#ffffff', text: 'PUUR', art: ['letter', 'S'] } },
+  letterA: { shape: 'box', w: 0.13, h: 0.17, d: 0.03, face: { bg: '#e8a33c', fg: '#ffffff', text: 'WIT', art: ['letter', 'A'] } },
+  letterM: { shape: 'box', w: 0.13, h: 0.17, d: 0.03, face: { bg: '#2e8b57', fg: '#ffffff', text: 'HAZELNOOT', art: ['letter', 'M'] } },
   // coffee and tea
   koffie: { shape: 'box', w: 0.12, h: 0.18, d: 0.07, face: { bg: '#c0392b', band: '#2b1a12', text: 'KOFFIE', sub: 'snelfilter', art: ['cup', '#5b3a29'] } },
   koffiepads: { shape: 'box', w: 0.14, h: 0.16, d: 0.1, face: { bg: '#1d4f9a', band: '#f6d04d', fg: '#1d4f9a', text: 'KOFFIEPADS', art: ['cup', '#5b3a29'] } },
@@ -209,7 +211,7 @@ let zincMat = null;
 const zinc = () => (zincMat ??= mat({ color: '#a9b1b8', roughness: 0.4 }));
 
 // What goes on each shelf (bottom to top) of each aisle, the freezers and the
-// drinks fridges, and the bakery's bread rack, pastry case and the Sinterklaas stand.
+// drinks fridges, and the bakery's bread rack, pastry case and the Sinterklaas stands.
 export const ASSORTMENT = {
   BROODBELEG: [['beschuit', 'ontbijtkoek'], ['hagelslag', 'melkhagel', 'vlokken', 'muisjesRoze', 'muisjesBlauw'], ['pindakaas', 'pindakaasNoot', 'pindakaas', 'chocopasta'], ['jam', 'appelstroop', 'pindakaas', 'honing']],
   ZUIVEL: [['eieren', 'boter'], ['melk', 'karnemelk', 'chocomelk'], ['yoghurt', 'vla', 'kwark'], ['melk', 'vla', 'slagroom', 'koffiemelk']],
@@ -222,6 +224,7 @@ export const ASSORTMENT = {
   BAKKERIJ: [['tijgerbrood', 'volkoren', 'witbrood'], ['witbrood', 'suikerbrood', 'tijgerbrood'], ['stokbrood'], ['krentenbol', 'croissants', 'bolletjes']],
   GEBAK: [['tompouce', 'appeltaart', 'gevuldekoek', 'kaneelbroodje']],
   SINT: [['pepernoten', 'kruidnoten'], ['letterL', 'letterS', 'speculaas'], ['pepernoten', 'letterL', 'kruidnoten']],
+  LETTERS: [['letterL', 'letterS', 'letterA'], ['letterM', 'letterL', 'letterS'], ['letterA', 'letterM', 'letterL']],
 };
 
 /** Size of a product as half extents (x across the front, y up, z depth). */
