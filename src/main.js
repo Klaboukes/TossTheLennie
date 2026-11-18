@@ -3644,7 +3644,7 @@ function tick(dt, now) {
     shop.update(dt * timeScale);
     house.update(dt * timeScale);
     smashedDishes();
-    cars.update(dt * timeScale, carWatch, camera.position, carSounds);
+    cars.update(dt * timeScale, carWatch, carSounds);
   }
   updateHud(dt, now);
   renderer.render(scene, camera);

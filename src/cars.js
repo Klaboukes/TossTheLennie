@@ -23,6 +23,8 @@ const BRAKE = 5; // m/s², how hard a car brakes
 const SPEED_UP = 2.5; // m/s², how quickly it pulls away again
 const LANE_HALF = 1.3; // a part of Lennie this close to a lane's middle is in that lane
 const GAP = [5, 14]; // seconds between cars
+const HEAR = 8; // metres from a car's lane Lennie can be and still hear it drive past (only out on the street)
+const HEAD_START = 1.2; // seconds before a car reaches him that its engine starts to be heard
 const PAINT = [0xc8322b, 0x2f5fa8, 0xeeeeea, 0xa9adb3, 0x2a2c30, 0x3d6b45, 0xe0a526, 0x7a2f5a, 0x5f8fbf];
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -151,6 +153,7 @@ export function createCars(scene, world, material) {
   let clock = 0;
   let nextAt = rand(2, 5); // the first one comes along soon
   const _v = new THREE.Vector3();
+  const _mid = new THREE.Vector3();
 
   /** Out of sight and out of the physics, until it's needed again. */
   function park(car) {
@@ -199,13 +202,23 @@ export function createCars(scene, world, material) {
     return gap;
   }
 
+  /** Lennie's middle (the average of his body parts), in `out`. */
+  function middleOf(bodies, out) {
+    out.set(0, 0, 0);
+    for (const b of bodies) out.x += b.position.x, out.y += b.position.y, out.z += b.position.z;
+    return out.divideScalar(bodies.length);
+  }
+
   /**
-   * Moves the traffic on by dt (game time). `lennie`: { bodies, flying, held },
-   * `listener`: the camera's position, for the sound of a car going by.
+   * Moves the traffic on by dt (game time). `lennie`: { bodies, flying, held }.
    * `on`: { honk(car, at), pass(car, strength) } for the sounds and shouts.
    */
-  function update(dt, lennie, listener, on) {
+  function update(dt, lennie, on) {
     clock += dt;
+    // A car is only heard when Lennie is out on the street (past the front
+    // garden's hedge, not up in the air) and it drives close past him.
+    const mid = middleOf(lennie.bodies, _mid);
+    const onStreet = mid.z > STREET.cycle[0] && mid.z < STREET.shopFront && mid.y < 4;
     if (clock > nextAt) {
       spawn();
       // now and then one follows close behind
@@ -245,11 +258,14 @@ export function createCars(scene, world, material) {
 
       car.body.velocity.set(car.dir * car.speed, 0, 0);
 
-      // a whoosh as it goes past the camera
-      if (!car.passed && (listener.x - car.x) * car.dir < 4) {
-        car.passed = true;
-        const d = Math.hypot(listener.z - car.z, listener.y);
-        if (d < 30) on.pass?.(car, 1 - d / 30);
+      // its engine as it drives past him, starting just before it gets there
+      const dz = Math.abs(mid.z - car.z);
+      if (!car.passed && onStreet && dz < HEAR) {
+        const ahead = (mid.x - car.x) * car.dir; // how far the car's middle still is from him
+        if (ahead > -car.length / 2 && ahead < car.cruise * HEAD_START + car.length / 2) {
+          car.passed = true;
+          on.pass?.(car, 1 - dz / (HEAR * 1.5));
+        }
       }
       if (car.x * car.dir > ENDS) park(car);
     }

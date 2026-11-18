@@ -501,14 +501,69 @@ export class Sfx {
     }
   }
 
-  /** A car going by: an engine dropping in pitch as it passes, and the hiss of its tyres. strength 0..1 (how close) */
-  carPass(strength) {
+  /**
+   * A car driving past: a rumbling engine that grows, drops in pitch as it
+   * goes by and fades away, with the swish of its tyres. It's level with the
+   * listener after `up` seconds. strength 0..1 (how close)
+   */
+  carPass(strength, up = 1.2) {
     if (!this.ready) return;
-    const t = this.ctx.currentTime;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
     const s = strength * this.#tire('car', 4);
-    const f = rand(70, 95);
-    this.#tone(t, { type: 'sawtooth', f: f * 1.15, to: f * 0.8, glide: 1.4, peak: 0.05 + s * 0.12, attack: 0.5, release: 1.0, lowpass: 380 });
-    this.#burst(t, { filter: 'bandpass', f: 500, to: 1500, glide: 0.6, Q: 0.7, peak: 0.03 + s * 0.09, attack: 0.55, release: 0.9 });
+    const at = t + up; // level with him
+    const end = at + 1.6;
+    const f = rand(46, 58);
+    // the engine: two low, slightly detuned sawtooths (they beat against each
+    // other, so it's rough rather than one clean buzzy note), through a filter
+    // that opens up as it gets close
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 1.5;
+    lp.frequency.setValueAtTime(220, t);
+    lp.frequency.exponentialRampToValueAtTime(650, at);
+    lp.frequency.exponentialRampToValueAtTime(200, end);
+    const oscs = [];
+    for (const k of [1, 1.025, 0.5]) {
+      const osc = ctx.createOscillator();
+      osc.type = k === 0.5 ? 'triangle' : 'sawtooth';
+      osc.frequency.setValueAtTime(f * k * 1.08, t);
+      osc.frequency.exponentialRampToValueAtTime(f * k, at);
+      osc.frequency.exponentialRampToValueAtTime(f * k * 0.86, end); // lower once it's past
+      osc.connect(lp);
+      oscs.push(osc);
+    }
+    // the engine's chug: its loudness throbs a dozen times a second (brrrm)
+    const chug = ctx.createGain();
+    chug.gain.value = 0.65;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = rand(10, 14);
+    const depth = ctx.createGain();
+    depth.gain.value = 0.35;
+    lfo.connect(depth).connect(chug.gain);
+    oscs.push(lfo);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.07 + s * 0.13, at);
+    g.gain.exponentialRampToValueAtTime(0.0001, end);
+    lp.connect(chug).connect(g).connect(this.master);
+    for (const o of oscs) {
+      o.start(t);
+      o.stop(end + 0.05);
+    }
+    // the tyres on the road: a swish, loudest as it goes by
+    const tyres = this.#noiseSource(t, end - t + 0.05);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 0.6;
+    bp.frequency.setValueAtTime(400, t);
+    bp.frequency.exponentialRampToValueAtTime(1300, at);
+    bp.frequency.exponentialRampToValueAtTime(350, end);
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(0.0001, t);
+    tg.gain.exponentialRampToValueAtTime(0.03 + s * 0.08, at);
+    tg.gain.exponentialRampToValueAtTime(0.0001, end - 0.3);
+    tyres.connect(bp).connect(tg).connect(this.master);
   }
 
   // ------------------------------------------------------------ picking Lennie up
@@ -735,10 +790,11 @@ export class Sfx {
       bp.frequency.value = 700;
       bp.Q.value = 2;
       const g = ctx.createGain();
-      const t0 = t + i * rand(0.2, 0.6);
+      const t0 = t + i * rand(0.1, 0.3) * duration;
+      const fade = Math.min(0.4, duration * 0.35);
       g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(0.035, t0 + 0.3);
-      g.gain.setValueAtTime(0.035, t0 + duration - 0.4);
+      g.gain.exponentialRampToValueAtTime(0.035, t0 + fade);
+      g.gain.setValueAtTime(0.035, t0 + duration - fade);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
       osc.connect(bp).connect(g).connect(this.master);
       osc.start(t0); lfo.start(t0);

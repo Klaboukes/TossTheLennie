@@ -54,6 +54,8 @@ const FREEZE_TIME = 5; // seconds frozen stiff
 const THAW_TIME = 2.5; // then shivering
 const SPIN_TIME = 2.6;
 const STINK_TIME = 12;
+const BUZZES = 3; // fly buzzes when he starts to stink
+const BUZZ_GAP = 0.9; // seconds from one to the next
 const STICKY_TIME = 10;
 const STUCK_TIME = 2.5; // how long the pindakaas holds him to a wall
 const MAX_ANCHORS = 3;
@@ -261,6 +263,7 @@ export class Effects {
     this.paint = null;
     this.stinkT = 0;
     this.buzzT = 0;
+    this.buzzes = 0; // fly buzzes still to come (a few quick ones when he starts to stink, then quiet)
     this.stinkPuffT = 0;
     this.stickyT = 0;
     this.smokeT = 0;
@@ -402,6 +405,7 @@ export class Effects {
     this.peanut = 0;
     this.stickyT = 0;
     this.stinkT = 0;
+    this.buzzes = 0;
     this.#releaseAnchors();
     this.bitList = this.bitList.filter((b) => !(b.mode === 'stick' && ['sprinkle', 'paint', 'feather'].includes(b.kind)) && b.kind !== 'fly');
     this.zap.soot = 0;
@@ -698,6 +702,7 @@ export class Effects {
       this.#bit({ mode: 'swarm', kind: 'fly', s: new THREE.Vector3(0.03, 0.018, 0.022), color: new THREE.Color(0x151515), r: rand(0.22, 0.38), w: rand(3, 6) * (Math.random() < 0.5 ? -1 : 1), h: rand(0.05, 0.35) });
     }
     this.buzzT = 0;
+    this.buzzes = BUZZES;
     this.sfx.voice('yuck');
     this.#say('stink');
     this.hooks.feat('stink');
@@ -713,9 +718,11 @@ export class Effects {
       const part = pick(this.parts).group.position;
       this.#puff(_v.copy(part), { color: 0x9bbf3a, size: [0.08, 0.24], rise: 0.35, life: 1.8 });
     }
-    if (this.buzzT <= 0) {
-      this.buzzT = 3;
-      this.sfx.buzz(Math.min(3, this.stinkT));
+    // a few quick buzzes when the flies arrive, then they circle him quietly
+    if (this.buzzes > 0 && this.buzzT <= 0) {
+      this.buzzes -= 1;
+      this.buzzT = BUZZ_GAP;
+      this.sfx.buzz(0.8);
     }
     if (this.stinkT <= 0) this.bitList = this.bitList.filter((b) => b.kind !== 'fly');
   }
