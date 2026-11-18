@@ -23,6 +23,7 @@ import { pictureCount, sizeOf } from './pictures.js';
 import { sceneryParts, reportFlicker } from './flickercheck.js';
 import { createBlobShadow } from './blobshadow.js';
 import { tunePhysics } from './broadphase.js';
+import { CURSORS } from './cursors.js';
 import { t, fmt, fixed, lang, setLang, onLangChange } from './i18n.js';
 
 const FIXED_DT = 1 / 120;
@@ -1405,7 +1406,7 @@ function startGrab(pick, pointerId, pointerType = 'mouse') {
   hideResult();
   if (lennie.expression !== 'normal') lennie.setExpression('normal');
   sfx.grab();
-  canvas.style.cursor = 'grabbing';
+  canvas.style.cursor = CURSORS.grabbing;
   grabLine.visible = grabDot.visible = true;
   hideAim();
   aim.guide = aim.through = aim.lift = null;
@@ -1527,7 +1528,7 @@ function startSling(pick, e) {
   hideResult();
   if (lennie.expression !== 'normal') lennie.setExpression('normal');
   sfx.grab();
-  canvas.style.cursor = 'grabbing';
+  canvas.style.cursor = CURSORS.grabbing;
   grabLine.visible = grabDot.visible = true;
   hideAim();
   aim.pin = null;
@@ -1705,8 +1706,8 @@ function beginFlight() {
 }
 
 function idleCursor() {
-  if (hoverPart) return 'grab';
-  return aim.on ? 'crosshair' : '';
+  if (hoverPart) return CURSORS.grab;
+  return aim.on ? CURSORS.aim : '';
 }
 
 function setHover(name) {
@@ -2443,7 +2444,7 @@ function toggleAim() {
   if (!aim.on) hideAim();
   aim.pin = null;
   drawArcPicture();
-  canvas.style.cursor = grab ? 'grabbing' : idleCursor();
+  canvas.style.cursor = grab ? CURSORS.grabbing : idleCursor();
   const how = document.body.classList.contains('touch')
     ? 'tap where Lennie should go, then tap there again to throw'
     : 'point where Lennie should go and click. Scroll for a higher or lower arc';

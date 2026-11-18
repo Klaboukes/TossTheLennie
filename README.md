@@ -225,6 +225,7 @@ Each frame, `main.js` moves the camera first, then lets the house and the shop d
 - `src/replay.js`: records each toss (and the chairs he knocks over) and plays it back in slow motion
 - `src/guard.js`: safety net that puts Lennie back in one piece if a limb ever ends up inside a wall or floor
 - `src/audio.js`: synthesized sound effects and Lennie's voice
+- `src/cursors.js`: the cartoon mouse pointers: a glove that opens over Lennie and closes into a fist while you hold him, and a target in aim mode
 - `tests/check.mjs`: quick code check (modules parse, imports resolve, files linked from `index.html` exist), run nightly by `.github/workflows/ci.yml`
 
 ## License
