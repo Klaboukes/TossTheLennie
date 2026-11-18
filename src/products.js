@@ -39,6 +39,7 @@ export const PRODUCTS = {
   krentenbol: { shape: 'box', w: 0.2, h: 0.1, d: 0.14, face: { bg: '#fbf3e4', band: '#e2231a', text: 'KRENTENBOLLEN', art: ['buns'] } },
   hagelslag: { shape: 'box', w: 0.11, h: 0.2, d: 0.06, face: { bg: '#2a1f1a', band: '#7b4a2a', fg: '#ffffff', text: 'HAGELSLAG', art: ['sprinkles'] } },
   melkhagel: { shape: 'box', w: 0.11, h: 0.2, d: 0.06, face: { bg: '#6b3f22', band: '#e8c48a', fg: '#6b3f22', text: 'MELKHAGEL', art: ['sprinkles'] } },
+  hagelslagXL: { shape: 'box', w: 0.4, h: 0.62, d: 0.22, face: { bg: '#2a1f1a', band: '#7b4a2a', fg: '#ffffff', text: 'HAGELSLAG', sub: 'XXL', art: ['sprinkles'] } },
   vlokken: { shape: 'box', w: 0.11, h: 0.2, d: 0.06, face: { bg: '#8a4f2a', band: '#f6d04d', fg: '#8a4f2a', text: 'VLOKKEN', art: ['flakes'] } },
   muisjesRoze: { shape: 'box', w: 0.1, h: 0.16, d: 0.05, face: { bg: '#ffffff', band: '#e86fa0', text: 'MUISJES', art: ['muisjes', '#e86fa0'] } },
   muisjesBlauw: { shape: 'box', w: 0.1, h: 0.16, d: 0.05, face: { bg: '#ffffff', band: '#3b7dd8', text: 'MUISJES', art: ['muisjes', '#6fa8e8'] } },
@@ -213,7 +214,6 @@ const zinc = () => (zincMat ??= mat({ color: '#a9b1b8', roughness: 0.4 }));
 // What goes on each shelf (bottom to top) of each aisle, the freezers and the
 // drinks fridges, and the bakery's bread rack, pastry case and the Sinterklaas stands.
 export const ASSORTMENT = {
-  BROODBELEG: [['beschuit', 'ontbijtkoek'], ['hagelslag', 'melkhagel', 'vlokken', 'muisjesRoze', 'muisjesBlauw'], ['pindakaas', 'pindakaasNoot', 'pindakaas', 'chocopasta'], ['jam', 'appelstroop', 'pindakaas', 'honing']],
   ZUIVEL: [['eieren', 'boter'], ['melk', 'karnemelk', 'chocomelk'], ['yoghurt', 'vla', 'kwark'], ['melk', 'vla', 'slagroom', 'koffiemelk']],
   'KOFFIE & THEE': [['koffie', 'koffiepads'], ['thee', 'koffiemelk', 'koffie'], ['koffiepads', 'stroopwafels', 'speculaas'], ['thee', 'koffie']],
   SNOEP: [['chipsPaprika', 'chipsNaturel'], ['drop', 'snoepmix', 'pepernoten'], ['chocolade', 'stroopwafels', 'speculaas'], ['chipsNaturel', 'snoepmix', 'drop']],

@@ -361,6 +361,7 @@ const zap = new Zap(scene, lennie);
 const effects = new Effects({
   scene, world, ragdoll: lennie, zap, sfx, trolley,
   spots: [...house.spots, ...shop.spots],
+  places: shop.places,
   hooks: {
     pop: (position, text, cls) => popAt(position, text, cls),
     // counts towards this toss's bonus (houseBonuses)

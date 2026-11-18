@@ -45,8 +45,6 @@ const PLACES = {
   piano: box([2.07, 0, 0.4], [3.9, 1.4, 1.12]), // the piano in the living room, against the right-hand wall
   paint: box([1.75, 0, -7.45], [3.5, 1.0, -6.75]), // the paint tins on the garage's tool shelves
   bins: box([1.35, 0, -16.1], [3.85, 1.2, -15.2]), // the three wheelie bins
-  hagelslag: box([-18.62, 0.4, 36.1], [-17.38, 1.45, 42.5]), // aisle 1's shelves of hagelslag, vlokken and muisjes (and just above)
-  sint: box([-1.2, 0, 34.7], [0.2, 1.8, 35.45]), // the Sinterklaas stand
   lamps: LAMP_XS.map((x) => box([x - 0.3, 0, STREET.verge[1] - 0.7], [x + 0.3, 7.2, STREET.verge[1] - 0.1])),
 };
 
@@ -130,7 +128,7 @@ export class Effects {
    * hooks: pop(position, text, cls), feat(id) (counts towards this toss's bonus),
    * free() (nobody's holding him and no replay is on).
    */
-  constructor({ scene, world, ragdoll, zap, sfx, spots, trolley, hooks }) {
+  constructor({ scene, world, ragdoll, zap, sfx, spots, places, trolley, hooks }) {
     this.world = world;
     this.ragdoll = ragdoll;
     this.zap = zap;
@@ -153,6 +151,9 @@ export class Effects {
       // a bed from the floor up, with the height of its mattress
       beds: by('bed').map((s) => ({ min: [s.min[0], s.min[1] - 0.45, s.min[2]], max: s.max, top: s.min[1] + 0.2 })),
       pindakaas: by('pindakaas').map((s) => box([s.min[0], 0, s.min[2]], s.max)),
+      // the hagelslag pyramid and the Sinterklaas stands (supermarket.js)
+      hagelslag: places.hagelslag,
+      sint: places.sint,
     };
     this.basket = box([0, 0, 0], [0, 0, 0]);
 
@@ -434,8 +435,8 @@ export class Effects {
     if (v > 2.5 && inBox(point, z.piano, 0.05)) this.#piano(point, v);
     if (v > 2 && z.washer.some((b) => inBox(point, b, 0.08))) this.#spin();
     if (v > 3 && inBox(point, z.paint, 0.05)) this.#paintJob(point);
-    if (v > 3 && inBox(point, z.hagelslag, 0.05)) this.#hagelslag(point);
-    if (v > 3 && inBox(point, z.sint, 0.05)) this.#sint();
+    if (v > 3 && z.hagelslag.some((b) => inBox(point, b, 0.05))) this.#hagelslag(point);
+    if (v > 3 && z.sint.some((b) => inBox(point, b, 0.05))) this.#sint();
     if (v > 3 && z.pindakaas.some((b) => inBox(point, b, 0.05))) this.#sticky();
     if (v > 5) {
       const bed = z.beds.find((b) => inBox(point, b, 0.05));

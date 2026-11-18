@@ -46,6 +46,7 @@ const MESS = {
   pindakaas: ['Smooth move!', 'Nuts!', 'Crunchy or smooth?', 'Sticky situation!', 'Going nuts, Lennie!'],
   snacks: ['Snack attack!', 'Bitterballen bonanza!', 'Frikandel frenzy!', 'Mustard not included!', 'Frozen solid... and flying!'],
   sausage: ['What the sausage?!', 'Wurst landing ever!', 'Best of the wurst!', 'Rookworst rain!', 'Meat you on the floor!'],
+  hagelslag: ['Hagelslag hailstorm!', 'Sprinkles everywhere!', 'Breakfast is served!', 'Stacked and smacked!', 'Muisjes? No, hagelslag!'],
   letters: ['L is for Lennie!', 'Chocolate alphabet soup!', 'Spell it out, Lennie!', 'Sint saw that!', 'Is it 5 December already?'],
   flowers: ['Flower power!', 'Say it with flowers!', 'Tulip trouble!', 'Oops-a-daisy!', 'Painting the town red!'],
   sint: ['In de zak, Lennie!', 'Sint saw that!', 'Strooi, strooi, strooi!', 'Is it 5 December already?', 'Pepernoten party!'],
@@ -653,8 +654,9 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
   const endCap = green;
   const AISLE = { z0: 36.2, z1: 42.4, h: 1.95, half: 0.55 };
   const shelfYs = [0.12, 0.55, 0.98, 1.41];
-  const aisleNames = ['BROODBELEG', 'ZUIVEL', 'KOFFIE & THEE', 'SNOEP', 'DRINKEN', 'PASTA & SAUS'];
-  const aisleXs = [-18, -13, -8, -3, 2, 7];
+  // (where a sixth aisle stood, by the cheese, the pindakaas and hagelslag pyramids are now)
+  const aisleNames = ['ZUIVEL', 'KOFFIE & THEE', 'SNOEP', 'DRINKEN', 'PASTA & SAUS'];
+  const aisleXs = [-13, -8, -3, 2, 7];
   aisleXs.forEach((cx, a) => {
     const { z0, z1, h, half } = AISLE;
     // (the shelves run between the green end caps, not into them, or their sides and tops flicker through)
@@ -1089,42 +1091,46 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     return stock.knock(cheesePacks, point, cheeseF.out, strength, push);
   };
 
-  // ---------------------------------------------------------------- the pindakaas pyramid by the entrance
-  // A cardboard pallet stacked with jars in steps, the giant jar on top. Knock
-  // out enough of a layer and everything above it comes down too.
-  {
-    const P0 = { x: -7.4, z: 34.2 };
+  // ---------------------------------------------------------------- the pindakaas and hagelslag pyramids, where the first aisle stood
+  // A cardboard pallet stacked with jars or boxes in steps, a giant one on
+  // top. Knock out enough of a layer and everything above it comes down too.
+  const places = { sint: [], hagelslag: [] }; // for effects.js: where Lennie crashing into a Sint stand, or the hagelslag, does something
+  const cardboard = std({ color: 0xb8925a, roughness: 0.9 });
+  /**
+   * A pyramid at (x, z): `kinds` the products of each layer (bottom up), `xl`
+   * the giant one on top, `cols` × `rows` the bottom layer (two fewer each way
+   * on every layer up), `pitch` [x, z] the spacing; `print` the pallet's
+   * printed sides; `offer` the price on the card. Returns its landing spot.
+   */
+  function pyramid({ x, z, kinds, xl, cols, rows, pitch, jitter, print, offer, mess }) {
     const base = 0.45;
-    const pitch = 0.095;
-    const jarH = halfSize(PRODUCTS.pindakaas)[1] * 2;
-    const cardboard = std({ color: 0xb8925a, roughness: 0.9 });
-    const printed = std({ map: labelTexture('PINDAKAAS', '#f2c14e', '#c0392b', 512, 112) });
-    boxAt([P0.x - 0.62, 0, P0.z - 0.52], [P0.x + 0.62, base, P0.z + 0.52], faces(printed, printed, cardboard, cardboard, printed, printed), { cast: true });
-    const baseBody = solid([P0.x - 0.62, 0, P0.z - 0.52], [P0.x + 0.62, base, P0.z + 0.52], 'furniture');
+    const [phx, phz] = [(cols * pitch[0]) / 2 + 0.05, (rows * pitch[1]) / 2 + 0.045]; // the pallet's half size
+    boxAt([x - phx, 0, z - phz], [x + phx, base, z + phz], faces(print, print, cardboard, cardboard, print, print), { cast: true });
+    const baseBody = solid([x - phx, 0, z - phz], [x + phx, base, z + phz], 'furniture');
     const layers = [];
     let y = base;
-    for (let L = 0; L < 5; L++) {
-      const cols = 12 - 2 * L;
-      const rows = 10 - 2 * L;
-      const hx = (cols * pitch) / 2;
-      const hz = (rows * pitch) / 2;
-      boxAt([P0.x - hx - 0.01, y, P0.z - hz - 0.01], [P0.x + hx + 0.01, y + 0.008, P0.z + hz + 0.01], cardboard);
+    kinds.forEach((id, L) => {
+      const [cs, rs] = [cols - 2 * L, rows - 2 * L];
+      const hx = (cs * pitch[0]) / 2;
+      const hz = (rs * pitch[1]) / 2;
+      const h = halfSize(PRODUCTS[id])[1] * 2;
+      boxAt([x - hx - 0.01, y, z - hz - 0.01], [x + hx + 0.01, y + 0.008, z + hz + 0.01], cardboard);
       y += 0.008;
       const section = stock.section();
-      for (let i = 0; i < cols; i++) {
-        for (let j = 0; j < rows; j++) stock.place('pindakaas', P0.x - hx + (i + 0.5) * pitch, y, P0.z - hz + (j + 0.5) * pitch, Math.PI + (rnd() - 0.5) * 0.6, section);
+      for (let i = 0; i < cs; i++) {
+        for (let j = 0; j < rs; j++) stock.place(id, x - hx + (i + 0.5) * pitch[0], y, z - hz + (j + 0.5) * pitch[1], Math.PI + (rnd() - 0.5) * jitter, section);
       }
-      layers.push({ section, min: [P0.x - hx, y - 0.008, P0.z - hz], max: [P0.x + hx, y + jarH, P0.z + hz] });
-      y += jarH;
-    }
+      layers.push({ section, min: [x - hx, y - 0.008, z - hz], max: [x + hx, y + h, z + hz] });
+      y += h;
+    });
     const xlSection = stock.section();
-    stock.place('pindakaasXL', P0.x, y, P0.z, Math.PI, xlSection);
-    const xlR = halfSize(PRODUCTS.pindakaasXL)[0];
-    layers.push({ section: xlSection, min: [P0.x - xlR, y, P0.z - xlR], max: [P0.x + xlR, y + 2 * halfSize(PRODUCTS.pindakaasXL)[1], P0.z + xlR] });
+    stock.place(xl, x, y, z, Math.PI, xlSection);
+    const [xx, xy, xz] = halfSize(PRODUCTS[xl]);
+    layers.push({ section: xlSection, min: [x - xx, y, z - xz], max: [x + xx, y + 2 * xy, z + xz] });
     const pyramidTop = layers.at(-1).max[1];
     const left = (sec) => sec.items.filter((it) => it.state === 'home').length / sec.items.length;
     const hit = (point, strength, push) => {
-      _out.set(point.x - P0.x, 0, point.z - P0.z);
+      _out.set(point.x - x, 0, point.z - z);
       if (_out.lengthSq() < 0.01) _out.set(push?.x ?? 0, 0, push?.z ?? 1);
       _out.normalize();
       let n = 0;
@@ -1139,7 +1145,7 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
         for (let L = fallen; L < layers.length; L++) {
           for (const item of layers[L].section.items) {
             if (item.state !== 'home') continue;
-            _mid.set(item.home.x - P0.x, 0, item.home.z - P0.z);
+            _mid.set(item.home.x - x, 0, item.home.z - z);
             if (_mid.lengthSq() < 0.01) _mid.copy(_out);
             n += stock.knock({ items: [item] }, item.home, _mid.normalize(), 4 + rnd() * 3, null, { radius: 1 });
           }
@@ -1151,20 +1157,36 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     };
     for (const l of layers) {
       l.body = solid(l.min, l.max, 'furniture');
-      l.body.surface.mess = MESS.pindakaas;
+      l.body.surface.mess = mess;
       l.body.surface.onHit = hit;
     }
-    baseBody.surface.mess = MESS.pindakaas;
+    baseBody.surface.mess = mess;
     baseBody.surface.onHit = (point, strength, push) => hit(point.setY(Math.max(point.y, base + 0.02)), strength * 0.7, push);
     onRestock.push(() => {
-      toRemove.clear();
       for (const l of layers) if (!l.body.world) world.addBody(l.body);
     });
-    // the offer: buy one, get one free
-    boxAt([P0.x + 0.56, base - 0.01, P0.z + 0.46], [P0.x + 0.6, 2.1, P0.z + 0.5], darkFrame); // (its foot sunk into the pallet)
-    const card = std({ map: offerTexture('1+1') });
-    boxAt([P0.x + 0.28, 1.5, P0.z + 0.45], [P0.x + 0.88, 2.25, P0.z + 0.48], card);
-    spotsExtra.push(['pindakaas', 'In the pindakaas!', 550, 'PINDAKAAS!', [P0.x - 0.75, base - 0.1, P0.z - 0.65], [P0.x + 0.75, 1.9, P0.z + 0.65]]);
+    // the offer on a pole at a back corner
+    boxAt([x + phx - 0.06, base - 0.01, z + phz - 0.06], [x + phx - 0.02, 2.1, z + phz - 0.02], darkFrame); // (its foot sunk into the pallet)
+    boxAt([x + phx - 0.34, 1.5, z + phz - 0.07], [x + phx + 0.26, 2.25, z + phz - 0.04], std({ map: offerTexture(offer) }));
+    return [[x - phx - 0.13, base - 0.1, z - phz - 0.13], [x + phx + 0.13, 1.9, z + phz + 0.13]];
+  }
+  onRestock.push(() => toRemove.clear());
+  const pindakaasSpot = pyramid({
+    x: -18, z: 37.6, kinds: Array(5).fill('pindakaas'), xl: 'pindakaasXL', cols: 12, rows: 10, pitch: [0.095, 0.095], jitter: 0.6,
+    print: std({ map: labelTexture('PINDAKAAS', '#f2c14e', '#c0392b', 512, 112) }), offer: '1+1', mess: MESS.pindakaas,
+  });
+  spotsExtra.push(['pindakaas', 'In the pindakaas!', 550, 'PINDAKAAS!', ...pindakaasSpot]);
+  const hagelslagSpot = pyramid({
+    x: -18, z: 40.9, kinds: ['hagelslag', 'melkhagel', 'hagelslag', 'vlokken', 'hagelslag'], xl: 'hagelslagXL', cols: 10, rows: 14, pitch: [0.12, 0.07], jitter: 0.05,
+    print: std({ map: labelTexture('HAGELSLAG', '#2a1f1a', '#ffffff', 512, 112) }), offer: '1,99', mess: MESS.hagelslag,
+  });
+  places.hagelslag.push({ min: hagelslagSpot[0], max: [hagelslagSpot[1][0], 2.6, hagelslagSpot[1][2]] });
+  // and the aisle's sign, still hanging over them
+  {
+    const label = std({ map: labelTexture('BROODBELEG') });
+    const [cx, sz] = [-18, AISLE.z0 - 0.4];
+    boxAt([cx - 0.9, 2.75, sz - 0.05], [cx + 0.9, 3.2, sz], faces(green, green, green, green, label, label));
+    for (const dx of [-0.7, 0.7]) boxAt([cx + dx - 0.01, 3.2, sz - 0.03], [cx + dx + 0.01, IN.y1, sz - 0.02], darkFrame);
   }
 
   // ---------------------------------------------------------------- the open snack freezer: kroketten, frikandellen, bitterballen
@@ -1209,11 +1231,14 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
   }
 
   // ---------------------------------------------------------------- the Sinterklaas stands: pepernoten and chocolate letters
-  // One on the open floor before the aisles, two against the aisles' green end
-  // caps on that side (just in front of them, not touching), one of those all chocolate letters.
+  // Against the green end caps on the entrance side of three aisles (just in
+  // front of them, not touching): the middle one straight across from the
+  // doors, one at each end, that one all chocolate letters.
   const red = std({ color: 0xc8102e, roughness: 0.8 });
   const sintHeaders = new Map();
-  function sintStand(back, u0, u1, assortment, line, mess) {
+  function sintStand(cx, assortment, line, mess) {
+    const [back, u0, u1] = [AISLE.z0 - 0.06, cx - 0.6, cx + 0.6];
+    places.sint.push({ min: [u0 - 0.1, 0, back - 0.6], max: [u1 + 0.1, 1.8, back + 0.05] });
     const sint = shelfUnit({
       axis: 'x', back, dir: -1, u0, u1, depth: 0.45, h: 1.3, ys: [0.1, 0.5, 0.9],
       assortment, mats: { frame: red, shelf: cabinetWhite, back: red }, mess,
@@ -1221,9 +1246,9 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     if (!sintHeaders.has(line)) sintHeaders.set(line, std({ map: sintHeader(line) }));
     boxAt(...sint.box(u0, 1.3, 0, u1, 1.75, 0.04), sint.withFront(red, sintHeaders.get(line)), { cast: true });
   }
-  sintStand(35.3, -1.1, 0.1, ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
-  sintStand(AISLE.z0 - 0.06, aisleXs[1] - 0.6, aisleXs[1] + 0.6, ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
-  sintStand(AISLE.z0 - 0.06, aisleXs[5] - 0.6, aisleXs[5] + 0.6, ASSORTMENT.LETTERS, 'chocoladeletters!', MESS.letters);
+  sintStand(-13, ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
+  sintStand(-3, ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
+  sintStand(7, ASSORTMENT.LETTERS, 'chocoladeletters!', MESS.letters);
   /** The red sign on top of a Sinterklaas stand: a mitre, SINT, and what's in it. */
   function sintHeader(line) {
     return canvasTexture(512, 192, (g, w, h) => {
@@ -1552,7 +1577,7 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     S('trolley', 'In the trolleys!', 400, 'WHEEE!', [0.15, 0.95, IN.z0 + 0.1], [1.8, 1.8, IN.z0 + 1.25]),
     ...vegSpots.map((box) => S('fruit', 'In the fruit and veg!', 400, 'SQUISH!', ...box)),
     ...[-17, -13.5, -10].map((c) => S('checkout', 'Scanned at the checkout!', 500, 'BEEP!', [c - 0.45, 0.85, IN.z0 + 1.15], [c + 1.05, 1.6, IN.z0 + 3.85])),
-    ...[-18, -13, -8, -3, 2, 7].map((cx) => S('shelves', 'On top of the shelves!', 500, 'HELP!', [cx - 0.6, 1.9, 36.1], [cx + 0.6, 2.8, 42.5])),
+    ...aisleXs.map((cx) => S('shelves', 'On top of the shelves!', 500, 'HELP!', [cx - 0.6, 1.9, 36.1], [cx + 0.6, 2.8, 42.5])),
     S('pastry', 'In the pastry case!', 600, 'TOMPOUCE!', ...caseF.box(CASE.u0, CASE.top - 0.1, 0, CASE.u1, CASE.glass + 0.5, CASE.depth + 0.1), () => pastryCase.broken),
     S('bread', 'In the bread baskets!', 400, 'FRESH!', [breadTable.x0 - 0.05, 0.7, breadTable.z0 - 0.05], [breadTable.x1 + 0.05, 1.5, breadTable.z1 + 0.05]),
     S('breadrack', 'On top of the bread rack!', 500, 'HELP!', ...breadRack.box(IN.z0 + 0.2, 2.4, 0, 35.4, 3.2, 0.65)),
@@ -1592,7 +1617,7 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
   }
 
   // Where 'Drop Lennie on the supermarket' puts him: the open floor just inside
-  // the sliding doors, between the checkouts, the pindakaas and the aisles.
+  // the sliding doors, between the checkouts and the Sint stands before the aisles.
   const spawnPoint = () => ({ x: -4.5, z: 34.4, height: 0.05 });
 
   const fadeMaterials = () => [...lines.values()].flatMap((e) => [...e.mats]);
@@ -1601,7 +1626,7 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     get farView() { return farView; },
     get far() { return far; },
     allowFar(on) { farAllowed = on; },
-    isInside, isOnRoof, spawnPoint, updateView, fadeMaterials, isFaded, spots, windows, breakPiece, repairAll, update };
+    isInside, isOnRoof, spawnPoint, updateView, fadeMaterials, isFaded, spots, places, windows, breakPiece, repairAll, update };
   for (const piece of windows) piece.owner = api;
   return api;
 }
