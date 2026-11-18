@@ -6,7 +6,7 @@ import { buildSupermarket, canvasTexture } from './supermarket.js';
 // The street in front of the row, after the real one: past the front-garden
 // hedge a red cycle path, a grass verge with tall trees and street lamps, a
 // two-lane road, another verge, and across the road an orange supermarket with
-// a zigzag of grey gables (supermarket.js), which Lennie can be flung into.
+// slate and glass gables (supermarket.js), which Lennie can be flung into.
 // Distances are z (metres) from the middle of the house; its front is at 5.1.
 export const STREET = {
   cycle: [12.6, 15.0], // red cycle path

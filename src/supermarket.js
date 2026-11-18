@@ -8,8 +8,9 @@ import { farCopy } from './farview.js';
 import { drawn } from './pictures.js';
 
 // The supermarket across the road, after the real one: a long orange box
-// under a zigzag of grey gables, with a brick-and-glass entrance and a big
-// green four-dot logo. Lennie can be flung in through the open sliding doors:
+// whose wall steps up and down along the street, with dark slate and glazed
+// gables rising in the dips, a brick-and-glass entrance and a big green
+// four-dot logo. Lennie can be flung in through the open sliding doors:
 // inside are checkouts, fruit and veg crates with red offer signs, aisles of
 // shelves stocked with products (products.js) that tumble off when Lennie hits
 // them, and glass-door freezers and fridges. The shop window and every
@@ -17,8 +18,8 @@ import { drawn } from './pictures.js';
 // Walls, the roof and the entrance fade like the house's walls when they block
 // the view of the camera target.
 export const SHOP = {
-  x0: -36, x1: 14, // whole building
-  hall: -22, // the shop floor runs from here to x1; west of it is the storeroom
+  x0: -36, end: 20, // whole building
+  hall: -22, x1: 14, // the shop floor runs from hall to x1; west of it is the storeroom, east of it a back room
   z0: 30, z1: 46, // front (street side) and back walls
   h: 4.2, // wall height; the ceiling is at 3.95
   t: 0.3, // wall thickness
@@ -84,6 +85,29 @@ function poster(bg, items) {
       }
     }
   });
+}
+
+/**
+ * The glazed gable ends: grey-green glass with the frames running at 45°,
+ * parallel to the roof slopes, in diamonds 2 m across, and a pale sky in it.
+ */
+function glazingTexture() {
+  const t = canvasTexture(128, 128, (g, w, h) => {
+    const sky = g.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#b9cdd0');
+    sky.addColorStop(1, '#8ea7aa');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = 'rgba(255,255,255,0.22)';
+    g.beginPath(); g.moveTo(0, h * 0.55); g.lineTo(w * 0.45, h); g.lineTo(w * 0.7, h); g.lineTo(0, h * 0.3); g.closePath(); g.fill();
+    // both diagonals of the tile: tiled, they make a lattice of diamonds
+    g.strokeStyle = '#66706f';
+    g.lineWidth = 7;
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(w, h); g.moveTo(w, 0); g.lineTo(0, h); g.stroke();
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1 / 2, 1 / 2); // (the gable ends' corners are in metres)
+  return t;
 }
 
 /** The shop's logo, hand-drawn in comic style: four green dots and a bold green name, on a clear background. */
@@ -284,9 +308,10 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
   // ---------------------------------------------------------------- the storeroom (closed, solid)
   boxAt([SHOP.x0, 0, SHOP.z0], [SHOP.hall, SHOP.h, SHOP.z1], faces(orange, orange, roofGrey, orange, orange, orange), { cast: true });
   solid([SHOP.x0, 0, SHOP.z0], [SHOP.hall, SHOP.h, SHOP.z1], 'wall');
-  // (the white rims along the top stick out 2 cm above the roof, so their tops never flicker against it)
-  // (it runs 1 cm into the next rim, so its end isn't in one plane with the side of the hall)
-  boxAt([SHOP.x0 - 0.05, SHOP.h - 0.15, SHOP.z0 - 0.06], [SHOP.hall + 0.01, SHOP.h + 0.02, SHOP.z0 + 0.02], white);
+  // and a back room east of the shop floor, closed too; it fades with the
+  // shop floor's east wall, so you can still look in from that side
+  boxAt([SHOP.x1, 0, SHOP.z0], [SHOP.end, SHOP.h, SHOP.z1], faces(orange, orange, roofGrey, orange, orange, orange), { cast: true, fade: 'east' });
+  solid([SHOP.x1, 0, SHOP.z0], [SHOP.end, SHOP.h, SHOP.z1], 'wall');
 
   // ---------------------------------------------------------------- walls of the shop floor
   // The walls stop under the roof slab (at the ceiling), which forms the top
@@ -299,7 +324,6 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     boxAt([a, 0, SHOP.z0], [b, IN.y1, SHOP.z0 + SHOP.t], frontMats, { cast: true, fade: 'front' });
     solid([a, 0, SHOP.z0], [b, SHOP.h, SHOP.z0 + SHOP.t], 'wall');
   }
-  boxAt([SHOP.hall - 0.01, SHOP.h - 0.15, SHOP.z0 - 0.06], [SHOP.x1 + 0.05, SHOP.h + 0.02, SHOP.z0 + 0.02], white, { fade: 'front' });
 
   boxAt([IN.x1, 0, SHOP.z0], [SHOP.x1, IN.y1, SHOP.z1], faces(orange, innerWall, orange, orange, orange, orange), { cast: true, fade: 'east' });
   solid([IN.x1, 0, SHOP.z0], [SHOP.x1, SHOP.h, SHOP.z1], 'wall');
@@ -312,41 +336,116 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
   boxAt([IN.x0, 0, 43.1], [IN.x0 + 0.04, 2.2, 44.5], std({ color: 0x8d949a, roughness: 0.5 }));
   boxAt([IN.x0, 2.3, 43.1], [IN.x0 + 0.04, 2.6, 44.5], std({ map: labelTexture('Alleen personeel', '#ffffff', '#c0392b', 512, 96) }));
 
-  // ---------------------------------------------------------------- roof, with the zigzag of gables
+  // ---------------------------------------------------------------- the street front: orange blocks before tall gables
+  // After the photo of the real shop. Pitched roofs run front to back over
+  // the flat roof, and their gable ends come all the way down to the ground:
+  // tall house-shaped panels, dark slate or glazed, side by side. Orange
+  // blocks stand just in front of them, their top corners cut off at 45°
+  // under the roof slopes. So between two blocks a gable pair shows as a
+  // grey Y: two slanting arms under the roofs, meeting in a strip down to the
+  // ground with a drainpipe from the valley (and a door, in the first one).
+  // A low orange point stands in front of the valley between the two dark
+  // pairs. Seen from the street (+x is on the left): a short block, four dark
+  // gables with the point, a short block, the entrance, a short block, two
+  // glazed gables, and the long block with the name to the far end.
   boxAt([SHOP.hall, IN.y1, SHOP.z0], [SHOP.x1, SHOP.h, SHOP.z1], faces(orange, orange, roofGrey, ceiling, orange, orange), { fade: 'roof' });
   solid([SHOP.hall, IN.y1, SHOP.z0], [SHOP.x1, SHOP.h, SHOP.z1], 'roof');
-  const gableW = 5;
-  const gableH = 2.6;
-  const tri = new THREE.Shape([new THREE.Vector2(-gableW / 2, 0), new THREE.Vector2(gableW / 2, 0), new THREE.Vector2(0, gableH)]);
-  const gableGeo = new THREE.ExtrudeGeometry(tri, { depth: SHOP.z1 - SHOP.z0 - 0.4, bevelEnabled: false });
-  const slate = [std({ color: 0x5b6268, emissive: 0x1c1f22, roughness: 0.7 }), std({ color: 0x8e959b, roughness: 0.6 })];
-  const glazed = [std({ color: 0x8fb6b9, emissive: 0x22302f, roughness: 0.2 }), slate[1]];
-  for (let x = SHOP.x0 + gableW / 2; x < SHOP.x1; x += gableW) {
-    const overEntrance = x === -8.5 || x === -3.5;
-    const m = add(new THREE.Mesh(gableGeo, overEntrance ? glazed : slate), { cast: true, fade: x > SHOP.hall ? 'roof' : null });
-    m.position.set(x, SHOP.h, SHOP.z0 + 0.2);
-    gableBody(x, gableW, gableH, SHOP.z0 + 0.2, SHOP.z1 - 0.2);
+
+  /** A mesh of `poly` ([x, y] corners around `at`, in the x-y plane) stretched in z from za to zb; materials [ends, sides]. */
+  function prism(poly, at, za, zb, mats, opts) {
+    const shape = new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x, y)));
+    const m = add(new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: zb - za, bevelEnabled: false }), mats), opts);
+    m.position.set(at[0], at[1], za);
+    return m;
   }
-  /** A solid triangular prism under one gable, so Lennie lands on (and slides down) its slopes. */
-  function gableBody(cx, w, hgt, za, zb) {
-    const y = SHOP.h;
-    const pts = [[cx - w / 2, y, za], [cx + w / 2, y, za], [cx, y + hgt, za], [cx - w / 2, y, zb], [cx + w / 2, y, zb], [cx, y + hgt, zb]];
+  /** A solid body of a convex `poly` stretched like prism(), so Lennie lands on (and slides down) its slopes. */
+  function prismBody(poly, at, za, zb, kind) {
+    const n = poly.length;
+    const pts = [za, zb].flatMap((z) => poly.map(([x, y]) => [at[0] + x, at[1] + y, z]));
     const c = [0, 1, 2].map((i) => pts.reduce((s, p) => s + p[i], 0) / pts.length);
     const verts = pts.map((p) => new CANNON.Vec3(p[0] - c[0], p[1] - c[1], p[2] - c[2]));
-    const faceList = [[0, 1, 2], [3, 4, 5], [0, 1, 4, 3], [1, 2, 5, 4], [2, 0, 3, 5]].map((f) => {
+    const ring = [...Array(n).keys()];
+    const faceList = [ring, ring.map((i) => i + n), ...ring.map((i) => [i, (i + 1) % n, (i + 1) % n + n, i + n])].map((f) => {
       const [a, b, d] = f.map((i) => verts[i]);
-      const n = b.vsub(a).cross(d.vsub(a));
+      const nrm = b.vsub(a).cross(d.vsub(a));
       const mid = f.reduce((s, i) => s.vadd(verts[i]), new CANNON.Vec3()).scale(1 / f.length);
-      return n.dot(mid) < 0 ? [...f].reverse() : f; // normals point away from the centre
+      return nrm.dot(mid) < 0 ? [...f].reverse() : f; // normals point away from the centre
     });
     const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.ConvexPolyhedron({ vertices: verts, faces: faceList }) });
     b.position.set(...c);
-    b.surface = { kind: 'roof' };
+    b.surface = { kind };
     world.addBody(b);
   }
 
+  // Sizes, in metres. Every slope is 45°, except the orange point's gentler one.
+  const HIGH = 5.0; // the orange blocks' flat tops
+  const VALLEY = 4.75; // where two gables meet (their eaves), just under the blocks' tops
+  const G = 1.6; // half a gable's width: its peak is this much above the valley
+  const CUT = 1.6; // the blocks' cut corners drop this much (and run this far sideways)
+  const FOOT = HIGH - CUT; // the height where a cut corner meets the block's vertical edge
+  const GAP = 1.0; // half the width of the strip between two blocks, down to the ground
+  const POINT = 2 * G - GAP; // half the orange point's width, so it fills the space between two strips
+  // The valleys over the strips (and the one behind the point). The dark
+  // pairs stand over the shop floor between the entrance and the back room,
+  // their outer gables short of the entrance; the glazed pair
+  // stands as far on the entrance's other side, so the entrance is in the middle.
+  const E = { x0: -9.6, x1: 0.5, z0: SHOP.z0 - 0.7, top: 5.6 }; // the entrance (built below)
+  const v3 = 3.9; // the dark pair beside the entrance
+  const v2 = v3 + 2 * G; // behind the orange point
+  const v1 = v2 + 2 * G; // the dark pair near the east end
+  const vg = E.x0 + E.x1 - v3; // the glazed pair
+  // Layers from the street in: the blocks' fronts, the gable ends (a thin
+  // panel each), then the shop's own wall at SHOP.z0.
+  const Z = { block: SHOP.z0 - 0.16, panel: SHOP.z0 - 0.08, panelBack: SHOP.z0 - 0.02, back: SHOP.z0 + SHOP.t - 0.05 };
+  const fadeAt = (x) => (x > SHOP.hall ? 'front' : null);
+
+  // The orange blocks, each a convex outline from the ground up (so each is one solid body too).
+  // Their backs are 5 cm inside the wall, so no face of them lies in one plane with the wall's inside.
+  const E0 = -9.3; // (the blocks either side of the entrance end inside its brick pillars)
+  const E1 = 0.2;
+  const SEAM = SHOP.hall + 0.05; // the long block is in two, so the part in front of the shop floor can fade
+  const blocks = [
+    [[v1 + GAP, 0], [SHOP.end + 0.02, 0], [SHOP.end + 0.02, HIGH], [v1 + GAP + CUT, HIGH], [v1 + GAP, FOOT]], // the east end's block
+    [[v2 - POINT, 0], [v2 + POINT, 0], [v2 + POINT, FOOT], [v2, VALLEY - 0.02], [v2 - POINT, FOOT]], // the orange point
+    [[E1, 0], [v3 - GAP, 0], [v3 - GAP, FOOT], [v3 - GAP - CUT, HIGH], [E1, HIGH]], // the short block beside the entrance
+    [[vg + GAP, 0], [E0, 0], [E0, HIGH], [vg + GAP + CUT, HIGH], [vg + GAP, FOOT]], // the short block on the entrance's other side
+    [[SEAM, 0], [vg - GAP, 0], [vg - GAP, FOOT], [vg - GAP - CUT, HIGH], [SEAM, HIGH]], // the long block with the name...
+    [[SHOP.x0 - 0.02, 0], [SEAM, 0], [SEAM, HIGH], [SHOP.x0 - 0.02, HIGH]], // ...on in front of the storeroom
+  ];
+  for (const poly of blocks) {
+    prism(poly, [0, 0], Z.block, Z.back, orange, { cast: true, fade: fadeAt(poly[0][0]) });
+    prismBody(poly, [0, 0], Z.block, Z.back, 'wall');
+  }
+  // the blocks' tops run on round both ends of the building, all the way to the back
+  for (const [x0, x1, fade] of [[SHOP.x0 - 0.02, SHOP.x0 + SHOP.t], [SHOP.end - SHOP.t, SHOP.end + 0.02, 'east']]) {
+    boxAt([x0, SHOP.h - 0.1, Z.back], [x1, HIGH, SHOP.z1 + 0.02], orange, { cast: true, fade });
+    solid([x0, SHOP.h - 0.1, Z.back], [x1, HIGH, SHOP.z1 + 0.02], 'wall');
+  }
+
+  // The gables: a tall panel from the ground for the end, and the roof
+  // behind it on the flat roof, 8 cm higher so its corrugated edge shows
+  // above the panel. Dark slate or glass on the ends, light grey sheet on the roofs.
+  // (facing away from the sun like the orange, so it glows a little too, or it's near black)
+  const slate = std({ color: 0x66717b, emissive: 0x2b3238, roughness: 0.7 });
+  const roofing = std({ map: tex.grooves, color: 0xa5acb1, roughness: 0.6 }); // (the ribs run down the slopes)
+  const glazing = std({ map: glazingTexture(), emissive: 0x1d2a2c, roughness: 0.2 });
+  const gables = [
+    ...[v1 + G, v1 - G, v3 + G, v3 - G].map((x) => [x, slate, slate]),
+    ...[vg + G, vg - G].map((x) => [x, glazing, darkFrame]),
+  ];
+  for (const [x, end, edge] of gables) {
+    const panel = [[-G, 0], [G, 0], [G, VALLEY], [0, VALLEY + G], [-G, VALLEY]];
+    prism(panel, [x, 0], Z.panel, Z.panelBack, [end, edge], { cast: true, fade: fadeAt(x) });
+    prismBody(panel, [x, 0], Z.panel, Z.panelBack, 'wall');
+    const up = VALLEY + 0.08 - SHOP.h;
+    const roof = [[-G, -0.05], [G, -0.05], [G, up], [0, up + G], [-G, up]];
+    prism(roof, [x, SHOP.h], SHOP.z0 - 0.01, SHOP.z1 - 0.2, [end, roofing], { cast: true, fade: x > SHOP.hall ? 'roof' : null });
+    prismBody(roof, [x, SHOP.h], SHOP.z0 - 0.01, SHOP.z1 - 0.2, 'roof');
+  }
+  // a drainpipe down each strip from the valley, as on the real one
+  for (const v of [v1, v3, vg]) boxAt([v - 0.07, 0, Z.block - 0.01], [v + 0.07, VALLEY, Z.panel - 0.01], orange, { fade: fadeAt(v) });
+
   // ---------------------------------------------------------------- the entrance: brick and glass under the logo
-  const E = { x0: -9.6, x1: 0.5, z0: SHOP.z0 - 0.7, top: 5.6 };
   const fadeFront = { fade: 'front', cast: true };
   boxAt([E.x0, 0, E.z0], [E.x0 + 0.6, E.top, SHOP.z0], brick, { ...fadeFront, uv: true });
   boxAt([E.x1 - 0.6, 0, E.z0], [E.x1, E.top, SHOP.z0], brick, { ...fadeFront, uv: true });
@@ -410,11 +509,22 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     poster('#f3d36b', [['bread', 128, 100, 40]]),
     poster('#a7d98a', [['cheese', 128, 100, 44]]),
     poster('#f2a2b8', [['orange', 80, 96, 32], ['apple', 170, 100, 36]]),
+    poster('#ffd59e', [['tomato', 84, 100, 32], ['cheese', 172, 104, 34]]),
+    poster('#b9d7f2', [['bread', 96, 100, 34], ['apple', 186, 104, 28]]),
   ];
-  [-30, -20.5, 4.5, 10].forEach((x, i) => {
-    boxAt([x, 1.3, SHOP.z0 - 0.04], [x + 2.4, 3.1, SHOP.z0], faces(white, white, white, white, white, std({ map: posters[i] })), { fade: x > SHOP.hall ? 'front' : null });
+  // like the real wall: posters on the orange blocks, grey service doors
+  // (one of them in the first grey strip, beside its drainpipe)
+  [v2 - 1.2, -21.2, -27.0, -17.4, 12.6, 16.4].forEach((x, i) => {
+    boxAt([x, 1.3, Z.block - 0.04], [x + 2.4, 3.1, Z.block], faces(white, white, white, white, white, std({ map: posters[i] })), { fade: fadeAt(x) });
   });
-  boxAt([-14, 0, SHOP.z0 - 0.05], [-12.4, 2.4, SHOP.z0], std({ color: 0x8d949a, roughness: 0.5 }), { fade: 'front' });
+  const serviceDoor = std({ color: 0x8d949a, roughness: 0.5 });
+  for (const [x, z, w] of [[v1 - 0.95, Z.panel, 0.8], [-23.6, Z.block, 1.1], [-33.9, Z.block, 1.1]]) {
+    boxAt([x, 0, z - 0.05], [x + w, 2.3, z], serviceDoor, { fade: fadeAt(x) });
+  }
+  // and the name once more, high up on the long block (cut out, not see-through: no blending to pay for)
+  const wallLogo = add(new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.1), std({ map: logoTex, emissive: 0xffffff, emissiveMap: logoTex, emissiveIntensity: 0.35, alphaTest: 0.5 })), { fade: 'front' });
+  wallLogo.rotation.y = Math.PI;
+  wallLogo.position.set(-19.5, 4.3, Z.block - 0.01);
 
   const bikeColors = [0x2c6fb6, 0x222222, 0xc0392b, 0x2e8b57, 0x7d3c98];
   const tyre = std({ color: 0x1d1d1d, roughness: 0.7 });
@@ -1323,7 +1433,7 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
 
   // ---------------------------------------------------------------- queries and the view
   const isInside = (p) => p.y > -1 && p.y < IN.y1 && p.x > IN.x0 && p.x < IN.x1 && p.z > IN.z0 && p.z < IN.z1;
-  const isOnRoof = (p) => p.y > IN.y1 && p.x > SHOP.x0 - 0.5 && p.x < SHOP.x1 + 0.5 && p.z > SHOP.z0 - 0.5 && p.z < SHOP.z1 + 0.5;
+  const isOnRoof = (p) => p.y > IN.y1 && p.x > SHOP.x0 - 0.5 && p.x < SHOP.end + 0.5 && p.z > SHOP.z0 - 0.5 && p.z < SHOP.z1 + 0.5;
 
   // From across the road (see house.js, which does the same the other way):
   // with the camera's target on the house's side of the cycle path and the
