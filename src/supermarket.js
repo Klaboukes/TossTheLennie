@@ -11,7 +11,7 @@ import { drawn } from './pictures.js';
 // whose wall steps up and down along the street, with dark slate and glazed
 // gables rising in the dips, a brick-and-glass entrance and a big green
 // four-dot logo. Lennie can be flung in through the open sliding doors:
-// inside are checkouts, fruit and veg crates with red offer signs, aisles of
+// inside are checkouts, a sloping stand of fruit and veg crates, aisles of
 // shelves stocked with products (products.js) that tumble off when Lennie hits
 // them, and glass-door freezers and fridges. The shop window and every
 // freezer and fridge door is breakable glass. The west end is a closed storeroom.
@@ -46,6 +46,7 @@ const MESS = {
   pindakaas: ['Smooth move!', 'Nuts!', 'Crunchy or smooth?', 'Sticky situation!', 'Going nuts, Lennie!'],
   snacks: ['Snack attack!', 'Bitterballen bonanza!', 'Frikandel frenzy!', 'Mustard not included!', 'Frozen solid... and flying!'],
   sausage: ['What the sausage?!', 'Wurst landing ever!', 'Best of the wurst!', 'Rookworst rain!', 'Meat you on the floor!'],
+  flowers: ['Flower power!', 'Say it with flowers!', 'Tulip trouble!', 'Oops-a-daisy!', 'Painting the town red!'],
   sint: ['In de zak, Lennie!', 'Sint saw that!', 'Strooi, strooi, strooi!', 'Is it 5 December already?', 'Pepernoten party!'],
 };
 
@@ -592,26 +593,22 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     boxAt([c + 0.2, 2.2, z1 - 0.18], [c + 0.6, 2.6, z1], faces(green, green, green, green, std({ map: labelTexture(String(i + 1), '#3fae3a', '#ffffff', 96, 96) }), std({ map: labelTexture(String(i + 1), '#3fae3a', '#ffffff', 96, 96) })));
   }
 
-  // ---------------------------------------------------------------- fruit and veg crates with offer signs
-  // The fruit and veg are loose products (products.js), like the groceries on
-  // the shelves: a knock against a crate table sends them rolling, off the
-  // table and across the floor.
-  const crate = std({ color: 0x4b7f33, roughness: 0.8 });
-  const produceKinds = ['appel', 'sinaasappel', 'kool', 'citroen', 'tomaat', 'pruim', 'boontjes', 'wortel', 'peer'];
-  const prices = ['0,99', '1,49', '2,49', '0,79', '1,99', '0,89'];
-  const CRATE = { z0: IN.z0 + 2.0, z1: IN.z0 + 3.6, top: 0.72 };
-  const crateXs = [[0.6, 3.6], [4.1, 7.1], [7.6, 10.6]];
-  const crateTables = crateXs.map(([x0, x1]) => ({ x0, x1, z0: CRATE.z0, z1: CRATE.z1, y: CRATE.top }));
+  // ---------------------------------------------------------------- the products, and tables for loose ones
   // the bakery's table of bread baskets, by the bread rack
   const breadTable = { x0: -20.1, x1: -18.8, z0: 32.3, z1: 34.4, y: 0.72 };
-  const stock = createStock(outer, { bounds: IN, tables: [...crateTables, breadTable] });
+  // the stand of tulip buckets by the entrance: a low front step and a higher back one
+  const FLOWERS = { x0: -8.7, x1: -6.3, z0: IN.z0 + 0.1, z1: IN.z0 + 0.85, low: 0.25, high: 0.5 };
+  const flowerSteps = [
+    { x0: FLOWERS.x0, x1: FLOWERS.x1, z0: (FLOWERS.z0 + FLOWERS.z1) / 2, z1: FLOWERS.z1, y: FLOWERS.low },
+    { x0: FLOWERS.x0, x1: FLOWERS.x1, z0: FLOWERS.z0, z1: (FLOWERS.z0 + FLOWERS.z1) / 2, y: FLOWERS.high },
+  ];
+  const stock = createStock(outer, { bounds: IN, tables: [breadTable, ...flowerSteps] });
   const _mid = new THREE.Vector3();
   /**
-   * A table piled with loose products (fruit, rolls) in compartments, one kind
+   * A table piled with loose products (rolls) in compartments, one kind
    * each: a knock sends them rolling off the table and across the floor.
-   * `card` puts a red offer card on a pole behind each compartment.
    */
-  function looseTable({ x0, x1, z0, z1, y: top }, kinds, mat, mess, card = null) {
+  function looseTable({ x0, x1, z0, z1, y: top }, kinds, mat, mess) {
     boxAt([x0, 0, z0], [x1, top, z1], mat, { cast: true });
     const table = solid([x0, 0, z0], [x1, top + 0.08, z1], 'furniture');
     const section = stock.section();
@@ -645,16 +642,8 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
           stock.place(id, x + (rnd() - 0.5) * 0.02, top + r * (rnd() - 0.5) * 0.3, z, rnd() * Math.PI * 2, section);
         }
       }
-      if (card) {
-        const cx = (a0 + a1) / 2;
-        // (the post stands just behind the card's face, not level with it)
-        boxAt([cx - 0.02, top, z1 - 0.05], [cx + 0.02, 1.55, z1 - 0.02], darkFrame);
-        const m = std({ map: offerTexture(card(p)) });
-        boxAt([cx - 0.24, 1.45, z1 - 0.06], [cx + 0.24, 2.05, z1 - 0.03], m);
-      }
     }
   }
-  crateTables.forEach((t, i) => looseTable(t, [0, 1, 2].map((p) => produceKinds[(i * 3 + p) % produceKinds.length]), crate, MESS.veg, (p) => prices[(i * 3 + p) % prices.length]));
 
   // ---------------------------------------------------------------- aisles of shelves
   // Each aisle is stocked with products that belong there (products.js); a
@@ -896,91 +885,133 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
   boxAt([-18.06, 0.95, IN.z0 + 0.6], [-17.98, 1.03, IN.z0 + 0.63], std({ color: 0x3fae3a, emissive: 0x1d5a1b }));
   solid([-18.45, 0, IN.z0 + 0.05], [-17.85, 1.45, IN.z0 + 0.65], 'furniture');
 
-  // ---------------------------------------------------------------- the sloping fruit and veg stand against the east wall
+  // ---------------------------------------------------------------- the sloping fruit and veg stand, along the east wall and round the corner
   // Rows of black crates tilted towards the shop, each piled with one kind of
-  // vegetable, with price screens on poles behind them.
-  const VEG = { u0: IN.z0 + 0.3, u1: 35.5, depth: 1.55, front: 0.7, back: 1.2, rows: 3 };
-  const vegF = frame('z', IN.x1, -1);
+  // fruit or vegetable, with price screens on poles behind them. It runs along
+  // the east wall and on round the corner along the front wall, up to the
+  // bottle return machine. In the corner the east run starts just behind the
+  // front run's crates.
+  const VEG = { depth: 1.55, front: 0.7, back: 1.2, rows: 3, end: 0.03 };
+  const lightWood = std({ color: 0xd8b98a, roughness: 0.8 });
+  const vegSign = std({ map: labelTexture('GROENTE & FRUIT') });
+  const crateParts = []; // the crates' floors and rims, as [centre, turn, size]: one instanced mesh of black boxes
   const slope = Math.atan2(VEG.back - VEG.front, VEG.depth - 0.1);
   const slopeLen = Math.hypot(VEG.back - VEG.front, VEG.depth - 0.1);
-  // a point on the slope: s up it from the front edge, n off its surface, at u along the stand
-  const slopeDir = new THREE.Vector3(Math.cos(slope) * -vegF.out.x, Math.sin(slope), 0);
-  const slopeNormal = new THREE.Vector3(Math.sin(slope) * vegF.out.x, Math.cos(slope), 0);
-  const [fx] = vegF.P(0, 0, VEG.depth);
-  const onSlope = (s, u, n) => new THREE.Vector3(fx, VEG.front, u).addScaledVector(slopeDir, s).addScaledVector(slopeNormal, n);
-  const slopeQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -vegF.out.x * slope);
-  const lightWood = std({ color: 0xd8b98a, roughness: 0.8 });
-  boxAt(...vegF.box(VEG.u0, 0, 0.08, VEG.u1, VEG.front - 0.04, VEG.depth), lightWood, { cast: true });
-  boxAt(...vegF.box(VEG.u0, 0, 0, VEG.u1, VEG.back + 0.3, 0.08), lightWood, { cast: true });
-  const plate = add(new THREE.Mesh(new THREE.BoxGeometry(slopeLen, 0.04, VEG.u1 - VEG.u0), lightWood));
-  plate.position.copy(onSlope(slopeLen / 2, (VEG.u0 + VEG.u1) / 2, -0.02));
-  plate.quaternion.copy(slopeQ);
-  // the crates: one instanced mesh of black boxes (floors and rims)
-  const vegKinds = ['paprikaRood', 'komkommer', 'paprikaGeel', 'broccoli', 'tomaat', 'prei', 'paprikaGroen', 'champignon', 'ui', 'aubergine', 'wortel', 'aardappel', 'boontjes', 'citroen'];
-  const vegSection = stock.section();
   const crateW = { s: (slopeLen - 0.08) / VEG.rows - 0.04, u: 0.6 };
-  const cratesAlong = Math.floor((VEG.u1 - VEG.u0 - 0.04) / (crateW.u + 0.04));
-  const crateParts = [];
+  const UP_ = new THREE.Vector3(0, 1, 0);
   const _p = new THREE.Vector3();
-  for (let r = 0; r < VEG.rows; r++) {
-    for (let c = 0; c < cratesAlong; c++) {
-      const sc = 0.04 + r * (crateW.s + 0.04) + crateW.s / 2;
-      const uc = VEG.u0 + 0.04 + c * (crateW.u + 0.04) + crateW.u / 2;
-      const { s: ws, u: wu } = crateW;
-      // floor, then the four rims, as (s, n, u) centre and size
-      crateParts.push([sc, 0.01, uc, ws, 0.02, wu], [sc - ws / 2, 0.06, uc, 0.015, 0.12, wu], [sc + ws / 2, 0.06, uc, 0.015, 0.12, wu], [sc, 0.06, uc - wu / 2, ws, 0.12, 0.015], [sc, 0.06, uc + wu / 2, ws, 0.12, 0.015]);
-      const id = vegKinds[(c * 2 + r * 5) % vegKinds.length];
-      const [hu, hn, hs] = halfSize(PRODUCTS[id]); // a stick lies along u
-      for (let s = sc - ws / 2 + hs + 0.02; s < sc + ws / 2 - hs - 0.01; s += hs * 2.1) {
-        for (let u = uc - wu / 2 + hu + 0.02; u < uc + wu / 2 - hu - 0.01; u += hu * 2.1) {
-          _p.copy(onSlope(s, u, 0.02 + hn + rnd() * 0.01));
-          stock.place(id, _p.x, _p.y - hn, _p.z, Math.PI / 2 + (PRODUCTS[id].shape === 'stick' ? 0 : rnd() * Math.PI * 2), vegSection);
+  /**
+   * One run of the stand against a wall (frame F), from u0 to u1 along it.
+   * `ends`: which ends get a side panel ([at u0, at u1]; not against a wall).
+   * `kinds` picks what's in the crate in row r, column c; `screens` is two
+   * [name, price] lines for each price screen, spread along the run.
+   */
+  function vegRun(F, u0, u1, { ends, kinds, screens }) {
+    // the slope: s up it from the front edge, n off its surface, at u along the run
+    const slopeDir = F.out.clone().multiplyScalar(-Math.cos(slope)).addScaledVector(UP_, Math.sin(slope));
+    const slopeNormal = F.out.clone().multiplyScalar(Math.sin(slope)).addScaledVector(UP_, Math.cos(slope));
+    const along = new THREE.Vector3().crossVectors(slopeDir, slopeNormal); // the way u runs
+    const slopeQ = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(slopeDir, slopeNormal, along));
+    const onSlope = (s, u, n) => new THREE.Vector3(...F.P(u, VEG.front, VEG.depth)).addScaledVector(slopeDir, s).addScaledVector(slopeNormal, n);
+    // the wooden stand: a side panel at an open end, the rest fitting between them
+    const a0 = ends[0] ? u0 + VEG.end : u0;
+    const a1 = ends[1] ? u1 - VEG.end : u1;
+    const side = new THREE.Shape([[0, 0], [-VEG.depth, 0], [-VEG.depth, VEG.front + 0.14], [0, VEG.front + VEG.depth * Math.tan(slope) + 0.14]].map(([x, y]) => new THREE.Vector2(x, y)));
+    const sideGeo = new THREE.ExtrudeGeometry(side, { depth: VEG.end, bevelEnabled: false });
+    ends.forEach((open, i) => {
+      if (!open) return;
+      // (the shape's x runs from the wall inwards, mirrored, so its faces still face out)
+      const m = add(new THREE.Mesh(sideGeo, lightWood), { cast: true });
+      m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(F.out.clone().negate(), UP_, along));
+      m.position.set(...F.P(i ? u1 - VEG.end : u0, 0, 0));
+    });
+    boxAt(...F.box(a0, 0, 0.08, a1, VEG.front - 0.04, VEG.depth), lightWood, { cast: true });
+    boxAt(...F.box(a0, 0, 0, a1, VEG.back + 0.3, 0.08), lightWood, { cast: true });
+    const plate = add(new THREE.Mesh(new THREE.BoxGeometry(slopeLen, 0.04, a1 - a0), lightWood));
+    plate.position.copy(onSlope(slopeLen / 2, (a0 + a1) / 2, -0.02));
+    plate.quaternion.copy(slopeQ);
+    // the crates, and what's in them
+    const section = stock.section();
+    const cratesAlong = Math.floor((a1 - a0 - 0.04) / (crateW.u + 0.04));
+    const first = (a0 + a1) / 2 - (cratesAlong * (crateW.u + 0.04) - 0.04) / 2; // (centred along the run)
+    for (let r = 0; r < VEG.rows; r++) {
+      for (let c = 0; c < cratesAlong; c++) {
+        const sc = 0.04 + r * (crateW.s + 0.04) + crateW.s / 2;
+        const uc = first + c * (crateW.u + 0.04) + crateW.u / 2;
+        const { s: ws, u: wu } = crateW;
+        // floor, then the four rims, as (s, n, u) centre and size
+        for (const [s, n, u, sw, sn, su] of [[sc, 0.01, uc, ws, 0.02, wu], [sc - ws / 2, 0.06, uc, 0.015, 0.12, wu], [sc + ws / 2, 0.06, uc, 0.015, 0.12, wu], [sc, 0.06, uc - wu / 2, ws, 0.12, 0.015], [sc, 0.06, uc + wu / 2, ws, 0.12, 0.015]]) {
+          crateParts.push([onSlope(s, u, n), slopeQ, new THREE.Vector3(sw, sn, su)]);
+        }
+        const id = kinds(r, c);
+        const [hu, hn, hs] = halfSize(PRODUCTS[id]); // a stick lies along u
+        for (let s = sc - ws / 2 + hs + 0.02; s < sc + ws / 2 - hs - 0.01; s += hs * 2.1) {
+          for (let u = uc - wu / 2 + hu + 0.02; u < uc + wu / 2 - hu - 0.01; u += hu * 2.1) {
+            _p.copy(onSlope(s, u, 0.02 + hn + rnd() * 0.01));
+            stock.place(id, _p.x, _p.y - hn, _p.z, F.yaw + (PRODUCTS[id].shape === 'stick' ? 0 : rnd() * Math.PI * 2), section);
+          }
         }
       }
     }
-  }
-  const crateMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), std({ color: 0x1f2123, roughness: 0.7 }), crateParts.length);
-  crateParts.forEach(([s, n, u, ws, hn, wu], i) => {
-    crateMesh.setMatrixAt(i, new THREE.Matrix4().compose(onSlope(s, u, n), slopeQ, new THREE.Vector3(ws, hn, wu)));
-  });
-  add(crateMesh, { cast: true });
-  const vegHit = (point, strength, push) => stock.knock(vegSection, point, vegF.out, strength, push, { radius: Math.min(0.8, 0.25 + strength * 0.05) });
-  for (const b of [
-    solid(...vegF.box(VEG.u0, 0, 0, VEG.u1, VEG.front - 0.04, VEG.depth), 'furniture'),
-    solid(...vegF.box(VEG.u0, 0, 0, VEG.u1, VEG.back + 0.3, 0.08), 'furniture'),
-  ]) {
-    b.surface.mess = MESS.veg;
-    b.surface.onHit = vegHit;
-  }
-  {
-    // the slope itself, tilted like the crates
-    const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3(slopeLen / 2, 0.15, (VEG.u1 - VEG.u0) / 2)) });
-    const c = onSlope(slopeLen / 2, (VEG.u0 + VEG.u1) / 2, 0.08 - 0.15);
-    b.position.set(c.x, c.y, c.z);
-    b.quaternion.set(slopeQ.x, slopeQ.y, slopeQ.z, slopeQ.w);
-    b.surface = { kind: 'furniture', mess: MESS.veg, onHit: vegHit };
-    world.addBody(b);
-  }
-  // price screens on poles behind the crates
-  const screens = [['KOMKOMMER', '0,89'], ['PAPRIKA', '1,29'], ['PREI', '0,99'], ['BROCCOLI', '1,49'], ['TOMATEN', '1,79'], ['UIEN', '0,69']];
-  [0.2, 0.5, 0.8].forEach((f, i) => {
-    const u = VEG.u0 + (VEG.u1 - VEG.u0) * f;
-    boxAt(...vegF.box(u - 0.03, VEG.back + 0.3, 0.02, u + 0.03, 2.1, 0.07), darkFrame);
-    const tex = canvasTexture(384, 224, (g, w, h) => {
-      g.fillStyle = '#10213a'; g.fillRect(0, 0, w, h);
-      g.font = 'bold 34px "Trebuchet MS", sans-serif'; g.textBaseline = 'middle';
-      for (const [k, [name, price]] of screens.slice(i * 2, i * 2 + 2).entries()) {
-        const y = 62 + k * 100;
-        g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.fillText(name, 20, y);
-        g.fillStyle = '#f6d04d'; g.textAlign = 'right'; g.fillText(price, w - 20, y);
-      }
-      g.strokeStyle = '#3c4146'; g.lineWidth = 14; g.strokeRect(0, 0, w, h);
+    // a knock sends what's near it rolling out into the shop
+    const hit = (point, strength, push) => stock.knock(section, point, F.out, strength, push, { radius: Math.min(0.8, 0.25 + strength * 0.05) });
+    for (const b of [solid(...F.box(u0, 0, 0, u1, VEG.front - 0.04, VEG.depth), 'furniture'), solid(...F.box(u0, 0, 0, u1, VEG.back + 0.3, 0.08), 'furniture')]) {
+      b.surface.mess = MESS.veg;
+      b.surface.onHit = hit;
+    }
+    {
+      // the slope itself, tilted like the crates
+      const b = new CANNON.Body({ mass: 0, material: physMats.hard, shape: new CANNON.Box(new CANNON.Vec3(slopeLen / 2, 0.15, (u1 - u0) / 2)) });
+      const c = onSlope(slopeLen / 2, (u0 + u1) / 2, 0.08 - 0.15);
+      b.position.set(c.x, c.y, c.z);
+      b.quaternion.set(slopeQ.x, slopeQ.y, slopeQ.z, slopeQ.w);
+      b.surface = { kind: 'furniture', mess: MESS.veg, onHit: hit };
+      world.addBody(b);
+    }
+    // price screens on poles behind the crates
+    screens.forEach((lines, i) => {
+      const u = u0 + ((u1 - u0) * (i + 0.5)) / screens.length;
+      boxAt(...F.box(u - 0.03, VEG.back + 0.3, 0.02, u + 0.03, 2.1, 0.07), darkFrame);
+      const tex = canvasTexture(256, 150, (g, w, h) => {
+        g.fillStyle = '#10213a'; g.fillRect(0, 0, w, h);
+        g.textBaseline = 'middle';
+        for (const [k, [name, price]] of lines.entries()) {
+          const y = 42 + k * 67;
+          g.font = 'bold 23px "Trebuchet MS", sans-serif';
+          g.fillStyle = '#f6d04d'; g.textAlign = 'right'; g.fillText(price, w - 14, y);
+          // (a long name in smaller letters, so it doesn't run into the price)
+          const room = w - 28 - g.measureText(price).width - 12;
+          g.font = `bold ${Math.min(23, Math.floor((23 * room) / g.measureText(name).width))}px "Trebuchet MS", sans-serif`;
+          g.fillStyle = '#ffffff'; g.textAlign = 'left'; g.fillText(name, 14, y);
+        }
+        g.strokeStyle = '#3c4146'; g.lineWidth = 10; g.strokeRect(0, 0, w, h);
+      });
+      boxAt(...F.box(u - 0.38, 1.65, 0.07, u + 0.38, 2.1, 0.12), F.withFront(darkFrame, std({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.5 })));
     });
-    boxAt(...vegF.box(u - 0.38, 1.65, 0.07, u + 0.38, 2.1, 0.12), vegF.withFront(darkFrame, std({ map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.5 })));
-  });
-  const vegSign = std({ map: labelTexture('GROENTE & FRUIT') });
-  boxAt([12.88, 2.75, (VEG.u0 + VEG.u1) / 2 - 0.9], [12.93, 3.2, (VEG.u0 + VEG.u1) / 2 + 0.9], faces(vegSign, vegSign, green, green, green, green));
-  for (const dz of [-0.7, 0.7]) boxAt([12.9, 3.2, (VEG.u0 + VEG.u1) / 2 + dz - 0.01], [12.91, IN.y1, (VEG.u0 + VEG.u1) / 2 + dz + 0.01], darkFrame);
+    // the sign hanging over it, on two wires
+    const mid = (u0 + u1) / 2;
+    const signMats = F.withFront(green, vegSign);
+    signMats[signMats.indexOf(vegSign) ^ 1] = vegSign; // (and on its back: faces come in pairs, +x −x, +y −y, +z −z)
+    boxAt(...F.box(mid - 0.9, 2.75, 0.77, mid + 0.9, 3.2, 0.82), signMats);
+    for (const du of [-0.7, 0.7]) boxAt(...F.box(mid + du - 0.01, 3.2, 0.79, mid + du + 0.01, IN.y1, 0.8), darkFrame);
+    return F.box(u0, 0.6, 0, u1, 1.9, VEG.depth + 0.1); // its landing spot
+  }
+  const vegSpots = [
+    vegRun(frame('z', IN.x1, -1), IN.z0 + VEG.depth + 0.01, 35.5, {
+      ends: [true, true],
+      kinds: (r, c) => ['paprikaRood', 'komkommer', 'paprikaGeel', 'broccoli', 'tomaat', 'prei', 'paprikaGroen', 'champignon', 'ui', 'aubergine', 'wortel', 'aardappel', 'boontjes', 'citroen'][(c * 2 + r * 5) % 14],
+      screens: [[['KOMKOMMER', '0,89'], ['PAPRIKA', '1,29']], [['PREI', '0,99'], ['BROCCOLI', '1,49']]],
+    }),
+    vegRun(frame('x', IN.z0, 1), 3.2, IN.x1 - 0.01, {
+      ends: [true, false],
+      kinds: (r, c) => ['appel', 'peer', 'sinaasappel', 'citroen', 'pruim', 'kool', 'tomaat', 'wortel', 'boontjes', 'paprikaRood', 'aardappel'][(c * 3 + r * 4) % 11],
+      screens: [[['APPELS', '0,99'], ['PEREN', '1,49']], [['CITROENEN', '0,79'], ['PRUIMEN', '1,99']], [['SINAASAPPELS', '2,49'], ['KOOL', '0,89']]],
+    }),
+  ];
+  const crateMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), std({ color: 0x1f2123, roughness: 0.7 }), crateParts.length);
+  const _cm = new THREE.Matrix4();
+  crateParts.forEach(([at, q, size], i) => crateMesh.setMatrixAt(i, _cm.compose(at, q, size)));
+  add(crateMesh, { cast: true });
 
   // ---------------------------------------------------------------- the open cheese cooler along the west wall
   // Sloping shelves of cheese packs under a lit canopy, with big Gouda wheels
@@ -1200,42 +1231,24 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
 
   // ---------------------------------------------------------------- tulips by the entrance, and the bottle return machine
   {
-    const T = { x0: -8.7, x1: -6.3, z0: IN.z0 + 0.1, z1: IN.z0 + 0.85 };
-    boxAt([T.x0, 0, T.z0], [T.x1, 0.25, T.z1], darkWood, { cast: true });
-    boxAt([T.x0, 0.25, T.z0], [T.x1, 0.5, (T.z0 + T.z1) / 2], darkWood, { cast: true });
+    // The buckets are products (products.js): Lennie crashing into the stand
+    // sends them flying, and one that lands hard tips over, its tulips all over the floor.
+    const T = FLOWERS;
+    boxAt([T.x0, 0, T.z0], [T.x1, T.low, T.z1], darkWood, { cast: true });
+    boxAt([T.x0, T.low, T.z0], [T.x1, T.high, (T.z0 + T.z1) / 2], darkWood, { cast: true });
     boxAt([T.x0 + 0.6, 0.12, T.z1], [T.x1 - 0.6, 0.24, T.z1 + 0.01], std({ map: labelTexture('BLOEMEN', '#ffffff', '#3fae3a', 512, 112) }));
-    const colours = [0xe2231a, 0xf6c21d, 0xf28cb1, 0xf59a23, 0xfbf5f0, 0x8e44ad, 0xe2231a, 0xf6c21d];
-    const buckets = [];
-    for (let i = 0; i < 8; i++) {
+    const flowers = stock.section();
+    ['Rood', 'Geel', 'Roze', 'Oranje', 'Wit', 'Paars', 'Rood', 'Geel'].forEach((colour, i) => {
       const back = i >= 4;
-      buckets.push([T.x0 + 0.3 + (i % 4) * 0.6, back ? 0.5 : 0.25, back ? T.z0 + 0.2 : T.z1 - 0.18, colours[i]]);
-    }
-    const bucketMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.12, 0.28, 14), std({ color: 0xa9b1b8, metalness: 0.5, roughness: 0.4 }), buckets.length);
-    const perBucket = 14;
-    const stems = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.006, 0.006, 0.45, 4), std({ color: 0x3e8f3a }), buckets.length * perBucket);
-    const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.032, 8, 6), std({ color: 0xffffff, roughness: 0.6 }), buckets.length * perBucket);
-    const m4 = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const e = new THREE.Euler();
-    const col = new THREE.Color();
-    let k = 0;
-    buckets.forEach(([x, y0, z, c], i) => {
-      bucketMesh.setMatrixAt(i, m4.makeTranslation(x, y0 + 0.14, z));
-      for (let j = 0; j < perBucket; j++) {
-        const a = j * 2.4;
-        const r = 0.03 + (j % 4) * 0.025;
-        e.set(Math.cos(a) * r * 1.6, 0, -Math.sin(a) * r * 1.6);
-        q.setFromEuler(e);
-        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
-        const base = new THREE.Vector3(x + Math.sin(a) * r, y0 + 0.2, z + Math.cos(a) * r);
-        stems.setMatrixAt(k, m4.compose(base.clone().addScaledVector(up, 0.225), q, new THREE.Vector3(1, 1, 1)));
-        heads.setMatrixAt(k, m4.compose(base.clone().addScaledVector(up, 0.46), q, new THREE.Vector3(1, 1.4, 1)));
-        heads.setColorAt(k, col.setHex(c));
-        k++;
-      }
+      const id = `tulpen${colour}`;
+      const bucket = stock.place(id, T.x0 + 0.3 + (i % 4) * 0.6, back ? T.high : T.low, back ? T.z0 + 0.2 : T.z1 - 0.18, i * 1.3, flowers);
+      for (const piece of PRODUCTS[id].breaks) stock.place(piece, 0, 0, 0, 0, flowers, 0, { shardOf: bucket });
     });
-    for (const m of [bucketMesh, stems, heads]) add(m, { cast: true });
-    solid([T.x0, 0, T.z0], [T.x1, 0.5, T.z1], 'furniture');
+    const stand = solid([T.x0, 0, T.z0], [T.x1, T.high, T.z1], 'furniture');
+    stand.surface.sound = 'leaves';
+    stand.surface.mess = MESS.flowers;
+    // they fly away from where he hits, landing on them or crashing into the side
+    stand.surface.onHit = (point, strength, push) => stock.knock(flowers, point, _out.set(0, 0, 1), strength, push, { radius: Math.min(1.3, 0.45 + strength * 0.08), radial: true });
     spotsExtra.push(['tulips', 'In the tulips!', 350, 'TULPEN!', [T.x0 - 0.1, 0.2, T.z0 - 0.1], [T.x1 + 0.1, 1.4, T.z1 + 0.2]]);
 
     // the bottle return: hand in your empties for the deposit
@@ -1523,10 +1536,9 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     S('fridges', 'On top of the drinks fridges!', 500, 'WHOA!', [fridgeInside[0][0] - 0.1, CAB.height - 0.05, fridgeInside[0][2]], [IN.x1, 3.0, fridgeInside[1][2]]),
     S('freezertop', 'On top of the freezers!', 500, 'WHOA!', [freezerInside[0][0], CAB.height - 0.05, freezerInside[0][2] - 0.1], [freezerInside[1][0], 3.0, IN.z1]),
     S('trolley', 'In the trolleys!', 400, 'WHEEE!', [0.15, 0.95, IN.z0 + 0.1], [1.8, 1.8, IN.z0 + 1.25]),
-    S('fruit', 'In the fruit and veg!', 400, 'SQUISH!', [0.55, 0.7, IN.z0 + 1.95], [12.15, 1.5, IN.z0 + 3.65]),
+    ...vegSpots.map((box) => S('fruit', 'In the fruit and veg!', 400, 'SQUISH!', ...box)),
     ...[-17, -13.5, -10].map((c) => S('checkout', 'Scanned at the checkout!', 500, 'BEEP!', [c - 0.45, 0.85, IN.z0 + 1.15], [c + 1.05, 1.6, IN.z0 + 3.85])),
     ...[-18, -13, -8, -3, 2, 7].map((cx) => S('shelves', 'On top of the shelves!', 500, 'HELP!', [cx - 0.6, 1.9, 36.1], [cx + 0.6, 2.8, 42.5])),
-    S('fruit', 'In the fruit and veg!', 400, 'SQUISH!', [12.05, 0.6, VEG.u0], [IN.x1, 1.9, VEG.u1]),
     S('pastry', 'In the pastry case!', 600, 'TOMPOUCE!', ...caseF.box(CASE.u0, CASE.top - 0.1, 0, CASE.u1, CASE.glass + 0.5, CASE.depth + 0.1), () => pastryCase.broken),
     S('bread', 'In the bread baskets!', 400, 'FRESH!', [breadTable.x0 - 0.05, 0.7, breadTable.z0 - 0.05], [breadTable.x1 + 0.05, 1.5, breadTable.z1 + 0.05]),
     S('breadrack', 'On top of the bread rack!', 500, 'HELP!', ...breadRack.box(IN.z0 + 0.2, 2.4, 0, 35.4, 3.2, 0.65)),
@@ -1566,7 +1578,7 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
   }
 
   // Where 'Drop Lennie on the supermarket' puts him: the open floor just inside
-  // the sliding doors, between the checkouts, the fruit crates and the aisles.
+  // the sliding doors, between the checkouts, the pindakaas and the aisles.
   const spawnPoint = () => ({ x: -4.5, z: 34.4, height: 0.05 });
 
   const fadeMaterials = () => [...lines.values()].flatMap((e) => [...e.mats]);

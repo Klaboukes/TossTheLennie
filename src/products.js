@@ -143,7 +143,7 @@ export const PRODUCTS = {
   friet: { shape: 'box', w: 0.2, h: 0.3, d: 0.07, face: { bg: '#3b7dd8', band: '#e2231a', text: 'FRIET', art: ['fries'] } },
   doperwten: { shape: 'box', w: 0.2, h: 0.28, d: 0.06, face: { bg: '#2e8b57', band: '#ffffff', fg: '#2e8b57', text: 'DOPERWTEN', art: ['peas'] } },
   vissticks: { shape: 'box', w: 0.2, h: 0.06, d: 0.12, stack: true, face: { bg: '#3b7dd8', fg: '#ffffff', text: 'VISSTICKS', art: ['fish'] } },
-  // fruit and veg, loose on the crate tables by the door (veg: a faceted, matt ball)
+  // fruit and veg, in the crates of the sloping stand (veg: a faceted, matt ball)
   appel: { shape: 'ball', veg: true, r: 0.085, face: { bg: '#e8473b' } },
   sinaasappel: { shape: 'ball', veg: true, r: 0.085, face: { bg: '#f59a23' } },
   kool: { shape: 'ball', veg: true, r: 0.16, face: { bg: '#8cc63f' } },
@@ -163,7 +163,50 @@ export const PRODUCTS = {
   komkommer: { shape: 'stick', r: 0.026, len: 0.22, color: '#2f6b2a' },
   prei: { shape: 'stick', r: 0.024, len: 0.22, color: '#a7cf72' },
   aubergine: { shape: 'stick', r: 0.04, len: 0.1, color: '#4b2a5a' },
+  // what's left of a bucket of tulips once it's tipped over (see flowerBucket())
+  emmer: { w: 0.3, h: 0.28, d: 0.3, look: () => ({ geo: new THREE.CylinderGeometry(0.15, 0.12, 0.28, 14), material: zinc() }) },
+  tulpSteel: { shape: 'stick', r: 0.006, len: 0.42, color: '#3e8f3a' },
+  tulpKop: { w: 0.064, h: 0.09, d: 0.064, look: () => ({ geo: new THREE.SphereGeometry(0.032, 8, 6).scale(1, 1.4, 1), material: mat({ color: '#ffffff', roughness: 0.5 }) }) },
 };
+
+// The buckets of tulips by the shop's entrance, one colour to a bucket. Knocked
+// off their stand they tip over when they land: the bucket rolls away and the
+// tulips scatter (`breaks`: the pieces it falls apart into, placed by the
+// supermarket with `shardOf`).
+for (const [name, color] of [['Rood', '#e2231a'], ['Geel', '#f6c21d'], ['Roze', '#f28cb1'], ['Oranje', '#f59a23'], ['Wit', '#fbf5f0'], ['Paars', '#8e44ad']]) {
+  PRODUCTS[`tulpKop${name}`] = { base: 'tulpKop', color };
+  PRODUCTS[`tulpen${name}`] = { ...flowerBucket(color), breaks: ['emmer', 'tulpSteel', 'tulpSteel', 'tulpSteel', ...Array(5).fill(`tulpKop${name}`)] };
+}
+
+/** A zinc bucket with a bunch of tulips in it, centred on its middle like every product's model. */
+function flowerBucket(color) {
+  const stems = [];
+  const heads = [];
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  const up = new THREE.Vector3();
+  for (let j = 0; j < 14; j++) {
+    const a = j * 2.4;
+    const r = 0.03 + (j % 4) * 0.025;
+    q.setFromEuler(e.set(Math.cos(a) * r * 1.6, 0, -Math.sin(a) * r * 1.6));
+    up.set(0, 1, 0).applyQuaternion(q);
+    const base = new THREE.Vector3(Math.sin(a) * r, 0.2, Math.cos(a) * r);
+    const m = new THREE.Matrix4();
+    stems.push(new THREE.CylinderGeometry(0.006, 0.006, 0.45, 4).applyMatrix4(m.compose(base.clone().addScaledVector(up, 0.225), q, new THREE.Vector3(1, 1, 1))));
+    heads.push(new THREE.SphereGeometry(0.032, 8, 6).applyMatrix4(m.compose(base.clone().addScaledVector(up, 0.46), q, new THREE.Vector3(1, 1.4, 1))));
+  }
+  const bucket = new THREE.CylinderGeometry(0.15, 0.12, 0.28, 14).translate(0, 0.14, 0);
+  const geo = mergeGeometries([mergeGeometries(heads), mergeGeometries(stems), bucket], true);
+  geo.computeBoundingBox();
+  const c = geo.boundingBox.getCenter(new THREE.Vector3());
+  const s = geo.boundingBox.getSize(new THREE.Vector3());
+  geo.translate(-c.x, -c.y, -c.z);
+  let material = null;
+  const look = () => ({ geo, material: (material ??= [mat({ color, roughness: 0.5 }), mat({ color: '#3e8f3a', roughness: 0.7 }), zinc()]) });
+  return { w: s.x, h: s.y, d: s.z, look };
+}
+let zincMat = null;
+const zinc = () => (zincMat ??= mat({ color: '#a9b1b8', roughness: 0.4 }));
 
 // What goes on each shelf (bottom to top) of each aisle, the freezers and the
 // drinks fridges, and the bakery's bread rack, pastry case and the Sinterklaas stand.
