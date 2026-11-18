@@ -1231,9 +1231,9 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
   }
 
   // ---------------------------------------------------------------- the Sinterklaas stands: pepernoten and chocolate letters
-  // Against the green end caps on the entrance side of three aisles (just in
-  // front of them, not touching): the middle one straight across from the
-  // doors, one at each end, that one all chocolate letters.
+  // Against the green end caps on the entrance side of the three middle aisles
+  // (just in front of them, not touching), the middle one straight across
+  // from the doors; the last one is all chocolate letters.
   const red = std({ color: 0xc8102e, roughness: 0.8 });
   const sintHeaders = new Map();
   function sintStand(cx, assortment, line, mess) {
@@ -1246,9 +1246,9 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     if (!sintHeaders.has(line)) sintHeaders.set(line, std({ map: sintHeader(line) }));
     boxAt(...sint.box(u0, 1.3, 0, u1, 1.75, 0.04), sint.withFront(red, sintHeaders.get(line)), { cast: true });
   }
-  sintStand(-13, ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
-  sintStand(-3, ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
-  sintStand(7, ASSORTMENT.LETTERS, 'chocoladeletters!', MESS.letters);
+  sintStand(aisleXs[1], ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
+  sintStand(aisleXs[2], ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
+  sintStand(aisleXs[3], ASSORTMENT.LETTERS, 'chocoladeletters!', MESS.letters);
   /** The red sign on top of a Sinterklaas stand: a mitre, SINT, and what's in it. */
   function sintHeader(line) {
     return canvasTexture(512, 192, (g, w, h) => {
