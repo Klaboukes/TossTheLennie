@@ -95,6 +95,11 @@ export const PRODUCTS = {
   letterS: { shape: 'box', w: 0.13, h: 0.17, d: 0.03, face: { bg: '#1d4f9a', fg: '#ffffff', text: 'PUUR', art: ['letter', 'S'] } },
   letterA: { shape: 'box', w: 0.13, h: 0.17, d: 0.03, face: { bg: '#e8a33c', fg: '#ffffff', text: 'WIT', art: ['letter', 'A'] } },
   letterM: { shape: 'box', w: 0.13, h: 0.17, d: 0.03, face: { bg: '#2e8b57', fg: '#ffffff', text: 'HAZELNOOT', art: ['letter', 'M'] } },
+  // marsepein: boxes, and loose pink pigs and little potatoes (rolled in cocoa)
+  marsepeinDoos: { shape: 'box', w: 0.18, h: 0.1, d: 0.12, stack: true, face: { bg: '#fbe3ea', band: '#e86fa0', text: 'MARSEPEIN', art: ['pig'] } },
+  marsepeinFruit: { shape: 'box', w: 0.16, h: 0.08, d: 0.12, stack: true, face: { bg: '#fff3c4', band: '#3fae3a', text: 'MARSEPEIN', sub: 'fruitjes', art: ['strawberry'] } },
+  marsepeinVarken: { shape: 'bun', r: 0.055, color: '#f5a9b8' },
+  marsepeinAardappel: { shape: 'bun', r: 0.032, color: '#b07a4a' },
   // coffee and tea
   koffie: { shape: 'box', w: 0.12, h: 0.18, d: 0.07, face: { bg: '#c0392b', band: '#2b1a12', text: 'KOFFIE', sub: 'snelfilter', art: ['cup', '#5b3a29'] } },
   koffiepads: { shape: 'box', w: 0.14, h: 0.16, d: 0.1, face: { bg: '#1d4f9a', band: '#f6d04d', fg: '#1d4f9a', text: 'KOFFIEPADS', art: ['cup', '#5b3a29'] } },
@@ -224,6 +229,7 @@ export const ASSORTMENT = {
   BAKKERIJ: [['tijgerbrood', 'volkoren', 'witbrood'], ['witbrood', 'suikerbrood', 'tijgerbrood'], ['stokbrood'], ['krentenbol', 'croissants', 'bolletjes']],
   GEBAK: [['tompouce', 'appeltaart', 'gevuldekoek', 'kaneelbroodje']],
   SINT: [['pepernoten', 'kruidnoten'], ['letterL', 'letterS', 'speculaas'], ['pepernoten', 'letterL', 'kruidnoten']],
+  MARSEPEIN: [['marsepeinDoos', 'marsepeinFruit'], ['marsepeinVarken', 'marsepeinAardappel'], ['marsepeinFruit', 'marsepeinVarken', 'marsepeinDoos']],
   LETTERS: [['letterL', 'letterS', 'letterA'], ['letterM', 'letterL', 'letterS'], ['letterA', 'letterM', 'letterL']],
 };
 
@@ -291,6 +297,15 @@ const ART = {
     g.beginPath(); g.moveTo(x - s * 0.25, y - s * 0.12); g.quadraticCurveTo(x, y - s * 0.3, x + s * 0.25, y - s * 0.12); g.quadraticCurveTo(x + s * 0.2, y + s * 0.2, x, y + s * 0.3); g.quadraticCurveTo(x - s * 0.2, y + s * 0.2, x - s * 0.25, y - s * 0.12); g.fill(); g.stroke();
     g.fillStyle = '#3fae3a'; g.beginPath(); g.ellipse(x, y - s * 0.2, s * 0.18, s * 0.06, 0, 0, Math.PI * 2); g.fill();
     g.fillStyle = '#ffe9a8'; for (const [a, b] of [[-0.1, 0], [0.08, -0.02], [0, 0.12], [-0.05, 0.08], [0.1, 0.1]]) { circle(g, x + a * s, y + b * s, s * 0.02); g.fill(); }
+  },
+  pig(g, x, y, s) {
+    // a marsepein pig: a pink face with ears and a snout
+    g.fillStyle = '#f5a9b8';
+    for (const d of [-1, 1]) { g.beginPath(); g.moveTo(x + d * s * 0.12, y - s * 0.2); g.lineTo(x + d * s * 0.3, y - s * 0.36); g.lineTo(x + d * s * 0.3, y - s * 0.1); g.closePath(); g.fill(); g.stroke(); }
+    circle(g, x, y, s * 0.3); g.fill(); g.stroke();
+    g.fillStyle = '#ef8fa4'; g.beginPath(); g.ellipse(x, y + s * 0.08, s * 0.13, s * 0.09, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillStyle = '#2b2b2b';
+    for (const d of [-1, 1]) { circle(g, x + d * s * 0.05, y + s * 0.08, s * 0.025); g.fill(); circle(g, x + d * s * 0.12, y - s * 0.08, s * 0.035); g.fill(); }
   },
   cow(g, x, y, s) {
     g.fillStyle = '#1b1b1b';

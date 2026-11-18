@@ -47,6 +47,7 @@ const MESS = {
   snacks: ['Snack attack!', 'Bitterballen bonanza!', 'Frikandel frenzy!', 'Mustard not included!', 'Frozen solid... and flying!'],
   sausage: ['What the sausage?!', 'Wurst landing ever!', 'Best of the wurst!', 'Rookworst rain!', 'Meat you on the floor!'],
   hagelslag: ['Hagelslag hailstorm!', 'Sprinkles everywhere!', 'Breakfast is served!', 'Stacked and smacked!', 'Muisjes? No, hagelslag!'],
+  marsepein: ['This little piggy went flying!', 'Pigs can fly!', 'Pink pig party!', 'Sweet as marsepein!', 'Sint saw that!'],
   letters: ['L is for Lennie!', 'Chocolate alphabet soup!', 'Spell it out, Lennie!', 'Sint saw that!', 'Is it 5 December already?'],
   flowers: ['Flower power!', 'Say it with flowers!', 'Tulip trouble!', 'Oops-a-daisy!', 'Painting the town red!'],
   sint: ['In de zak, Lennie!', 'Sint saw that!', 'Strooi, strooi, strooi!', 'Is it 5 December already?', 'Pepernoten party!'],
@@ -818,7 +819,7 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
   }
 
   /** A shelf unit against a wall (or back to back with nothing), stocked shelf by shelf from `assortment`. */
-  function shelfUnit({ axis, back, dir, u0, u1, depth, h, ys, assortment, mats, mess }) {
+  function shelfUnit({ axis, back, dir, u0, u1, depth, h, ys, assortment, mats, mess, rows = 1 }) {
     const F = frame(axis, back, dir);
     const part = (ua, ya, wa, ub, yb, wb, m, cast = false) => boxAt(...F.box(ua, ya, wa, ub, yb, wb), m, { cast });
     // (the back fits between the sides and under the top, so its edges don't flicker through theirs)
@@ -831,7 +832,7 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
     ys.forEach((y, i) => {
       const above = (ys[i + 1] ?? h) - 0.04;
       stock.fillRow(assortment[i], {
-        along: axis, a: u0 + 0.07, b: u1 - 0.07, y, yaw: F.yaw, maxH: Math.min(0.42, above - y), section,
+        along: axis, a: u0 + 0.07, b: u1 - 0.07, y, yaw: F.yaw, maxH: Math.min(0.42, above - y), section, rows,
         depthAt: (row, d) => F.P(0, 0, depth - 0.02 - d / 2 - row * (d + 0.01))[F.wAxis], room: depth - 0.08,
       });
     });
@@ -1233,20 +1234,21 @@ export function buildSupermarket(root, world, physMats, { std, tex }) {
   // ---------------------------------------------------------------- the Sinterklaas stands: pepernoten and chocolate letters
   // Against the green end caps on the entrance side of the three middle aisles
   // (just in front of them, not touching), the middle one straight across
-  // from the doors; the last one is all chocolate letters.
+  // from the doors: marsepein, pepernoten and chocolate letters.
   const red = std({ color: 0xc8102e, roughness: 0.8 });
   const sintHeaders = new Map();
-  function sintStand(cx, assortment, line, mess) {
+  // (`rows`: how many rows deep each shelf is filled; loose sweets need a few to look like a heap)
+  function sintStand(cx, assortment, line, mess, rows = 1) {
     const [back, u0, u1] = [AISLE.z0 - 0.06, cx - 0.6, cx + 0.6];
     places.sint.push({ min: [u0 - 0.1, 0, back - 0.6], max: [u1 + 0.1, 1.8, back + 0.05] });
     const sint = shelfUnit({
       axis: 'x', back, dir: -1, u0, u1, depth: 0.45, h: 1.3, ys: [0.1, 0.5, 0.9],
-      assortment, mats: { frame: red, shelf: cabinetWhite, back: red }, mess,
+      assortment, mats: { frame: red, shelf: cabinetWhite, back: red }, mess, rows,
     });
     if (!sintHeaders.has(line)) sintHeaders.set(line, std({ map: sintHeader(line) }));
     boxAt(...sint.box(u0, 1.3, 0, u1, 1.75, 0.04), sint.withFront(red, sintHeaders.get(line)), { cast: true });
   }
-  sintStand(aisleXs[1], ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
+  sintStand(aisleXs[1], ASSORTMENT.MARSEPEIN, 'marsepein!', MESS.marsepein, 3);
   sintStand(aisleXs[2], ASSORTMENT.SINT, 'pepernoten!', MESS.sint);
   sintStand(aisleXs[3], ASSORTMENT.LETTERS, 'chocoladeletters!', MESS.letters);
   /** The red sign on top of a Sinterklaas stand: a mitre, SINT, and what's in it. */
