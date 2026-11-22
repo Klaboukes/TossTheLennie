@@ -80,53 +80,49 @@ kbd {
   border-radius: 5px;
 }
 
-/* ---------- The opening screen: the title, then Play over the demo ----------
-   Over everything. While the game loads it has a sky behind it, solid, so
-   nothing of the game shows while it's being built; once it's ready the sky
-   fades and only the card and the button are left over the game (so no
-   see-through layer over the whole picture, which a weak tablet would have to
-   blend every frame). Only transforms and opacity move, and no blur. */
+/* ---------- The opening screen: the title and a pixel-art toss, then Play ----------
+   Solid, over everything, until Play. The picture is src/splash.js's pixel art;
+   what moves only moves and fades (transform and opacity), which the browser
+   does without redrawing, also while it's busy building the game. No blur. */
 #splash {
+  --stage-w: min(100vw, 115.5vh); /* (the street is 160 × 72 art pixels, at most 52% of the screen's height) */
+  --ground: max(5vh, 18px);
   position: fixed;
   inset: 0;
   z-index: 100;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: max(6vh, 16px) 16px max(9vh, 20px);
+  /* the title and the button in the middle of the sky, above the street */
+  padding: 14px 16px calc(var(--stage-w) * 0.45 + var(--ground) + 8px);
+  overflow: hidden;
   cursor: pointer;
+  /* a sky in bands, as pixel art would have it */
+  background: linear-gradient(180deg, #62b6f0 0 28%, #79c2f3 28% 50%, #91cdf5 50% 70%, #abd9f7 70%);
   transition: opacity 0.35s ease;
 }
-#splash::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(180deg, #7cc4f5 0%, #b5dcf7 60%, #cfe6f7 100%);
-  transition: opacity 0.6s ease, visibility 0s 0.6s;
-}
-#splash.ready::before { opacity: 0; visibility: hidden; }
 #splash.leaving { opacity: 0; pointer-events: none; }
+#splash.failed { cursor: default; }
 
+.splash-card, .splash-foot { position: relative; z-index: 1; }
 .splash-card {
+  margin-top: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   max-width: min(520px, 100%);
-  padding: 16px 28px 14px;
+  padding: 14px 26px 12px;
   text-align: center;
   background: var(--panel-solid);
   border: 1px solid var(--edge);
-  border-radius: 24px;
+  border-radius: 22px;
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  animation: splash-drop 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
 }
 .splash-title {
   margin: 0;
   font-family: 'Bungee', 'Fredoka', sans-serif;
   font-weight: 400;
-  font-size: clamp(30px, 9vmin, 60px);
+  font-size: clamp(28px, 8.5vmin, 58px);
   line-height: 1.05;
   white-space: nowrap;
   background-image: var(--candy);
@@ -141,13 +137,13 @@ kbd {
   vertical-align: middle;
 }
 .splash-tagline {
-  margin: 6px 0 0;
-  font-size: clamp(14px, 2.8vmin, 17px);
+  margin: 5px 0 0;
+  font-size: clamp(13px, 2.7vmin, 17px);
   font-weight: 500;
   color: var(--text-soft);
 }
 
-.splash-foot { display: flex; justify-content: center; }
+.splash-foot { display: flex; justify-content: center; margin: max(3vh, 12px) 0 auto; }
 .splash-status {
   margin: 0;
   padding: 9px 18px;
@@ -160,14 +156,12 @@ kbd {
   box-shadow: var(--shadow);
   animation: hint-bob 1s ease-in-out infinite;
 }
-#splash.failed { cursor: default; }
 #splash.failed .splash-status { max-width: 420px; border-radius: 16px; animation: none; }
-
 .splash-play {
   display: none;
-  min-width: 190px;
-  padding: 13px 38px;
-  font: 700 clamp(24px, 5.5vmin, 32px) 'Fredoka', system-ui, sans-serif;
+  min-width: 180px;
+  padding: 11px 36px;
+  font: 700 clamp(22px, 5vmin, 30px) 'Fredoka', system-ui, sans-serif;
   color: #fff;
   background: var(--candy);
   border: 0;
@@ -181,11 +175,6 @@ kbd {
 .splash-play:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
 #splash.ready .splash-status { display: none; }
 #splash.ready .splash-play { display: block; }
-
-@keyframes splash-drop {
-  from { transform: translateY(-30px) scale(0.9); opacity: 0; }
-  to { transform: none; opacity: 1; }
-}
 @keyframes splash-pop {
   from { transform: scale(0.4); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -194,13 +183,124 @@ kbd {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.06); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .splash-card, .splash-status, .splash-play { animation: none; }
+
+/* The street: grass, then the pavement, right across the bottom */
+.splash-ground {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--ground);
+  background: linear-gradient(180deg, #5fae4a 0 22%, #4c9a3c 22% 34%, #c9c3b8 34% 46%, #8d8a85 46%);
+}
+/* The picture stands on it. Everything in it is placed in art pixels: x / 160 and y / 72. */
+.splash-stage {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--ground) - 1px);
+  width: var(--stage-w);
+  aspect-ratio: 160 / 72;
+  transform: translateX(-50%);
+}
+.splash-stage svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.splash-stage > * { position: absolute; }
+.splash-scene { inset: 0; }
+
+/* The toss, every 3.2 s: the glass bursts out of the window, Lennie tumbles
+   along the dots (a quarter turn at a time, as pixel art does) and lands at
+   the shop with a bang and points. */
+.splash-lennie {
+  left: 0;
+  top: 0;
+  width: 10.625%; /* 17 art pixels */
+  height: 22.222%; /* 16 */
+  animation: splash-fly 3.2s linear infinite;
+}
+.splash-spin { width: 100%; height: 100%; animation: splash-tumble 3.2s infinite; }
+/* (each point: the arc's x − 8.5 over 17, y − 8 over 16, as % of Lennie's own size) */
+@keyframes splash-fly {
+  0% { transform: translate(191.2%, 187.5%); opacity: 0; }
+  3% { opacity: 1; }
+  5.5% { transform: translate(244.1%, 112.5%); }
+  11% { transform: translate(291.2%, 62.5%); }
+  16.5% { transform: translate(344.1%, 25%); }
+  22% { transform: translate(397.1%, 12.5%); }
+  27.5% { transform: translate(450%, 18.75%); }
+  33% { transform: translate(497.1%, 43.75%); }
+  38.5% { transform: translate(550%, 93.75%); }
+  44% { transform: translate(602.9%, 156.25%); }
+  49.5% { transform: translate(650%, 243.75%); }
+  55%, 100% { transform: translate(702.9%, 350%); }
+  88% { opacity: 1; }
+  96%, 100% { opacity: 0; }
+}
+@keyframes splash-tumble {
+  0% { transform: rotate(0deg); animation-timing-function: steps(7, end); }
+  55%, 100% { transform: rotate(630deg); }
+}
+.splash-glass {
+  left: 18.75%;
+  top: 36.11%;
+  width: 15%;
+  height: 33.33%;
+  opacity: 0;
+  animation: splash-shatter 3.2s ease-out infinite;
+}
+@keyframes splash-shatter {
+  0% { transform: scale(0.3); opacity: 1; }
+  18%, 100% { transform: scale(1.8) translateX(12%); opacity: 0; }
+}
+.splash-bang {
+  left: 71.875%;
+  top: 73.61%;
+  width: 16.25%;
+  height: 30.56%;
+  opacity: 0;
+  animation: splash-bang 3.2s infinite;
+}
+@keyframes splash-bang {
+  0%, 54% { transform: scale(0.2); opacity: 0; }
+  55% { transform: scale(0.4); opacity: 1; }
+  60% { transform: scale(1.2); }
+  64% { transform: scale(1); }
+  86% { opacity: 1; }
+  93%, 100% { transform: scale(1); opacity: 0; }
+}
+.splash-score {
+  left: 67.5%;
+  top: 46%;
+  width: 25%;
+  text-align: center;
+  font: 400 calc(var(--stage-w) * 0.055) 'Bungee', 'Fredoka', sans-serif;
+  color: var(--gold);
+  text-shadow: 0 3px 0 var(--ink), 2px 0 0 var(--ink), -2px 0 0 var(--ink), 0 -2px 0 var(--ink);
+  opacity: 0;
+  animation: splash-score 3.2s infinite;
+}
+@keyframes splash-score {
+  0%, 56% { transform: translateY(40%) scale(0.6); opacity: 0; }
+  60% { transform: translateY(0) scale(1.1); opacity: 1; }
+  64% { transform: translateY(0) scale(1); }
+  88% { transform: translateY(-45%); opacity: 1; }
+  95%, 100% { transform: translateY(-55%); opacity: 0; }
 }
 
-/* While the demo plays behind it, the game's own panels and hints stay out of the way. */
-body.demo #hud-left, body.demo #toolbar, body.demo #meter, body.demo #result, body.demo #aim-pad,
-body.demo #grab-hint, body.demo #pull-hint, body.demo #sling-power { visibility: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .splash-status, .splash-play, .splash-lennie, .splash-spin, .splash-glass, .splash-bang, .splash-score { animation: none; }
+  .splash-lennie { transform: translate(397.1%, 12.5%); } /* (at the top of his flight) */
+}
+/* A tall, narrow screen (a phone held upright): the street bigger, its far ends
+   off the sides (the smashed window and the shop's door stay in the picture) */
+@media (max-aspect-ratio: 3/4) {
+  #splash { --stage-w: 130vw; }
+}
+/* A short screen (a phone on its side): the title smaller, so the street fits under it */
+@media (max-height: 480px) {
+  #splash { --stage-w: min(100vw, 100vh); }
+  .splash-card { padding: 8px 20px 8px; }
+  .splash-tagline { display: none; }
+  .splash-foot { margin-top: 8px; }
+}
 
 /* ---------- Top left: score, challenge, players' board ---------- */
 #hud-left {

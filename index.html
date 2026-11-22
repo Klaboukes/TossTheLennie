@@ -23,12 +23,10 @@
 <body>
   <canvas id="scene"></canvas>
 
-  <!-- The opening screen: the title on a sky while the game loads (on a slow tablet or a slow connection
-       that takes a while, and the first picture's pause is behind it too). Then the sky clears, and the
-       title and a Play button stay over the game while Lennie is flung around behind them (main.js:
-       splashReady() and the demo). If the game can't start at all (no internet for three.js, no WebGL),
-       it says so instead of waiting for ever. The game's own texts (i18n.js) haven't arrived yet at this
-       point, so both languages are right here. -->
+  <!-- The opening screen: the title and a pixel-art Lennie flung out of his window into the supermarket
+       (src/splash.js draws it), while the game loads; on a slow tablet or a slow connection that takes a
+       while, and the first picture's pause is behind it too. Then a Play button (main.js: splashReady()).
+       If the game can't start at all (no internet for three.js, no WebGL), it says so instead. -->
   <div id="splash" translate="no">
     <div class="splash-card">
       <h1 class="splash-title">Toss <span>the</span> Lennie</h1>
@@ -38,32 +36,16 @@
       <p id="splash-status" class="splash-status">Lennie is on his way…</p>
       <button id="splash-play" class="splash-play" tabindex="-1">Play!</button>
     </div>
+    <div class="splash-ground"></div>
+    <div class="splash-stage" aria-hidden="true">
+      <svg class="splash-scene" viewBox="0 0 160 72" shape-rendering="crispEdges"></svg>
+      <div class="splash-glass"><svg viewBox="0 0 12 12" shape-rendering="crispEdges"></svg></div>
+      <div class="splash-bang"><svg viewBox="0 0 13 11" shape-rendering="crispEdges"></svg></div>
+      <div class="splash-score">+850</div>
+      <div class="splash-lennie"><div class="splash-spin"><svg viewBox="0 0 17 16" shape-rendering="crispEdges"></svg></div></div>
+    </div>
   </div>
-  <script>
-    (function () {
-      var nl = false;
-      try {
-        var saved = localStorage.getItem('toss-the-lennie:lang');
-        nl = saved ? saved === 'nl' : (navigator.languages || [navigator.language]).some(function (l) { return /^nl\b/i.test(l || ''); });
-      } catch (e) { /* storage unavailable */ }
-      var box = document.getElementById('splash');
-      var status = document.getElementById('splash-status');
-      if (nl) {
-        document.getElementById('splash-tagline').textContent = 'Slinger Lennie door zijn huis en de supermarkt in!';
-        status.textContent = 'Lennie komt eraan…';
-        document.getElementById('splash-play').textContent = 'Spelen!';
-      }
-      window.lennieFailed = function () {
-        // The game is running: whatever went wrong later, it isn't this
-        if (!box.isConnected || box.classList.contains('ready')) return;
-        box.classList.add('failed');
-        status.textContent = nl
-          ? 'Het spel kon niet starten. Controleer de internetverbinding en laad de pagina opnieuw.'
-          : "The game couldn't start. Check the internet connection and load the page again.";
-      };
-      window.addEventListener('error', window.lennieFailed);
-    })();
-  </script>
+  <script src="src/splash.js"></script>
 
   <!-- Top left: the score, and under it the current challenge (free play) or the players' scores (taking turns) -->
   <div id="hud-left">
