@@ -23,29 +23,62 @@
 <body>
   <canvas id="scene"></canvas>
 
-  <!-- The opening screen: the title and a pixel-art Lennie flung out of his window into the supermarket
-       (src/splash.js draws it), while the game loads; on a slow tablet or a slow connection that takes a
-       while, and the first picture's pause is behind it too. Then a Play button (main.js: splashReady()).
-       If the game can't start at all (no internet for three.js, no WebGL), it says so instead. -->
+  <!-- The opening screen: the game's logo, big, with Lennie peeking over it now and then, while the game
+       loads; on a slow tablet or a slow connection that takes a while, and the first picture's pause is
+       behind it too. Then he comes up all the way and there's a Play button (main.js: splashReady()), and
+       Play flings him off. If the game can't start at all (no internet for three.js, no WebGL), it says so
+       instead. -->
   <div id="splash" translate="no">
-    <div class="splash-card">
-      <h1 class="splash-title">Toss <span>the</span> Lennie</h1>
-      <p id="splash-tagline" class="splash-tagline">Fling Lennie through his house and into the supermarket!</p>
+    <div class="splash-logo">
+      <!-- (Lennie's head: glasses and beard, as in ragdoll.js) -->
+      <div class="splash-peek" aria-hidden="true"><div class="splash-head">
+        <svg viewBox="70 26 60 60">
+          <circle cx="76" cy="58" r="5.5" fill="#f0bfa2"/><circle cx="124" cy="58" r="5.5" fill="#f0bfa2"/><circle cx="100" cy="56" r="24" fill="#f0bfa2"/>
+          <path d="M80 62q2 22 20 23 18-1 20-23-4 11-20 12-16-1-20-12Z" fill="#4d3d33"/>
+          <path d="M77 52q-1-25 23-25t23 25q-4-12-11-11-6-6-12-5-6-1-12 5-7-1-11 11Z" fill="#3a281d"/>
+          <path d="M89 64q11 13 22 0Z" fill="#3a1018"/><path d="M90.5 64.5h19l-1.5 2.6h-16Z" fill="#fbf7ee"/>
+          <g fill="rgba(255,255,255,.35)" stroke="#30343a" stroke-width="2.6" stroke-linecap="round">
+            <rect x="82.5" y="48" width="15" height="11" rx="3.5"/><rect x="102.5" y="48" width="15" height="11" rx="3.5"/>
+            <path d="M97.5 52.5h5M82.5 52l-5-1.5M117.5 52l5-1.5" fill="none"/>
+          </g>
+          <circle cx="90.5" cy="53.5" r="2.2" fill="#1b1b22"/><circle cx="109.5" cy="53.5" r="2.2" fill="#1b1b22"/>
+        </svg>
+      </div></div>
+      <h1 class="splash-pill"><span class="splash-title">Toss <span>the</span><br /> Lennie</span></h1>
+      <i class="splash-hand left" aria-hidden="true"></i><i class="splash-hand right" aria-hidden="true"></i>
     </div>
     <div class="splash-foot">
       <p id="splash-status" class="splash-status">Lennie is on his way…</p>
       <button id="splash-play" class="splash-play" tabindex="-1">Play!</button>
     </div>
-    <div class="splash-ground"></div>
-    <div class="splash-stage" aria-hidden="true">
-      <svg class="splash-scene" viewBox="0 0 160 72" shape-rendering="crispEdges"></svg>
-      <div class="splash-glass"><svg viewBox="0 0 12 12" shape-rendering="crispEdges"></svg></div>
-      <div class="splash-bang"><svg viewBox="0 0 13 11" shape-rendering="crispEdges"></svg></div>
-      <div class="splash-score">+850</div>
-      <div class="splash-lennie"><div class="splash-spin"><svg viewBox="0 0 17 16" shape-rendering="crispEdges"></svg></div></div>
-    </div>
   </div>
-  <script src="src/splash.js"></script>
+  <!-- A plain script, not a module, so it runs straight away, long before the game (main.js) has loaded.
+       The game's own texts (i18n.js) haven't arrived yet at this point, so both languages are right here. -->
+  <script>
+    (function () {
+      var nl = false;
+      try {
+        var saved = localStorage.getItem('toss-the-lennie:lang');
+        nl = saved ? saved === 'nl' : (navigator.languages || [navigator.language]).some(function (l) { return /^nl\b/i.test(l || ''); });
+      } catch (e) { /* storage unavailable */ }
+      var root = document.getElementById('splash');
+      var status = document.getElementById('splash-status');
+      if (nl) {
+        status.textContent = 'Lennie komt eraan…';
+        document.getElementById('splash-play').textContent = 'Spelen!';
+      }
+      // If the game can't start at all, it says so instead of waiting for ever.
+      window.lennieFailed = function () {
+        // The game is running: whatever went wrong later, it isn't this
+        if (!root.isConnected || root.classList.contains('ready')) return;
+        root.classList.add('failed');
+        status.textContent = nl
+          ? 'Het spel kon niet starten. Controleer de internetverbinding en laad de pagina opnieuw.'
+          : "The game couldn't start. Check the internet connection and load the page again.";
+      };
+      window.addEventListener('error', window.lennieFailed);
+    })();
+  </script>
 
   <!-- Top left: the score, and under it the current challenge (free play) or the players' scores (taking turns) -->
   <div id="hud-left">

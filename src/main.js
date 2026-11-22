@@ -2775,9 +2775,9 @@ ui.helpClose.addEventListener('click', () => setHelp(false));
 // keep driving the game rather than re-pressing the button.
 document.querySelectorAll('#toolbar .icon-btn').forEach((b) => b.addEventListener('click', () => b.blur()));
 
-// The opening screen (index.html): the title and a pixel-art Lennie being
-// tossed while the game is built, then a Play button once its first picture is
-// on screen (see frame(), which then waits until Play). A tap anywhere plays.
+// The opening screen (index.html): the logo with Lennie peeking over it while
+// the game is built, then a Play button once its first picture is on screen
+// (see frame(), which then waits until Play). A tap anywhere plays.
 const splash = { el: $('splash'), play: $('splash-play') };
 function splashReady() {
   splash.el.classList.add('ready');
@@ -2792,7 +2792,7 @@ function closeSplash() {
   splash.el = null;
   splash.play.blur();
   el.classList.add('leaving');
-  setTimeout(() => el.remove(), 400); // (after the fade, style.css)
+  setTimeout(() => el.remove(), 800); // (after Lennie's been flung off and the fade, style.css)
 }
 splash.el.addEventListener('click', () => {
   sfx.unlock(); // (the tap on Play lets the sound start)
