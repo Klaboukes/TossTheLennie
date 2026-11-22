@@ -171,7 +171,7 @@ Lennie reacts: a grin and a "wheee!" or "wa-hoo!" when he's flung, "ow!", "oof",
 
 The game is made to run smoothly on cheap tablets and older phones too. That's why there are no real shadows (Lennie has a soft spot under him instead, which grows and fades as he flies higher), why the shelves hold one row of products, and why the picture is drawn a little less sharp than a phone's screen could show. If a device still can't keep up, the game makes the picture a bit less sharp by itself, a step at a time. The panels are frosted glass only where there's a mouse (a computer): on a tablet or phone they're plain, because blurring what's behind them has to be redone every frame. And the physics only looks at the scenery near Lennie (`broadphase.js`), which more than halves its work.
 
-While the game loads, a *Lennie is on his way…* bubble shows, so a slow tablet doesn't sit there with an empty screen; if the game can't start (no internet for three.js, or no WebGL) it says so.
+The game opens on a title screen: a cartoon Lennie tumbles over his street while the game loads (*Lennie is on his way…*), so a slow tablet doesn't sit there with an empty screen, and a **Play!** button pops up once it's ready. The pause while the game gets its first picture ready happens behind it too. If the game can't start (no internet for three.js, or no WebGL) it says so. The tablet scripts (`scripts/tablet/`) skip the Play button: the title screen goes away by itself as soon as the game is ready.
 
 ## How it fits together
 

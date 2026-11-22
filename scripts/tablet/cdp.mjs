@@ -162,6 +162,9 @@ export async function connect({ match = ':5173' } = {}) {
   });
   await send('Runtime.enable');
   await send('Page.enable');
+  // The game's opening screen waits for a tap on Play: here it goes away by itself
+  // as soon as the game is ready, so the scripts measure and throw as they always did.
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.lennieSkipSplash = true;' });
 
   const t = {
     url: page.url,

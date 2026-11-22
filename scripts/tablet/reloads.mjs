@@ -24,7 +24,7 @@ console.log(url);
 for (let i = 0; i <= reloads; i++) {
   const sent = await within(i === 0 ? t.send('Page.navigate', { url }) : t.send('Page.reload', { ignoreCache: true }), 20000);
   await sleep(16000);
-  const running = sent === 'NO ANSWER' ? sent : await within(t.eval("!!window.lennie && !document.getElementById('loading')").catch((e) => e.message), 8000);
+  const running = sent === 'NO ANSWER' ? sent : await within(t.eval("!!window.lennie && !document.getElementById('splash')").catch((e) => e.message), 8000);
   if (running !== true) {
     console.log(`load ${i + 1}: the game isn't running (${running}).`, android());
     if (running === 'NO ANSWER') break; // the tab is gone

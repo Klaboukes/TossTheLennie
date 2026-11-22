@@ -2775,6 +2775,41 @@ ui.helpClose.addEventListener('click', () => setHelp(false));
 // keep driving the game rather than re-pressing the button.
 document.querySelectorAll('#toolbar .icon-btn').forEach((b) => b.addEventListener('click', () => b.blur()));
 
+// The opening screen (index.html): the title while the game is built, then a
+// Play button once its first picture is on screen (see frame()).
+const splash = { el: $('splash'), play: $('splash-play') };
+function splashReady() {
+  splash.el.classList.add('ready');
+  splash.play.tabIndex = 0;
+  // (scripts/tablet set this: measuring goes straight on, as before there was a Play button)
+  if (window.lennieSkipSplash) closeSplash();
+  else splash.play.focus({ preventScroll: true });
+}
+function closeSplash() {
+  const el = splash.el;
+  if (!el?.classList.contains('ready')) return;
+  splash.el = null;
+  splash.play.blur();
+  el.classList.add('leaving');
+  setTimeout(() => el.remove(), 400); // (after the fade, style.css)
+}
+splash.play.addEventListener('click', () => {
+  sfx.unlock(); // (the tap on Play lets the sound start)
+  closeSplash();
+});
+// While it's up, keys don't reach the game behind it; Enter or Space plays.
+addEventListener('keydown', (e) => {
+  if (!splash.el) return;
+  e.stopImmediatePropagation();
+  if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') {
+    e.preventDefault();
+    if (splash.el.classList.contains('ready')) {
+      sfx.unlock();
+      closeSplash();
+    }
+  }
+}, true);
+
 const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -3586,10 +3621,9 @@ function frame(now) {
   last = now;
   watchSpeed(seconds);
   tick(dt, now);
-  // The first picture is on screen: "Lennie is on his way…" (index.html) can go.
-  if (loading) {
-    loading.remove();
-    loading = null;
+  // The first picture is on screen (behind the opening screen, which now gets its Play button).
+  if (!started) {
+    started = true;
     // (now, while the game is still starting, rather than the first time a wall fades)
     // (and with the far copies in the picture, so the first trip across the road doesn't stall either)
     house.farView.visible = shop.farView.visible = true;
@@ -3601,9 +3635,10 @@ function frame(now) {
     scene.traverse((o) => {
       if (o.isInstancedMesh && o.userData.products) for (const m of [].concat(o.material)) if (m.map) renderer.initTexture(m.map);
     });
+    splashReady(); // (after all that, so the pause it takes is behind the opening screen too)
   }
 }
-let loading = $('loading');
+let started = false;
 
 function tick(dt, now) {
   if (replay.playing) {
