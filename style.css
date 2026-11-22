@@ -80,98 +80,55 @@ kbd {
   border-radius: 5px;
 }
 
-/* ---------- The opening screen: title, a tumbling Lennie, then Play ----------
-   Over everything, and solid, so nothing of the game shows through while it's
-   being built. Only transforms and opacity move (cheap on a weak tablet: the
-   graphics chip does them without redrawing), and no blur. */
+/* ---------- The opening screen: the title, then Play over the demo ----------
+   Over everything. While the game loads it has a sky behind it, solid, so
+   nothing of the game shows while it's being built; once it's ready the sky
+   fades and only the card and the button are left over the game (so no
+   see-through layer over the whole picture, which a weak tablet would have to
+   blend every frame). Only transforms and opacity move, and no blur. */
 #splash {
   position: fixed;
   inset: 0;
   z-index: 100;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  background: linear-gradient(180deg, #7cc4f5 0%, #b5dcf7 55%, #cfe6f7 100%);
-  transition: opacity 0.35s ease;
-}
-#splash.leaving { opacity: 0; pointer-events: none; }
-
-.splash-street {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 24vh;
-}
-.splash-houses .roof { fill: #5b3d38; }
-.splash-houses .brick { fill: #a5533f; }
-.splash-houses .win rect { fill: #fff3cf; stroke: #f4efe6; stroke-width: 2.5; }
-.splash-houses .door rect { fill: #2f5d50; }
-.splash-houses .seam { stroke: #84402f; stroke-width: 2; }
-
-.splash-body {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 16px;
-  margin-bottom: 22vh; /* (clear of the houses) */
+  justify-content: space-between;
+  padding: max(6vh, 16px) 16px max(9vh, 20px);
+  cursor: pointer;
+  transition: opacity 0.35s ease;
 }
-
-.splash-lennie {
-  width: min(38vmin, 210px);
-  height: min(38vmin, 210px);
-  margin-bottom: -2vmin;
-  animation: splash-bob 1.6s ease-in-out infinite;
+#splash::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, #7cc4f5 0%, #b5dcf7 60%, #cfe6f7 100%);
+  transition: opacity 0.6s ease, visibility 0s 0.6s;
 }
-.splash-lennie svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  animation: splash-spin 2.6s linear infinite;
-}
-.splash-lennie .whoosh { fill: none; stroke: rgba(255, 255, 255, 0.8); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 14 12; }
-.splash-lennie .legs path { fill: none; stroke: #6c6f77; stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; }
-.splash-lennie .arms path { fill: none; stroke: #b14a3e; stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; }
-.splash-lennie .shoe { fill: #30343f; }
-.splash-lennie .skin { fill: #f0bfa2; }
-.splash-lennie .hoodie { fill: #b14a3e; }
-.splash-lennie .pocket { fill: #963d33; }
-.splash-lennie .string { stroke: #eee6d8; stroke-width: 2.5; stroke-linecap: round; }
-.splash-lennie .hair { fill: #3a281d; }
-.splash-lennie .beard { fill: #4d3d33; }
-.splash-lennie .mouth { fill: #3a1018; }
-.splash-lennie .teeth { fill: #fbf7ee; }
-.splash-lennie .glasses rect { fill: rgba(255, 255, 255, 0.35); stroke: #30343a; stroke-width: 2.6; }
-.splash-lennie .glasses path { fill: none; stroke: #30343a; stroke-width: 2.6; stroke-linecap: round; }
-.splash-lennie .eye { fill: #1b1b22; }
-
-@keyframes splash-spin { to { transform: rotate(360deg); } }
-@keyframes splash-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4vmin); }
-}
+#splash.ready::before { opacity: 0; visibility: hidden; }
+#splash.leaving { opacity: 0; pointer-events: none; }
 
 .splash-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  max-width: min(440px, calc(100vw - 32px));
-  padding: 18px 26px 20px;
+  max-width: min(520px, 100%);
+  padding: 16px 28px 14px;
   text-align: center;
   background: var(--panel-solid);
   border: 1px solid var(--edge);
   border-radius: 24px;
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  animation: splash-drop 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both;
 }
 .splash-title {
   margin: 0;
   font-family: 'Bungee', 'Fredoka', sans-serif;
   font-weight: 400;
-  font-size: clamp(28px, 8vmin, 48px);
+  font-size: clamp(30px, 9vmin, 60px);
   line-height: 1.05;
+  white-space: nowrap;
   background-image: var(--candy);
   -webkit-background-clip: text;
   background-clip: text;
@@ -184,28 +141,33 @@ kbd {
   vertical-align: middle;
 }
 .splash-tagline {
-  margin: 6px 0 14px;
-  font-size: clamp(14px, 3vmin, 17px);
+  margin: 6px 0 0;
+  font-size: clamp(14px, 2.8vmin, 17px);
   font-weight: 500;
   color: var(--text-soft);
 }
+
+.splash-foot { display: flex; justify-content: center; }
 .splash-status {
   margin: 0;
   padding: 9px 18px;
   font-size: 15px;
   font-weight: 600;
+  text-align: center;
+  background: var(--panel-solid);
   border: 1px solid var(--edge);
   border-radius: 999px;
+  box-shadow: var(--shadow);
   animation: hint-bob 1s ease-in-out infinite;
 }
-#splash.failed .splash-status { border-radius: 16px; animation: none; }
-#splash.failed .splash-lennie, #splash.failed .splash-lennie svg { animation: none; }
+#splash.failed { cursor: default; }
+#splash.failed .splash-status { max-width: 420px; border-radius: 16px; animation: none; }
 
 .splash-play {
   display: none;
-  min-width: 170px;
-  padding: 12px 34px;
-  font: 700 clamp(22px, 5vmin, 28px) 'Fredoka', system-ui, sans-serif;
+  min-width: 190px;
+  padding: 13px 38px;
+  font: 700 clamp(24px, 5.5vmin, 32px) 'Fredoka', system-ui, sans-serif;
   color: #fff;
   background: var(--candy);
   border: 0;
@@ -220,6 +182,10 @@ kbd {
 #splash.ready .splash-status { display: none; }
 #splash.ready .splash-play { display: block; }
 
+@keyframes splash-drop {
+  from { transform: translateY(-30px) scale(0.9); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
 @keyframes splash-pop {
   from { transform: scale(0.4); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -228,15 +194,13 @@ kbd {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.06); }
 }
-
 @media (prefers-reduced-motion: reduce) {
-  .splash-lennie, .splash-lennie svg, .splash-status, .splash-play { animation: none; }
+  .splash-card, .splash-status, .splash-play { animation: none; }
 }
-/* A short, wide screen (a phone on its side): Lennie beside the card */
-@media (max-height: 460px) and (min-aspect-ratio: 4/3) {
-  .splash-body { flex-direction: row; gap: 4vw; margin-bottom: 18vh; }
-  .splash-lennie { width: 34vh; height: 34vh; margin: 0; }
-}
+
+/* While the demo plays behind it, the game's own panels and hints stay out of the way. */
+body.demo #hud-left, body.demo #toolbar, body.demo #meter, body.demo #result, body.demo #aim-pad,
+body.demo #grab-hint, body.demo #pull-hint, body.demo #sling-power { visibility: hidden; }
 
 /* ---------- Top left: score, challenge, players' board ---------- */
 #hud-left {

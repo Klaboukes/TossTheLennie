@@ -840,6 +840,10 @@ function houseBonuses(center) {
 }
 
 function finishToss() {
+  if (demo.on) {
+    endDemoToss(); // (behind the opening screen: no score)
+    return;
+  }
   if (toss.maxSpeed < MIN_TOSS_SPEED && !toss.smashed && !toss.doors && !toss.tv && !toss.zaps && !toss.cars && !toss.fx.size) {
     toss.state = 'idle';
     replay.stop(false);
@@ -1702,7 +1706,7 @@ function beginFlight() {
   toss.time = 0;
   toss.settle = 0;
   toss.maxSpeed = 0;
-  if (coach.on) endCoach();
+  if (coach.on && !demo.on) endCoach(); // (not for the opening screen's demo)
 }
 
 function idleCursor() {
@@ -2775,28 +2779,87 @@ ui.helpClose.addEventListener('click', () => setHelp(false));
 // keep driving the game rather than re-pressing the button.
 document.querySelectorAll('#toolbar .icon-btn').forEach((b) => b.addEventListener('click', () => b.blur()));
 
-// The opening screen (index.html): the title while the game is built, then a
-// Play button once its first picture is on screen (see frame()).
+// The opening screen (index.html): the title on a sky while the game is built,
+// then, once its first picture is on screen (see frame()), the sky clears and
+// the title and a Play button stay over the game, where Lennie is flung around
+// for real (the demo, below). A tap anywhere plays.
 const splash = { el: $('splash'), play: $('splash-play') };
 function splashReady() {
   splash.el.classList.add('ready');
   splash.play.tabIndex = 0;
   // (scripts/tablet set this: measuring goes straight on, as before there was a Play button)
-  if (window.lennieSkipSplash) closeSplash();
-  else splash.play.focus({ preventScroll: true });
+  if (window.lennieSkipSplash) {
+    closeSplash();
+    return;
+  }
+  splash.play.focus({ preventScroll: true });
+  startDemo();
 }
 function closeSplash() {
   const el = splash.el;
   if (!el?.classList.contains('ready')) return;
   splash.el = null;
   splash.play.blur();
+  stopDemo();
   el.classList.add('leaving');
   setTimeout(() => el.remove(), 400); // (after the fade, style.css)
 }
-splash.play.addEventListener('click', () => {
+splash.el.addEventListener('click', () => {
   sfx.unlock(); // (the tap on Play lets the sound start)
   closeSplash();
 });
+
+// The demo behind the opening screen: the real ragdoll thrown at the living
+// room's furniture (the couch, the dinner table, the piano...), bumps, pop-up
+// words and all. Its tosses don't score, find spots or end the first-visit
+// hand, and there's no sound until Play (none is allowed before a tap anyway).
+// Play puts the house back and Lennie in his chair, as a new game starts.
+const DEMO_SPOTS = house.spots.filter((s) => ['couch', 'armchair', 'table', 'piano', 'bar', 'counter'].includes(s.id));
+/** In the open living room and kitchen of floor 1 (not the hallway, the loo or the utility room, where the demo's throws would get stuck). */
+const inLivingRoom = (p) => house.isInside(p) && house.levelOf(p) === 0
+  && p.z > -4.8 && p.z < 4.95 && Math.abs(p.x) < 3.95 && !(p.x < -0.4 && p.z > 0.9);
+const demo = { on: false, timer: 0, hint: true, last: null };
+function startDemo() {
+  if (!DEMO_SPOTS.length) return;
+  demo.on = true;
+  demo.hint = hint.on;
+  document.body.classList.add('demo');
+  demo.timer = setTimeout(demoToss, 1200);
+}
+function demoToss() {
+  if (!demo.on) return;
+  const from = centerOfMass();
+  // Wandered off (out of a window, into the hallway): back to the living room first.
+  if (!inLivingRoom(from)) {
+    dropLennie(0);
+    demo.timer = setTimeout(demoToss, 1800);
+    return;
+  }
+  const choices = DEMO_SPOTS.filter((s) => s.id !== demo.last);
+  const spot = choices[Math.floor(Math.random() * choices.length)];
+  demo.last = spot.id;
+  const to = new THREE.Vector3((spot.min[0] + spot.max[0]) / 2, spot.min[1] + 0.15, (spot.min[2] + spot.max[2]) / 2);
+  launch(solveShot(from, to, new THREE.Vector3(0, 1, 0)).v);
+}
+/** A demo toss came to rest (finishToss): no score, just a dizzy Lennie and the next one. */
+function endDemoToss() {
+  toss.state = 'idle';
+  replay.stop(false);
+  resetChain();
+  lennie.setExpression('dizzy');
+  focusLennie(1.0);
+  clearTimeout(demo.timer);
+  demo.timer = setTimeout(demoToss, 1600);
+}
+function stopDemo() {
+  if (!demo.on) return;
+  demo.on = false;
+  clearTimeout(demo.timer);
+  document.body.classList.remove('demo');
+  resetAll(false);
+  hint.on = demo.hint;
+  ui.hintText.textContent = hintLabel();
+}
 // While it's up, keys don't reach the game behind it; Enter or Space plays.
 addEventListener('keydown', (e) => {
   if (!splash.el) return;

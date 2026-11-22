@@ -23,74 +23,20 @@
 <body>
   <canvas id="scene"></canvas>
 
-  <!-- The opening screen: the title and a tumbling Lennie while the game loads, then a Play button once
-       the game has drawn its first picture (main.js: splashReady(), and Play takes it away). On a slow
-       tablet or a slow connection loading takes a while, and this covers it, the first picture's pause
-       included. If the game can't start at all (no internet for three.js, no WebGL), it says so instead
-       of waiting for ever. The game's own texts (i18n.js) haven't arrived yet at this point, so both
-       languages are right here. -->
+  <!-- The opening screen: the title on a sky while the game loads (on a slow tablet or a slow connection
+       that takes a while, and the first picture's pause is behind it too). Then the sky clears, and the
+       title and a Play button stay over the game while Lennie is flung around behind them (main.js:
+       splashReady() and the demo). If the game can't start at all (no internet for three.js, no WebGL),
+       it says so instead of waiting for ever. The game's own texts (i18n.js) haven't arrived yet at this
+       point, so both languages are right here. -->
   <div id="splash" translate="no">
-    <!-- Lennie's street, a block of rowhouses along the bottom -->
-    <svg class="splash-street" viewBox="0 0 600 120" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-      <g class="splash-houses">
-        <path d="M0 120V52l24-32h552l24 32v68Z" class="roof"/>
-        <rect x="0" y="52" width="600" height="68" class="brick"/>
-        <g class="win">
-          <rect x="18" y="62" width="34" height="20" rx="2"/><rect x="68" y="62" width="34" height="20" rx="2"/>
-          <rect x="138" y="62" width="34" height="20" rx="2"/><rect x="188" y="62" width="34" height="20" rx="2"/>
-          <rect x="258" y="62" width="34" height="20" rx="2"/><rect x="308" y="62" width="34" height="20" rx="2"/>
-          <rect x="378" y="62" width="34" height="20" rx="2"/><rect x="428" y="62" width="34" height="20" rx="2"/>
-          <rect x="498" y="62" width="34" height="20" rx="2"/><rect x="548" y="62" width="34" height="20" rx="2"/>
-          <rect x="50" y="34" width="20" height="14" rx="2"/><rect x="170" y="34" width="20" height="14" rx="2"/>
-          <rect x="290" y="34" width="20" height="14" rx="2"/><rect x="410" y="34" width="20" height="14" rx="2"/>
-          <rect x="530" y="34" width="20" height="14" rx="2"/>
-        </g>
-        <g class="door">
-          <rect x="22" y="92" width="16" height="28"/><rect x="142" y="92" width="16" height="28"/>
-          <rect x="262" y="92" width="16" height="28"/><rect x="382" y="92" width="16" height="28"/>
-          <rect x="502" y="92" width="16" height="28"/>
-        </g>
-        <path d="M120 52v68M240 52v68M360 52v68M480 52v68" class="seam"/>
-      </g>
-    </svg>
-
-    <div class="splash-body">
-      <!-- A cartoon Lennie (brick-red hoodie, grey joggers, glasses and beard, as in ragdoll.js), tumbling -->
-      <div class="splash-lennie" aria-hidden="true">
-        <svg viewBox="0 0 200 200">
-          <path d="M30 104a74 74 0 0 1 24-58M170 96a74 74 0 0 1-24 58" class="whoosh"/>
-          <g class="legs">
-            <path d="M89 128 72 152l2 26"/><path d="M111 128l26 12 21-10"/>
-          </g>
-          <ellipse cx="72" cy="183" rx="11" ry="7" class="shoe"/>
-          <ellipse cx="166" cy="126" rx="11" ry="7" transform="rotate(-30 166 126)" class="shoe"/>
-          <g class="arms">
-            <path d="M84 88 60 78 46 54"/><path d="M116 88l28 8 18-22"/>
-          </g>
-          <circle cx="43" cy="48" r="7.5" class="skin"/><circle cx="165" cy="69" r="7.5" class="skin"/>
-          <rect x="76" y="76" width="48" height="60" rx="17" class="hoodie"/>
-          <path d="M86 112h28l-3 14H89Z" class="pocket"/>
-          <path d="M94 78l2 14M106 78l-2 14" class="string"/>
-          <circle cx="76" cy="58" r="5.5" class="skin"/><circle cx="124" cy="58" r="5.5" class="skin"/>
-          <circle cx="100" cy="56" r="24" class="skin"/>
-          <path d="M80 62q2 22 20 23 18-1 20-23-4 11-20 12-16-1-20-12Z" class="beard"/>
-          <path d="M77 52q-1-25 23-25t23 25q-4-12-11-11-6-6-12-5-6-1-12 5-7-1-11 11Z" class="hair"/>
-          <path d="M89 64q11 13 22 0Z" class="mouth"/>
-          <path d="M90.5 64.5h19l-1.5 2.6h-16Z" class="teeth"/>
-          <g class="glasses">
-            <rect x="82.5" y="48" width="15" height="11" rx="3.5"/><rect x="102.5" y="48" width="15" height="11" rx="3.5"/>
-            <path d="M97.5 52.5h5M82.5 52l-5-1.5M117.5 52l5-1.5"/>
-          </g>
-          <circle cx="90.5" cy="53.5" r="2.2" class="eye"/><circle cx="109.5" cy="53.5" r="2.2" class="eye"/>
-        </svg>
-      </div>
-
-      <div class="splash-card">
-        <h1 class="splash-title">Toss <span>the</span> Lennie</h1>
-        <p id="splash-tagline" class="splash-tagline">Fling Lennie through his house and into the supermarket!</p>
-        <p id="splash-status" class="splash-status">Lennie is on his way…</p>
-        <button id="splash-play" class="splash-play" tabindex="-1">Play!</button>
-      </div>
+    <div class="splash-card">
+      <h1 class="splash-title">Toss <span>the</span> Lennie</h1>
+      <p id="splash-tagline" class="splash-tagline">Fling Lennie through his house and into the supermarket!</p>
+    </div>
+    <div class="splash-foot">
+      <p id="splash-status" class="splash-status">Lennie is on his way…</p>
+      <button id="splash-play" class="splash-play" tabindex="-1">Play!</button>
     </div>
   </div>
   <script>
