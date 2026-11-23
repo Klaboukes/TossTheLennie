@@ -10,6 +10,178 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* The opening screen: the game's logo with Lennie peeking over it, then Play.
+       Its rules are here and not in style.css, so they always belong to the markup
+       below: a browser that still had an older style.css in its cache once showed
+       half a giant face. (The colours are style.css's own, from :root.)
+       Solid, over everything, until Play. What moves only moves and fades (transform
+       and opacity), which the browser does without redrawing, also while it's busy
+       building the game. No blur. */
+    #splash {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5vmin;
+      padding: 16px;
+      overflow: hidden;
+      cursor: pointer;
+      background: radial-gradient(90% 75% at 50% 42%, #33264b, #17111f 72%);
+      transition: opacity 0.35s ease 0.4s; /* (once Lennie has been flung off) */
+    }
+    #splash.leaving { opacity: 0; pointer-events: none; }
+    #splash.failed { cursor: default; }
+
+    /* The logo as in the score box (.brand), big, on a panel of its own. Everything
+       around it is sized in the logo's letters (em). */
+    .splash-logo { position: relative; font-size: min(7vw, 14vh); }
+    .splash-pill {
+      position: relative;
+      z-index: 1; /* (in front of Lennie's head, behind his hands) */
+      margin: 0;
+      padding: 0.34em 0.95em;
+      font-size: 1em;
+      font-weight: 400;
+      background: linear-gradient(180deg, #45365f, #2b2140);
+      border: 2px solid var(--edge);
+      border-radius: 999px;
+      box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+    .splash-title {
+      display: block;
+      font-family: 'Bungee', 'Fredoka', sans-serif;
+      line-height: 1.05;
+      white-space: nowrap;
+      background-image: var(--candy);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .splash-title span {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 0.77em;
+      font-weight: 600;
+      -webkit-text-fill-color: var(--gold);
+      vertical-align: 0.08em;
+    }
+    .splash-title br { display: none; }
+
+    /* Lennie behind it: his head comes up over the edge, looks left and right and
+       ducks again; his fingers stay over the edge. Both are pictures of the game's
+       own Lennie (scripts/splash-pictures.js). (The window he's seen through ends
+       at the panel's top, so nothing of him shows under it.) */
+    .splash-peek {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% - 3px);
+      width: 1.7em;
+      height: 1.7em;
+      margin-left: -0.85em;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .splash-head { height: 100%; transform: translateY(105%); animation: splash-peek 6s ease-in-out infinite; }
+    .splash-head img { display: block; width: 100%; height: 100%; }
+    /* A picture only shows once all of it has arrived (its onload, below): on a slow
+       connection it would otherwise come in from the top down, half a face at a time. */
+    .splash-head img, .splash-fingers { visibility: hidden; }
+    .splash-head img.loaded, .splash-fingers.loaded { visibility: visible; }
+    /* (the picture starts where his fingers leave his palm: that's laid on the panel's top edge) */
+    .splash-fingers {
+      position: absolute;
+      z-index: 2;
+      top: 0;
+      width: 0.5em;
+      height: auto;
+      pointer-events: none;
+    }
+    .splash-fingers.left { left: calc(50% - 1.25em); }
+    .splash-fingers.right { left: calc(50% + 0.75em); transform: scaleX(-1); } /* (the one picture, mirrored) */
+    @keyframes splash-peek {
+      0%, 8% { transform: translateY(105%); }
+      16% { transform: translateY(30%); }
+      20% { transform: translateY(38%); }
+      32% { transform: translateY(38%) rotate(-7deg); }
+      44% { transform: translateY(38%) rotate(7deg); }
+      54%, 66% { transform: translateY(38%); }
+      74%, 100% { transform: translateY(105%); }
+    }
+    /* The game is ready: he comes up all the way and stays, grinning */
+    #splash.ready .splash-head { animation: splash-up 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+    #splash.ready .splash-head img { animation: splash-bob 0.9s ease-in-out 0.4s infinite; }
+    @keyframes splash-up {
+      from { transform: translateY(105%); }
+      to { transform: translateY(6%); }
+    }
+    @keyframes splash-bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4%); }
+    }
+    /* Play: off he goes */
+    #splash.leaving .splash-peek { overflow: visible; }
+    #splash.leaving .splash-head { animation: splash-toss 0.75s cubic-bezier(0.3, 0, 0.7, 0.5) forwards; }
+    #splash.leaving .splash-fingers { display: none; }
+    @keyframes splash-toss {
+      from { transform: translateY(6%); }
+      to { transform: translate(45vw, -95vh) rotate(900deg); }
+    }
+    /* It can't start: he just looks over the edge */
+    #splash.failed .splash-head { animation: none; transform: translateY(38%); }
+
+    .splash-foot { display: grid; place-items: center; min-height: clamp(72px, 17vmin, 120px); }
+    .splash-status {
+      margin: 0;
+      max-width: 420px;
+      font-size: clamp(14px, 3vmin, 20px);
+      font-weight: 600;
+      text-align: center;
+      color: var(--text-soft);
+    }
+    #splash.failed .splash-status { color: var(--text); }
+    .splash-play {
+      display: none;
+      min-width: 180px;
+      padding: 0.4em 1.5em;
+      font: 700 clamp(22px, 5.4vmin, 36px) 'Fredoka', system-ui, sans-serif;
+      color: #fff;
+      background: var(--candy);
+      border: 0;
+      border-radius: 999px;
+      box-shadow: 0 6px 0 var(--accent-deep), var(--shadow);
+      cursor: pointer;
+      animation: splash-pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both, splash-throb 1.4s ease-in-out 0.6s infinite;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .splash-play:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--accent-deep), var(--shadow); animation: none; }
+    .splash-play:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+    #splash.ready .splash-status { display: none; }
+    #splash.ready .splash-play { display: block; }
+    @keyframes splash-pop {
+      from { transform: scale(0.4); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    @keyframes splash-throb {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .splash-head, #splash.ready .splash-head, #splash.ready .splash-head img, .splash-play { animation: none; }
+      .splash-head { transform: translateY(38%); }
+      #splash.ready .splash-head { transform: translateY(6%); }
+    }
+    /* A screen that's taller than wide (a phone held upright): the logo on two lines */
+    @media (max-aspect-ratio: 1/1) {
+      .splash-logo { font-size: 14.5vw; }
+      .splash-pill { padding: 0.3em 0.7em; border-radius: 0.75em; }
+      .splash-title { line-height: 1.12; text-align: center; }
+      .splash-title br { display: inline; }
+    }
+  </style>
   <script type="importmap">
     {
       "imports": {
@@ -30,22 +202,14 @@
        instead. -->
   <div id="splash" translate="no">
     <div class="splash-logo">
-      <!-- (Lennie's head: glasses and beard, as in ragdoll.js) -->
+      <!-- Lennie's head and fingers are pictures of the game's own Lennie, so it's him and not a drawing
+           of him. scripts/splash-pictures.js takes them; run it again when his head or hands change. -->
       <div class="splash-peek" aria-hidden="true"><div class="splash-head">
-        <svg viewBox="70 26 60 60">
-          <circle cx="76" cy="58" r="5.5" fill="#f0bfa2"/><circle cx="124" cy="58" r="5.5" fill="#f0bfa2"/><circle cx="100" cy="56" r="24" fill="#f0bfa2"/>
-          <path d="M80 62q2 22 20 23 18-1 20-23-4 11-20 12-16-1-20-12Z" fill="#4d3d33"/>
-          <path d="M77 52q-1-25 23-25t23 25q-4-12-11-11-6-6-12-5-6-1-12 5-7-1-11 11Z" fill="#3a281d"/>
-          <path d="M89 64q11 13 22 0Z" fill="#3a1018"/><path d="M90.5 64.5h19l-1.5 2.6h-16Z" fill="#fbf7ee"/>
-          <g fill="rgba(255,255,255,.35)" stroke="#30343a" stroke-width="2.6" stroke-linecap="round">
-            <rect x="82.5" y="48" width="15" height="11" rx="3.5"/><rect x="102.5" y="48" width="15" height="11" rx="3.5"/>
-            <path d="M97.5 52.5h5M82.5 52l-5-1.5M117.5 52l5-1.5" fill="none"/>
-          </g>
-          <circle cx="90.5" cy="53.5" r="2.2" fill="#1b1b22"/><circle cx="109.5" cy="53.5" r="2.2" fill="#1b1b22"/>
-        </svg>
+        <img src="img/splash-head.webp" alt="" width="320" height="320" draggable="false" onload="this.classList.add('loaded')" />
       </div></div>
       <h1 class="splash-pill"><span class="splash-title">Toss <span>the</span><br /> Lennie</span></h1>
-      <i class="splash-hand left" aria-hidden="true"></i><i class="splash-hand right" aria-hidden="true"></i>
+      <img class="splash-fingers left" src="img/splash-hand.webp" alt="" width="160" height="93" draggable="false" aria-hidden="true" onload="this.classList.add('loaded')" />
+      <img class="splash-fingers right" src="img/splash-hand.webp" alt="" width="160" height="93" draggable="false" aria-hidden="true" onload="this.classList.add('loaded')" />
     </div>
     <div class="splash-foot">
       <p id="splash-status" class="splash-status">Lennie is on his way…</p>
